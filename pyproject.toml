@@ -1,0 +1,43 @@
+[tool.poetry]
+name = "planificador"
+version = "0.1.0"
+description = "Aplicacion de planificacion de horarios"
+authors = ["Rafa <raarebollo@gmail.com>"]
+readme = "README.md"
+packages = [{include = "planificador", from = "src"}]
+
+[tool.poetry.dependencies]
+python = ">=3.13,<4.0"
+flet = "^0.28.3"
+sqlalchemy = "^2.0.41"
+pydantic = "^2.11.7"
+loguru = "^0.7.3"
+alembic = "^1.16.4"
+pendulum = "^3.1.0"
+pydantic-settings = "^2.4.2"
+aiosqlite = "^0.20.0"
+email-validator = "^2.2.0"
+greenlet = "^3.2.3"
+
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.4.1"
+ruff = "^0.12.4"
+pytest-asyncio = "^0.23.0"
+coverage = "^7.10.0"
+ripgrep = "^14.1.0"
+pytest-cov = "^6.2.1"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["src/planificador/tests"]
+pythonpath = ["src"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = "-v --tb=long"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+

@@ -1,0 +1,1 @@
+"""Fixtures reutilizables para testing."""

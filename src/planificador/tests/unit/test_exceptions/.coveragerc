@@ -1,0 +1,85 @@
+# .coveragerc - Configuración de coverage para tests de excepciones
+
+[run]
+# Directorios a incluir en el análisis de cobertura
+source = src/planificador/exceptions
+
+# Archivos a omitir
+omit = 
+    */tests/*
+    */test_*
+    */__pycache__/*
+    */venv/*
+    */env/*
+    */.venv/*
+    */.env/*
+
+# Incluir archivos de configuración
+include = 
+    src/planificador/exceptions/*
+    src/planificador/exceptions/**/*
+
+# Configuración de branches
+branch = True
+
+# Configuración de contexto
+context = test
+
+[report]
+# Configuración de reportes
+show_missing = True
+skip_covered = False
+skip_empty = False
+sort = Cover
+
+# Precisión de porcentajes
+precision = 2
+
+# Excluir líneas específicas del reporte
+exclude_lines =
+    # Excluir líneas de pragma
+    pragma: no cover
+    
+    # Excluir definiciones de funciones que nunca se ejecutan
+    def __repr__
+    if self.debug:
+    
+    # Excluir bloques de código que no se ejecutan en tests
+    if __name__ == .__main__.:
+    
+    # Excluir imports que solo se usan para type checking
+    if TYPE_CHECKING:
+    
+    # Excluir abstract methods
+    raise NotImplementedError
+    
+    # Excluir pass statements
+    pass
+    
+    # Excluir ellipsis
+    ...
+
+# Formato de salida
+format = term-missing
+
+[html]
+# Configuración para reporte HTML
+directory = htmlcov
+title = Exception System Coverage Report
+show_contexts = True
+
+[xml]
+# Configuración para reporte XML
+output = coverage.xml
+
+[json]
+# Configuración para reporte JSON
+output = coverage.json
+show_contexts = True
+pretty_print = True
+
+[paths]
+# Mapeo de rutas para diferentes entornos
+source =
+    src/planificador/exceptions
+    */site-packages/planificador/exceptions
