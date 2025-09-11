@@ -43,6 +43,63 @@ class ClientRelationshipManager:
     # CONSULTAS DE RELACIONES BÁSICAS
     # ============================================================================
 
+    async def get_client_project_count(self, client_id: int) -> int:
+        """
+        Obtiene el número de proyectos de un cliente.
+
+        Args:
+            client_id: ID del cliente
+
+        Returns:
+            Número de proyectos del cliente
+
+        Raises:
+            NotFoundError: Si el cliente no existe
+        """
+        try:
+            # Verificar que el cliente existe
+            await self._validate_client_exists(client_id)
+
+            # Contar proyectos del cliente
+            count_query = select(func.count(Project.id)).where(
+                Project.client_id == client_id
+            )
+            result = await self.session.execute(count_query)
+            count = result.scalar() or 0
+
+            self._logger.debug(
+                f"Cliente {client_id} tiene {count} proyectos"
+            )
+            return count
+
+        except NotFoundError:
+            raise
+        except SQLAlchemyError as e:
+            self._logger.error(
+                f"Error de base de datos contando proyectos del cliente "
+                f"{client_id}: {e}"
+            )
+            raise convert_sqlalchemy_error(
+                error=e,
+                operation="get_client_project_count",
+                entity_type="Client",
+                entity_id=client_id,
+            )
+        except Exception as e:
+            self._logger.error(
+                f"Error inesperado contando proyectos del cliente "
+                f"{client_id}: {e}"
+            )
+            raise RepositoryError(
+                message=(
+                    f"Error inesperado contando proyectos del cliente: {e}"
+                ),
+                operation="get_client_project_count",
+                entity_type="Client",
+                entity_id=client_id,
+                original_error=e,
+            )
+
     async def get_client_projects(
         self,
         client_id: int,
