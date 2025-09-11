@@ -1,13 +1,91 @@
-"""Facade para el repositorio de clientes que unifica módulos especializados.
+"""Facade principal para operaciones de cliente.
 
-Este módulo implementa el patrón Facade para proporcionar una interfaz
-unificada y simplificada para todas las operaciones relacionadas con
-clientes, coordinando
-los diferentes módulos especializados.
+Este módulo implementa el patrón Facade para unificar todas las operaciones
+relacionadas con clientes, proporcionando una interfaz simplificada que
+encapsula la complejidad de múltiples módulos especializados.
 
-Autor: Sistema de Modularización
-Fecha: 2025-01-21
-Versión: 1.0.0
+Arquitectura del Patrón Facade:
+===============================
+
+El ClientRepositoryFacade coordina los siguientes módulos especializados:
+
+1. **ClientCRUDOperations**: Operaciones CRUD básicas y avanzadas
+   - Creación, lectura, actualización y eliminación de clientes
+   - Validaciones de integridad de datos
+   - Transacciones seguras
+
+2. **ClientQueryBuilder**: Consultas especializadas y búsquedas
+   - Búsquedas por nombre, código, estado
+   - Filtros avanzados y combinados
+   - Optimización de consultas SQL
+
+3. **ClientValidator**: Validaciones de datos y reglas de negocio
+   - Validación de unicidad de nombres y códigos
+   - Reglas de negocio específicas del dominio
+   - Validaciones de formato y estructura
+
+4. **ClientStatistics**: Estadísticas y reportes
+   - Conteos por estado y categoría
+   - Métricas de rendimiento
+   - Reportes agregados
+
+5. **ClientDateOperations**: Operaciones de fecha y tiempo
+   - Manejo de zonas horarias con Pendulum
+   - Cálculos de períodos y duraciones
+   - Formateo y conversión de fechas
+
+6. **ClientExceptionHandler**: Manejo centralizado de excepciones
+   - Conversión de errores SQLAlchemy
+   - Logging estructurado de errores
+   - Contexto enriquecido para debugging
+
+7. **ClientRelationshipManager**: Gestión de relaciones cliente-proyecto
+   - Asignación y transferencia de proyectos
+   - Consultas de relaciones
+   - Mantenimiento de integridad referencial
+
+Características del Patrón:
+===========================
+
+- **Interfaz Unificada**: Un solo punto de entrada para todas las operaciones
+- **Encapsulación**: Oculta la complejidad de múltiples subsistemas
+- **Desacoplamiento**: Los clientes no dependen de módulos específicos
+- **Manejo Consistente**: Excepciones y logging uniformes
+- **Extensibilidad**: Fácil adición de nuevos módulos especializados
+- **Testabilidad**: Cada módulo puede ser probado independientemente
+
+Beneficios de la Implementación:
+===============================
+
+1. **Simplicidad**: Interfaz clara y fácil de usar
+2. **Mantenibilidad**: Cambios internos no afectan a los clientes
+3. **Reutilización**: Módulos especializados reutilizables
+4. **Robustez**: Manejo centralizado de errores
+5. **Performance**: Operaciones optimizadas y asíncronas
+6. **Monitoreo**: Health checks integrados para todos los módulos
+
+Ejemplo de uso:
+    ```python
+    facade = ClientRepositoryFacade(session)
+    
+    # Crear cliente con validaciones completas
+    client = await facade.create_client(client_data)
+    
+    # Búsquedas especializadas
+    active_clients = await facade.get_active_clients()
+    
+    # Gestión de relaciones
+    projects = await facade.get_client_projects(client_id)
+    
+    # Estadísticas
+    stats = await facade.get_client_statistics()
+    
+    # Verificación de salud
+    health = await facade.health_check()
+    ```
+
+Autor: Sistema de Repositorios
+Versión: 2.0.0
 """
 
 from datetime import date
@@ -36,6 +114,7 @@ from .client_crud_operations import ClientCRUDOperations
 from .client_date_operations import ClientDateOperations
 from .client_exception_handler import ClientExceptionHandler
 from .client_query_builder import ClientQueryBuilder
+from .client_relationship_manager import ClientRelationshipManager
 from .client_statistics import ClientStatistics
 from .client_validator import ClientValidator
 
@@ -56,6 +135,7 @@ class ClientRepositoryFacade:
         date_ops: Operaciones relacionadas con fechas
         exception_handler: Manejador centralizado de excepciones
         query_builder: Constructor de consultas especializadas
+        relationship_manager: Gestor de relaciones cliente-proyecto
         statistics: Generador de estadísticas y métricas
         validator: Validador de datos de clientes
     """
@@ -76,6 +156,7 @@ class ClientRepositoryFacade:
         self.crud_ops = ClientCRUDOperations(session, self.validator)
         self.date_ops = ClientDateOperations(session, self.query_builder)
         self.exception_handler = ClientExceptionHandler()
+        self.relationship_manager = ClientRelationshipManager(session)
         self.statistics = ClientStatistics(session)
 
         self._logger.debug(
@@ -127,11 +208,17 @@ class ClientRepositoryFacade:
 
         Returns:
             Cliente creado con validaciones de fecha
+
+        Raises:
+            ClientRepositoryError: Si ocurre un error en la creación
         """
         try:
             return await self.crud_ops.create_client_with_date_validation(
                 client_data
             )
+        except (ClientValidationError, ClientNotFoundError, ClientDuplicateError) as e:
+            # Re-lanzar excepciones de negocio sin modificar
+            raise e
         except Exception as e:
             return await self.exception_handler.handle_unexpected_error(
                 error=e,
@@ -152,9 +239,15 @@ class ClientRepositoryFacade:
 
         Returns:
             Cliente encontrado o None
+
+        Raises:
+            ClientRepositoryError: Si ocurre un error en la consulta
         """
         try:
             return await self.crud_ops.get_client_by_id(client_id)
+        except ClientNotFoundError:
+            # Cliente no encontrado es un caso válido, retornar None
+            return None
         except Exception as e:
             return await self.exception_handler.handle_unexpected_error(
                 error=e,
@@ -174,9 +267,15 @@ class ClientRepositoryFacade:
 
         Returns:
             Cliente actualizado o None si no existe
+
+        Raises:
+            ClientRepositoryError: Si ocurre un error en la actualización
         """
         try:
             return await self.crud_ops.update_client(client_id, client_data)
+        except (ClientValidationError, ClientNotFoundError, ClientDuplicateError) as e:
+            # Re-lanzar excepciones de negocio sin modificar
+            raise e
         except Exception as e:
             return await self.exception_handler.handle_unexpected_error(
                 error=e,
@@ -198,16 +297,21 @@ class ClientRepositoryFacade:
 
         Returns:
             True si se eliminó correctamente
+
+        Raises:
+            ClientRepositoryError: Si ocurre un error en la eliminación
         """
         try:
             return await self.crud_ops.delete_client(client_id)
+        except (ClientValidationError, ClientNotFoundError) as e:
+            # Re-lanzar excepciones de negocio sin modificar
+            raise e
         except Exception as e:
-            await self.exception_handler.handle_unexpected_error(
+            return await self.exception_handler.handle_unexpected_error(
                 error=e,
                 operation="delete_client",
                 additional_context={"client_id": client_id},
             )
-            return False
 
     # ============================================================================
     # CONSULTAS ESPECIALIZADAS
@@ -256,16 +360,18 @@ class ClientRepositoryFacade:
 
         Returns:
             Lista de clientes que coinciden
+
+        Raises:
+            ClientRepositoryError: Si ocurre un error en la búsqueda
         """
         try:
             return await self.query_builder.search_by_name(name_pattern)
         except Exception as e:
-            await self.exception_handler.handle_unexpected_error(
+            return await self.exception_handler.handle_unexpected_error(
                 error=e,
                 operation="search_clients_by_name",
                 additional_context={"name_pattern": name_pattern},
             )
-            return []
 
     async def get_active_clients(self) -> list[Client]:
         """
@@ -273,14 +379,16 @@ class ClientRepositoryFacade:
 
         Returns:
             Lista de clientes activos
+
+        Raises:
+            ClientRepositoryError: Si ocurre un error en la consulta
         """
         try:
             return await self.query_builder.get_active_clients()
         except Exception as e:
-            await self.exception_handler.handle_unexpected_error(
+            return await self.exception_handler.handle_unexpected_error(
                 error=e, operation="get_active_clients", additional_context={}
             )
-            return []
 
     async def search_with_advanced_filters(
         self,
@@ -1315,12 +1423,49 @@ class ClientRepositoryFacade:
 
             # Verificar validador
             try:
-                await self.validator.validate_name_unique(
+                await self.validator.validate_name_exists(
                     "__health_check_test__"
                 )
                 health_status["modules"]["validator"] = "healthy"
             except Exception as e:
                 health_status["modules"]["validator"] = f"error: {e!s}"
+
+            # Verificar relationship_manager
+            try:
+                await self.relationship_manager.get_client_projects(1)
+                health_status["modules"]["relationship_manager"] = "healthy"
+            except Exception as e:
+                health_status["modules"]["relationship_manager"] = f"error: {e!s}"
+
+            # Verificar crud_ops
+            try:
+                # Verificar que el módulo esté disponible
+                if hasattr(self.crud_ops, 'get_client_by_id'):
+                    health_status["modules"]["crud_ops"] = "healthy"
+                else:
+                    health_status["modules"]["crud_ops"] = "error: missing methods"
+            except Exception as e:
+                health_status["modules"]["crud_ops"] = f"error: {e!s}"
+
+            # Verificar date_ops
+            try:
+                # Verificar que el módulo esté disponible
+                if hasattr(self.date_ops, 'get_clients_created_current_week'):
+                    health_status["modules"]["date_ops"] = "healthy"
+                else:
+                    health_status["modules"]["date_ops"] = "error: missing methods"
+            except Exception as e:
+                health_status["modules"]["date_ops"] = f"error: {e!s}"
+
+            # Verificar exception_handler
+            try:
+                # Verificar que el módulo esté disponible
+                if hasattr(self.exception_handler, 'handle_unexpected_error'):
+                    health_status["modules"]["exception_handler"] = "healthy"
+                else:
+                    health_status["modules"]["exception_handler"] = "error: missing methods"
+            except Exception as e:
+                health_status["modules"]["exception_handler"] = f"error: {e!s}"
 
             # Determinar estado general
             unhealthy_modules = [

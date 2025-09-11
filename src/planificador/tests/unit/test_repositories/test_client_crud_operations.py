@@ -156,12 +156,12 @@ class TestClientCRUDOperations:
         
         crud_operations.session.rollback.assert_called_once()
 
-    # Tests para create_client_with_pendulum_validation
+    # Tests para create_client_with_date_validation
     @pytest.mark.asyncio
-    async def test_create_client_with_pendulum_validation_success(
+    async def test_create_client_with_date_validation_success(
         self, crud_operations, valid_client_data, mock_client
     ):
-        """Test: Creación exitosa con validación Pendulum."""
+        """Test: Creación exitosa con validación de fechas."""
         # Arrange
         crud_operations.validator.validate_client_data.return_value = None
         crud_operations.session.add = MagicMock()
@@ -172,7 +172,7 @@ class TestClientCRUDOperations:
         with patch.object(crud_operations, '_validate_dates_with_pendulum', return_value=valid_client_data):
             with patch('planificador.database.repositories.client.client_crud_operations.Client') as MockClient:
                 MockClient.return_value = mock_client
-                result = await crud_operations.create_client_with_pendulum_validation(
+                result = await crud_operations.create_client_with_date_validation(
                     valid_client_data
                 )
         
