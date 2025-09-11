@@ -46,10 +46,10 @@ class RepositoryError(DatabaseError):
             **kwargs
         )
         # Atributos explícitos para acceso directo en tests y manejo de errores
-        self.operation = operation
+        # Nota: self.operation se accede a través de la propiedad heredada
         self.entity_type = entity_type
         self.entity_id = entity_id
-        self.original_error = original_error
+        # Nota: self.original_error se accede a través de la propiedad heredada
         
         # Añadir detalles estandarizados esperados por los tests
         if entity_type is not None:

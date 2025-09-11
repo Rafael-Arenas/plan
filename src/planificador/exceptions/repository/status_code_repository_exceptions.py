@@ -41,7 +41,7 @@ class StatusCodeRepositoryError(RepositoryError):
             entity_id=str(status_code_id) if status_code_id else None,
             **kwargs
         )
-        self.operation = operation
+        # Nota: self.operation se accede a través de la propiedad heredada
         self.status_code_id = status_code_id
         self.status_code = status_code
 

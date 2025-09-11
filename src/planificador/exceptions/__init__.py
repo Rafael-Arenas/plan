@@ -40,7 +40,19 @@ from .infrastructure import (
     create_database_error,
     create_connection_error,
     create_config_error,
+    create_configuration_error,
     create_external_service_error,
+)
+
+# Importaciones de excepciones de repositorio
+from .repository import (
+    RepositoryError,
+    RepositoryConnectionError,
+    RepositoryIntegrityError,
+    RepositoryTimeoutError,
+    RepositoryTransactionError,
+    RepositoryValidationError,
+    convert_sqlalchemy_error,
 )
 
 # Importaciones de excepciones de validación
@@ -94,6 +106,15 @@ __all__ = [
     'DatabaseTimeoutError',
     'MigrationError',
     
+    # Repository exceptions
+    'RepositoryError',
+    'RepositoryConnectionError',
+    'RepositoryIntegrityError',
+    'RepositoryTimeoutError',
+    'RepositoryTransactionError',
+    'RepositoryValidationError',
+    'convert_sqlalchemy_error',
+    
     # Validation exceptions
     'PydanticValidationError',
     'DateValidationError',
@@ -111,6 +132,7 @@ __all__ = [
     'create_database_error',
     'create_connection_error',
     'create_config_error',
+    'create_configuration_error',
     'create_external_service_error',
     
     # Helper functions - Validation

@@ -12,7 +12,6 @@ from datetime import datetime, date
 from decimal import Decimal
 
 from ..base import PlanificadorBaseException, ValidationError, NotFoundError, ConflictError, BusinessLogicError
-from ..domain import WorkloadError, WorkloadNotFoundError, WorkloadValidationError, WorkloadBusinessLogicError
 from .base_repository_exceptions import RepositoryError, RepositoryValidationError
 
 
@@ -42,7 +41,7 @@ class WorkloadRepositoryError(RepositoryError):
             entity_id=str(workload_id) if workload_id else None,
             **kwargs
         )
-        self.operation = operation
+        # Nota: self.operation se accede a través de la propiedad heredada
         self.workload_id = workload_id
 
 

@@ -11,7 +11,6 @@ from typing import Any, Dict, List, Optional, Union
 from datetime import datetime, date
 
 from ..base import PlanificadorBaseException, ValidationError, NotFoundError, ConflictError, BusinessLogicError
-from ..domain import ProjectError, ProjectNotFoundError, ProjectValidationError, ProjectConflictError
 from .base_repository_exceptions import RepositoryError, RepositoryValidationError
 
 
@@ -41,7 +40,7 @@ class ProjectRepositoryError(RepositoryError):
             entity_id=str(project_id) if project_id else None,
             **kwargs
         )
-        self.operation = operation
+        # Nota: self.operation se accede a través de la propiedad heredada
         self.project_id = project_id
 
 

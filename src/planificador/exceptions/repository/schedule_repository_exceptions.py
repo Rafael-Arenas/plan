@@ -17,13 +17,6 @@ from ..base import (
     ConflictError,
     BusinessLogicError,
 )
-from ..domain import (
-    ScheduleError,
-    ScheduleNotFoundError,
-    ScheduleValidationError,
-    ScheduleTimeConflictError,
-    ScheduleBusinessLogicError,
-)
 from .base_repository_exceptions import RepositoryError, RepositoryValidationError
 
 
@@ -61,7 +54,7 @@ class ScheduleRepositoryError(RepositoryError):
             entity_id=str(schedule_id) if schedule_id is not None else None,
             **kwargs,
         )
-        self.operation = operation
+        # Nota: self.operation se accede a través de la propiedad heredada
         self.schedule_id = schedule_id
 
 

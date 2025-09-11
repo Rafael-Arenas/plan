@@ -10,7 +10,6 @@ from typing import Any, Dict, List, Optional, Union
 from datetime import datetime
 
 from ..base import PlanificadorBaseException, ValidationError, NotFoundError, ConflictError, BusinessLogicError
-from ..domain import ClientError, ClientNotFoundError, ClientValidationError, ClientConflictError
 from .base_repository_exceptions import RepositoryError, RepositoryValidationError
 
 
@@ -40,7 +39,7 @@ class ClientRepositoryError(RepositoryError):
             entity_id=str(client_id) if client_id else None,
             **kwargs
         )
-        self.operation = operation
+        # Nota: self.operation se accede a través de la propiedad heredada
         self.client_id = client_id
 
 
@@ -241,6 +240,93 @@ class ClientDateRangeError(ClientRepositoryError):
         self.end_date = end_date
 
 
+class ClientNotFoundError(ClientRepositoryError):
+    """
+    Error cuando no se encuentra un cliente específico.
+    
+    Se lanza cuando una operación requiere un cliente que no existe
+    en la base de datos o no es accesible.
+    """
+    
+    def __init__(
+        self, 
+        client_id: Union[int, str],
+        operation: Optional[str] = None,
+        **kwargs
+    ):
+        message = f"Cliente con ID '{client_id}' no encontrado"
+        if operation:
+            message += f" durante operación '{operation}'"
+        
+        super().__init__(
+            message,
+            operation=operation,
+            client_id=client_id,
+            **kwargs
+        )
+
+
+class ClientValidationError(ClientRepositoryError):
+    """
+    Error de validación específico para datos de cliente.
+    
+    Se lanza cuando los datos de un cliente no cumplen con las
+    reglas de validación establecidas.
+    """
+    
+    def __init__(
+        self, 
+        field: str,
+        value: Any,
+        reason: str,
+        client_id: Optional[Union[int, str]] = None,
+        **kwargs
+    ):
+        message = f"Validación fallida para campo '{field}': {reason}"
+        if client_id:
+            message += f" (Cliente ID: {client_id})"
+        
+        super().__init__(
+            message,
+            client_id=client_id,
+            **kwargs
+        )
+        
+        self.field = field
+        self.value = value
+        self.reason = reason
+
+
+class ClientDuplicateError(ClientRepositoryError):
+    """
+    Error cuando se intenta crear un cliente duplicado.
+    
+    Se lanza cuando una operación de creación viola restricciones
+    de unicidad en los datos del cliente.
+    """
+    
+    def __init__(
+        self, 
+        field: str,
+        value: Any,
+        existing_client_id: Optional[Union[int, str]] = None,
+        **kwargs
+    ):
+        message = f"Cliente duplicado: el campo '{field}' con valor '{value}' ya existe"
+        if existing_client_id:
+            message += f" (Cliente existente ID: {existing_client_id})"
+        
+        super().__init__(
+            message,
+            operation="create_client",
+            **kwargs
+        )
+        
+        self.field = field
+        self.value = value
+        self.existing_client_id = existing_client_id
+
+
 # ============================================================================
 # FUNCIONES HELPER PARA CREAR EXCEPCIONES
 # ============================================================================
@@ -398,4 +484,82 @@ def create_client_date_range_error(
         end_date=end_date,
         operation=operation,
         reason=reason
+    )
+
+
+def create_client_repository_error(
+    message: str,
+    operation: Optional[str] = None,
+    client_id: Optional[Union[int, str]] = None,
+    **kwargs
+) -> ClientRepositoryError:
+    """
+    Crea una excepción ClientRepositoryError con los parámetros especificados.
+    
+    Args:
+        message: Mensaje de error
+        operation: Operación que se estaba realizando
+        client_id: ID del cliente afectado
+        **kwargs: Argumentos adicionales
+        
+    Returns:
+        Instancia de ClientRepositoryError
+    """
+    return ClientRepositoryError(
+        message=message,
+        operation=operation,
+        client_id=client_id,
+        **kwargs
+    )
+
+
+def create_client_not_found_error(
+    client_id: Union[int, str],
+    operation: Optional[str] = None,
+    **kwargs
+) -> ClientNotFoundError:
+    """
+    Crea una excepción ClientNotFoundError con los parámetros especificados.
+    
+    Args:
+        client_id: ID del cliente no encontrado
+        operation: Operación que se estaba realizando
+        **kwargs: Argumentos adicionales
+        
+    Returns:
+        Instancia de ClientNotFoundError
+    """
+    return ClientNotFoundError(
+        client_id=client_id,
+        operation=operation or "find_client",
+        **kwargs
+    )
+
+
+def create_client_validation_error(
+    field: str,
+    value: Any,
+    reason: str,
+    client_id: Optional[Union[int, str]] = None,
+    **kwargs
+) -> ClientValidationError:
+    """
+    Crea una excepción ClientValidationError con los parámetros especificados.
+    
+    Args:
+        field: Campo que falló la validación
+        value: Valor que causó el error
+        reason: Razón del fallo de validación
+        client_id: ID del cliente afectado (opcional)
+        **kwargs: Argumentos adicionales
+        
+    Returns:
+        Instancia de ClientValidationError
+    """
+    return ClientValidationError(
+        field=field,
+        value=value,
+        reason=reason,
+        client_id=client_id,
+        **kwargs
     )

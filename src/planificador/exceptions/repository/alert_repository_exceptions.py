@@ -10,7 +10,6 @@ from typing import Any, Dict, List, Optional, Union
 from datetime import datetime
 
 from ..base import PlanificadorBaseException, ValidationError, NotFoundError, ConflictError, BusinessLogicError
-from ..domain import AlertError, AlertNotFoundError, AlertConflictError, AlertBusinessLogicError
 from .base_repository_exceptions import RepositoryError, RepositoryValidationError
 
 

@@ -11,7 +11,6 @@ from typing import Any, Dict, List, Optional, Union
 from datetime import datetime, date
 
 from ..base import PlanificadorBaseException, ValidationError, NotFoundError, ConflictError, BusinessLogicError
-from ..domain import EmployeeError, EmployeeNotFoundError, EmployeeValidationError, EmployeeConflictError
 from .base_repository_exceptions import RepositoryError, RepositoryValidationError
 
 
@@ -41,7 +40,7 @@ class EmployeeRepositoryError(RepositoryError):
             entity_id=str(employee_id) if employee_id else None,
             **kwargs
         )
-        self.operation = operation
+        # Nota: self.operation se accede a través de la propiedad heredada
         self.employee_id = employee_id
 
 
