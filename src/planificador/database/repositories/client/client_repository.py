@@ -182,11 +182,11 @@ class ClientRepository(BaseRepository[Client]):
                 client_id=client_id,
             )
 
-    async def create_client_with_pendulum_validation(
+    async def create_client_with_date_validation(
         self, client_data: dict[str, Any], validate_business_day: bool = False
     ) -> Client:
         """
-        Crea un cliente con validaciones avanzadas usando Pendulum.
+        Crea un cliente con validaciones avanzadas de fecha.
 
         Args:
             client_data: Datos del cliente
@@ -236,7 +236,7 @@ class ClientRepository(BaseRepository[Client]):
             )
             raise convert_sqlalchemy_error(
                 error=e,
-                operation="create_client_with_pendulum_validation",
+                operation="create_client_with_date_validation",
                 entity_type="Client",
             )
         except Exception as e:

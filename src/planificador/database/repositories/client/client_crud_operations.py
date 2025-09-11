@@ -257,14 +257,12 @@ class ClientCRUDOperations:
                 original_error=e,
             )
 
-    async def create_client_with_pendulum_validation(
+    async def create_client_with_date_validation(
         self, client_data: dict[str, Any]
     ) -> Client:
-        """Crea un cliente con validación avanzada de fechas usando Pendulum.
+        """Crea un cliente con validación avanzada de fechas.
 
-        Este método proporciona validación adicional para campos de fecha
-        utilizando la librería Pendulum para manejo robusto de fechas y
-        zonas horarias.
+        Este método proporciona validación adicional para campos de fecha.
 
         Args:
             client_data: Diccionario con los datos del cliente
@@ -313,7 +311,7 @@ class ClientCRUDOperations:
             )
             raise convert_sqlalchemy_error(
                 error=e,
-                operation="create_client_with_pendulum_validation",
+                operation="create_client_with_date_validation",
                 entity_type="Client",
             )
         except Exception as e:
@@ -330,7 +328,7 @@ class ClientCRUDOperations:
                     f"Error inesperado creando cliente con validación "
                     f"Pendulum: {e}"
                 ),
-                operation="create_client_with_pendulum_validation",
+                operation="create_client_with_date_validation",
                 entity_type="Client",
                 original_error=e,
             )

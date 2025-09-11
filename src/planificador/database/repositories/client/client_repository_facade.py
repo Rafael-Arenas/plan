@@ -116,11 +116,11 @@ class ClientRepositoryFacade:
                 },
             )
 
-    async def create_client_with_pendulum_validation(
+    async def create_client_with_date_validation(
         self, client_data: ClientCreate
     ) -> Client:
         """
-        Crea un cliente con validaciones avanzadas de fecha usando Pendulum.
+        Crea un cliente con validaciones avanzadas de fecha.
 
         Args:
             client_data: Datos del cliente a crear
@@ -129,13 +129,13 @@ class ClientRepositoryFacade:
             Cliente creado con validaciones de fecha
         """
         try:
-            return await self.crud_ops.create_client_with_pendulum_validation(
+            return await self.crud_ops.create_client_with_date_validation(
                 client_data
             )
         except Exception as e:
             return await self.exception_handler.handle_unexpected_error(
                 error=e,
-                operation="create_client_with_pendulum_validation",
+                operation="create_client_with_date_validation",
                 additional_context={
                     "client_data": client_data.model_dump()
                     if hasattr(client_data, "model_dump")
@@ -667,7 +667,7 @@ class ClientRepositoryFacade:
 
             # Crear el cliente usando validaciones de Pendulum
             client = (
-                await self.crud_ops.create_client_with_pendulum_validation(
+                await self.crud_ops.create_client_with_date_validation(
                     client_data
                 )
             )
