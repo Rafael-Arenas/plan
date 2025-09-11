@@ -1,6 +1,6 @@
 # src/planificador/schemas/client/client.py
 
-from typing import List, Optional, TYPE_CHECKING
+from typing import List, Optional, TYPE_CHECKING, Literal
 from pydantic import Field, EmailStr
 from datetime import datetime
 
@@ -43,3 +43,34 @@ class Client(ClientBase):
 
 class ClientWithProjects(Client):
     projects: List["Project"] = []
+
+
+class ClientStatsResponse(BaseSchema):
+    """Schema para respuesta de estadísticas de cliente."""
+    
+    total_clients: int = Field(..., ge=0)
+    active_clients: int = Field(..., ge=0)
+    inactive_clients: int = Field(..., ge=0)
+
+
+class ClientFilter(BaseSchema):
+    """Schema para filtros de búsqueda de clientes."""
+    
+    name: Optional[str] = Field(None, description="Filtrar por nombre")
+    code: Optional[str] = Field(None, description="Filtrar por código")
+    email: Optional[str] = Field(None, description="Filtrar por email")
+    is_active: Optional[bool] = Field(None, description="Filtrar por estado activo")
+    contact_person: Optional[str] = Field(None, description="Filtrar por persona de contacto")
+
+
+class ClientSort(BaseSchema):
+    """Schema para ordenamiento de clientes."""
+    
+    field: Literal["name", "code", "email", "created_at", "updated_at"] = Field(
+        default="name", 
+        description="Campo por el cual ordenar"
+    )
+    direction: Literal["asc", "desc"] = Field(
+        default="asc", 
+        description="Dirección del ordenamiento"
+    )
