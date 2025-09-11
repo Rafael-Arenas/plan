@@ -1,16 +1,26 @@
 # Funciones Disponibles en Client Repository
 
-**Fecha de actualización:** 20 de agosto de 2025
+## Resumen
+Este documento enumera todas las funciones públicas disponibles en el sistema de repositorios de cliente del Planificador. El sistema está organizado en módulos especializados que siguen principios de arquitectura limpia y separación de responsabilidades.
 
-## Módulos y Funciones
+## Arquitectura del Sistema
 
-### ClientRepository (client_repository.py)
+### Punto de Entrada Principal
+- **ClientRepositoryFacade**: Interfaz unificada que coordina todas las operaciones
+- **Módulos Especializados**: Cada uno maneja un aspecto específico del dominio
+- **Interfaces Abstractas**: Definen contratos para inyección de dependencias
 
-#### Operaciones CRUD Básicas (4 funciones)
-1. `create_client(client_data: Dict[str, Any]) -> Client` - Crea un nuevo cliente con validaciones completas
-2. `update_client(client_id: int, update_data: Dict[str, Any]) -> Optional[Client]` - Actualiza un cliente existente con validaciones
-3. `get_by_id(client_id: int) -> Optional[Client]` - Obtiene cliente por ID (heredado de BaseRepository)
-4. `create_client_with_pendulum_validation(client_data: Dict[str, Any], validate_business_day: bool = False) -> Client` - Crea cliente con validaciones avanzadas de fecha usando Pendulum
+---
+
+## 1. ClientRepositoryFacade (client_repository_facade.py)
+**Punto de entrada principal del sistema - 67 métodos públicos**
+
+### CRUD Operations (5 métodos)
+- `create_client(client_data: ClientCreate) -> Client`
+- `create_client_with_pendulum_validation(client_data: dict) -> Client`
+- `get_client_by_id(client_id: int) -> Client | None`
+- `update_client(client_id: int, update_data: ClientUpdate) -> Client`
+- `delete_client(client_id: int) -> bool`
 
 #### Consultas por Identificadores Únicos (2 funciones)
 5. `get_by_name(name: str) -> Optional[Client]` - Obtiene un cliente por su nombre

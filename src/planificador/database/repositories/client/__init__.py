@@ -15,30 +15,31 @@ Clases principales:
 
 Uso recomendado:
     from planificador.database.repositories.client import ClientRepository
-    
+
     # El ClientRepository refactorizado incluye automáticamente
     # todas las funcionalidades especializadas
     client_repo = ClientRepository(session)
-    
+
     # También se pueden usar las clases especializadas individualmente
     from planificador.database.repositories.client import ClientQueryBuilder
     query_builder = ClientQueryBuilder(session)
 """
 
-from .client_repository import ClientRepository
 from .client_query_builder import ClientQueryBuilder
+from .client_relationship_manager import ClientRelationshipManager
+from .client_repository import ClientRepository
 from .client_statistics import ClientStatistics
 from .client_validator import ClientValidator
-from .client_relationship_manager import ClientRelationshipManager
+
 
 # Alias para compatibilidad
 ClientRepositoryRefactored = ClientRepository
 
 __all__ = [
-    'ClientRepository',
-    'ClientRepositoryRefactored',
-    'ClientQueryBuilder',
-    'ClientStatistics',
-    'ClientValidator',
-    'ClientRelationshipManager'
+    "ClientQueryBuilder",
+    "ClientRelationshipManager",
+    "ClientRepository",
+    "ClientRepositoryRefactored",
+    "ClientStatistics",
+    "ClientValidator",
 ]
