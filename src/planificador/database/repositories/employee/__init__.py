@@ -18,6 +18,6 @@ Ejemplo de uso:
     employee = await repo.get_by_employee_code("EMP001")
 """
 
-from .employee_repository import EmployeeRepository
+from .employee_repository_facade import EmployeeRepositoryFacade
 
-__all__ = ['EmployeeRepository']
+__all__ = ['EmployeeRepositoryFacade']

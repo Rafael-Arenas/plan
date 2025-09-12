@@ -1,4 +1,8 @@
-# src/planificador/database/repositories/employee/employee_statistics.py
+"""Módulo de operaciones estadísticas para empleados.
+
+Este módulo implementa la interfaz IEmployeeStatisticsOperations proporcionando
+funcionalidad completa para generar estadísticas y métricas de empleados.
+"""
 
 from typing import Dict, List, Any, Optional
 from datetime import date, timedelta
@@ -7,35 +11,40 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import SQLAlchemyError
 from loguru import logger
 
-from ....models.employee import Employee, EmployeeStatus
-from ....models.team_membership import TeamMembership
-from ....models.project_assignment import ProjectAssignment
-from ....models.vacation import Vacation, VacationStatus
-# from ....models.time_entry import TimeEntry  # TODO: TimeEntry model not found
-from ....utils.date_utils import get_current_time
-from ....exceptions.repository import convert_sqlalchemy_error
-from ....exceptions.repository.employee_repository_exceptions import create_employee_statistics_error
+from .....models.employee import Employee, EmployeeStatus
+from .....models.team_membership import TeamMembership
+from .....models.project_assignment import ProjectAssignment
+from .....models.vacation import Vacation, VacationStatus
+from .....utils.date_utils import get_current_time
+from .....exceptions.repository import convert_sqlalchemy_error
+from .....exceptions.repository.employee_repository_exceptions import create_employee_statistics_error
+from ..interfaces.statistics_interface import IEmployeeStatisticsOperations
 
 
-class EmployeeStatistics:
-    """
-    Generador de estadísticas para empleados.
+class StatisticsOperations(IEmployeeStatisticsOperations):
+    """Implementación de operaciones estadísticas para empleados.
     
-    Proporciona métricas y análisis estadísticos sobre empleados,
-    incluyendo distribuciones, tendencias y resúmenes.
+    Esta clase proporciona métodos para generar estadísticas y métricas
+    detalladas sobre empleados, incluyendo distribuciones por estado,
+    departamento, posición, estadísticas salariales, participación en
+    equipos y proyectos, vacaciones, habilidades y carga de trabajo.
     """
     
     def __init__(self, session: AsyncSession):
+        """Inicializa las operaciones estadísticas.
+        
+        Args:
+            session: Sesión asíncrona de SQLAlchemy
+        """
         self.session = session
-        self._logger = logger
+        self._logger = logger.bind(component="StatisticsOperations")
     
     # ============================================================================
     # ESTADÍSTICAS POR CATEGORÍAS
     # ============================================================================
     
     async def get_employee_count_by_status(self) -> Dict[str, int]:
-        """
-        Obtiene el conteo de empleados por estado.
+        """Obtiene el conteo de empleados por estado.
         
         Returns:
             Diccionario con conteos por estado
@@ -52,16 +61,12 @@ class EmployeeStatistics:
             result = await self.session.execute(query)
             rows = result.all()
             
-            # Convertir a diccionario con nombres de estado legibles
-            counts = {}
-            for row in rows:
-                status_name = row.status.value if row.status else 'unknown'
-                counts[status_name] = row.count
+            # Inicializar con todos los estados posibles
+            counts = {status.value: 0 for status in EmployeeStatus}
             
-            # Asegurar que todos los estados estén representados
-            for status in EmployeeStatus:
-                if status.value not in counts:
-                    counts[status.value] = 0
+            # Actualizar con los conteos reales
+            for row in rows:
+                counts[row.status.value] = row.count
             
             self._logger.debug(f"Conteos por estado obtenidos: {counts}")
             return counts
@@ -82,8 +87,7 @@ class EmployeeStatistics:
             )
     
     async def get_employee_count_by_department(self) -> Dict[str, int]:
-        """
-        Obtiene el conteo de empleados por departamento.
+        """Obtiene el conteo de empleados por departamento.
         
         Returns:
             Diccionario con conteos por departamento
@@ -102,7 +106,10 @@ class EmployeeStatistics:
             result = await self.session.execute(query)
             rows = result.all()
             
-            counts = {row.department: row.count for row in rows}
+            counts = {}
+            for row in rows:
+                department = row.department or 'Sin Departamento'
+                counts[department] = row.count
             
             self._logger.debug(f"Conteos por departamento obtenidos: {len(counts)} departamentos")
             return counts
@@ -123,8 +130,7 @@ class EmployeeStatistics:
             )
     
     async def get_employee_count_by_position(self) -> Dict[str, int]:
-        """
-        Obtiene el conteo de empleados por posición.
+        """Obtiene el conteo de empleados por posición.
         
         Returns:
             Diccionario con conteos por posición
@@ -143,7 +149,10 @@ class EmployeeStatistics:
             result = await self.session.execute(query)
             rows = result.all()
             
-            counts = {row.position: row.count for row in rows}
+            counts = {}
+            for row in rows:
+                position = row.position or 'Sin Posición'
+                counts[position] = row.count
             
             self._logger.debug(f"Conteos por posición obtenidos: {len(counts)} posiciones")
             return counts
@@ -168,8 +177,7 @@ class EmployeeStatistics:
     # ============================================================================
     
     async def get_salary_statistics(self) -> Dict[str, float]:
-        """
-        Obtiene estadísticas de salarios de empleados activos.
+        """Obtiene estadísticas salariales de empleados activos.
         
         Returns:
             Diccionario con estadísticas salariales
@@ -194,8 +202,16 @@ class EmployeeStatistics:
             result = await self.session.execute(query)
             row = result.first()
             
-            if not row or row.count == 0:
-                return {
+            if row and row.count > 0:
+                stats = {
+                    'count': int(row.count),
+                    'average': float(row.average or 0),
+                    'minimum': float(row.minimum or 0),
+                    'maximum': float(row.maximum or 0),
+                    'total': float(row.total or 0)
+                }
+            else:
+                stats = {
                     'count': 0,
                     'average': 0.0,
                     'minimum': 0.0,
@@ -203,15 +219,7 @@ class EmployeeStatistics:
                     'total': 0.0
                 }
             
-            stats = {
-                'count': row.count,
-                'average': float(row.average) if row.average else 0.0,
-                'minimum': float(row.minimum) if row.minimum else 0.0,
-                'maximum': float(row.maximum) if row.maximum else 0.0,
-                'total': float(row.total) if row.total else 0.0
-            }
-            
-            self._logger.debug(f"Estadísticas salariales obtenidas: {stats['count']} empleados")
+            self._logger.debug(f"Estadísticas salariales obtenidas: {stats}")
             return stats
             
         except SQLAlchemyError as e:
@@ -234,22 +242,21 @@ class EmployeeStatistics:
     # ============================================================================
     
     async def get_hire_date_distribution(self, years: int = 5) -> Dict[str, int]:
-        """
-        Obtiene la distribución de fechas de contratación por año.
+        """Obtiene la distribución de fechas de contratación.
         
         Args:
-            years: Número de años hacia atrás a incluir
+            years: Número de años hacia atrás a considerar
             
         Returns:
             Diccionario con conteos por año
         """
         try:
             current_date = get_current_time().date()
-            start_date = current_date.replace(year=current_date.year - years)
+            start_date = date(current_date.year - years + 1, 1, 1)
             
             query = (
                 select(
-                    func.strftime('%Y', Employee.hire_date).label('year'),
+                    func.extract('year', Employee.hire_date).label('year'),
                     func.count(Employee.id).label('count')
                 )
                 .where(
@@ -258,27 +265,30 @@ class EmployeeStatistics:
                         Employee.hire_date <= current_date
                     )
                 )
-                .group_by(func.strftime('%Y', Employee.hire_date))
-                .order_by(func.strftime('%Y', Employee.hire_date))
+                .group_by(func.extract('year', Employee.hire_date))
+                .order_by(func.extract('year', Employee.hire_date))
             )
             
             result = await self.session.execute(query)
             rows = result.all()
             
-            distribution = {row.year: row.count for row in rows}
+            distribution = {}
+            for row in rows:
+                year = str(int(row.year))
+                distribution[year] = row.count
             
-            self._logger.debug(f"Distribución de contrataciones obtenida: {len(distribution)} años")
+            self._logger.debug(f"Distribución de fechas de contratación obtenida: {len(distribution)} años")
             return distribution
             
         except SQLAlchemyError as e:
-            self._logger.error(f"Error de base de datos obteniendo distribución de contrataciones: {e}")
+            self._logger.error(f"Error de base de datos obteniendo distribución de fechas de contratación: {e}")
             raise convert_sqlalchemy_error(
                 error=e,
                 operation="get_hire_date_distribution",
                 entity_type="Employee"
             )
         except Exception as e:
-            self._logger.error(f"Error inesperado obteniendo distribución de contrataciones: {e}")
+            self._logger.error(f"Error inesperado obteniendo distribución de fechas de contratación: {e}")
             raise create_employee_statistics_error(
                 message=f"Error inesperado obteniendo distribución de fechas de contratación: {e}",
                 operation="get_hire_date_distribution",
@@ -290,8 +300,7 @@ class EmployeeStatistics:
     # ============================================================================
     
     async def get_team_participation_stats(self) -> Dict[str, Any]:
-        """
-        Obtiene estadísticas de participación en equipos.
+        """Obtiene estadísticas de participación en equipos.
         
         Returns:
             Diccionario con estadísticas de equipos
@@ -362,8 +371,7 @@ class EmployeeStatistics:
             )
     
     async def get_project_participation_stats(self) -> Dict[str, Any]:
-        """
-        Obtiene estadísticas de participación en proyectos.
+        """Obtiene estadísticas de participación en proyectos.
         
         Returns:
             Diccionario con estadísticas de proyectos
@@ -438,8 +446,7 @@ class EmployeeStatistics:
     # ============================================================================
     
     async def get_vacation_statistics(self, year: Optional[int] = None) -> Dict[str, Any]:
-        """
-        Obtiene estadísticas de vacaciones.
+        """Obtiene estadísticas de vacaciones.
         
         Args:
             year: Año específico para las estadísticas (actual si es None)
@@ -532,8 +539,7 @@ class EmployeeStatistics:
     # ============================================================================
     
     async def get_skills_distribution(self, limit: int = 20) -> Dict[str, int]:
-        """
-        Obtiene la distribución de habilidades más comunes.
+        """Obtiene la distribución de habilidades más comunes.
         
         Args:
             limit: Número máximo de habilidades a retornar
@@ -599,8 +605,7 @@ class EmployeeStatistics:
     # ============================================================================
     
     async def get_employee_workload_stats(self, employee_id: int, start_date: date, end_date: date) -> Dict[str, Any]:
-        """
-        Obtiene estadísticas de carga de trabajo de un empleado.
+        """Obtiene estadísticas de carga de trabajo de un empleado.
         
         Args:
             employee_id: ID del empleado
@@ -611,7 +616,7 @@ class EmployeeStatistics:
             Diccionario con estadísticas de carga de trabajo
         """
         try:
-            from ....models.workload import Workload
+            from .....models.workload import Workload
             
             # Verificar que el empleado existe
             employee_query = select(Employee).where(Employee.id == employee_id)
@@ -714,8 +719,7 @@ class EmployeeStatistics:
     # ============================================================================
     
     async def get_comprehensive_summary(self) -> Dict[str, Any]:
-        """
-        Obtiene un resumen completo de estadísticas de empleados.
+        """Obtiene un resumen completo de estadísticas de empleados.
         
         Returns:
             Diccionario con resumen completo

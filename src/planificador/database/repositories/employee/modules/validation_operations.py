@@ -1,18 +1,19 @@
-# src/planificador/database/repositories/employee/employee_validator.py
+# src/planificador/database/repositories/employee/modules/validation_operations.py
 
 import re
 import json
 from typing import List, Optional, Dict, Any
 from loguru import logger
 
-from ....exceptions import ValidationError
-from ....models.employee import EmployeeStatus
-from ....utils.date_utils import get_current_time
+from .....exceptions import ValidationError
+from .....models.employee import EmployeeStatus
+from .....utils.date_utils import get_current_time
+from ..interfaces.validation_interface import IEmployeeValidationOperations
 
 
-class EmployeeValidator:
+class ValidationOperations(IEmployeeValidationOperations):
     """
-    Validador especializado para datos de empleados.
+    Implementación de operaciones de validación para empleados.
     
     Proporciona validaciones específicas para empleados incluyendo
     formato de datos, reglas de negocio y consistencia.
@@ -124,6 +125,81 @@ class EmployeeValidator:
         except Exception as e:
             self._logger.error(f"Error inesperado en validación de actualización: {e}")
             raise ValidationError(f"Error en validación: {str(e)}")
+    
+    def validate_skills_json(self, skills_json: Optional[str]) -> Optional[List[str]]:
+        """
+        Valida y convierte un JSON de habilidades a lista.
+        
+        Args:
+            skills_json: JSON string con las habilidades
+            
+        Returns:
+            Lista de habilidades o None
+            
+        Raises:
+            ValidationError: Si el JSON no es válido
+        """
+        if not skills_json:
+            return None
+        
+        try:
+            skills = json.loads(skills_json)
+            self._validate_skills(skills)
+            return skills
+            
+        except json.JSONDecodeError as e:
+            raise ValidationError(f"El JSON de habilidades no es válido: {str(e)}")
+        except ValidationError:
+            raise
+        except Exception as e:
+            raise ValidationError(f"Error procesando habilidades: {str(e)}")
+    
+    def validate_search_term(self, search_term: str) -> str:
+        """
+        Valida y limpia un término de búsqueda.
+        
+        Args:
+            search_term: Término de búsqueda
+            
+        Returns:
+            Término de búsqueda limpio
+            
+        Raises:
+            ValidationError: Si el término no es válido
+        """
+        if not search_term:
+            raise ValidationError("El término de búsqueda es requerido")
+        
+        if not isinstance(search_term, str):
+            raise ValidationError("El término de búsqueda debe ser una cadena")
+        
+        search_term = search_term.strip()
+        if not search_term:
+            raise ValidationError("El término de búsqueda no puede estar vacío")
+        
+        if len(search_term) < 2:
+            raise ValidationError("El término de búsqueda debe tener al menos 2 caracteres")
+        
+        if len(search_term) > 100:
+            raise ValidationError("El término de búsqueda no puede exceder 100 caracteres")
+        
+        return search_term
+    
+    def validate_employee_id(self, employee_id: int) -> None:
+        """
+        Valida un ID de empleado.
+        
+        Args:
+            employee_id: ID del empleado
+            
+        Raises:
+            ValidationError: Si el ID no es válido
+        """
+        if not isinstance(employee_id, int):
+            raise ValidationError("El ID del empleado debe ser un número entero")
+        
+        if employee_id <= 0:
+            raise ValidationError("El ID del empleado debe ser un número positivo")
     
     # ============================================================================
     # VALIDACIONES INTERNAS - CAMPOS REQUERIDOS
@@ -453,82 +529,3 @@ class EmployeeValidator:
             
             if len(skill) > 100:
                 raise ValidationError(f"La habilidad en posición {i} no puede exceder 100 caracteres")
-    
-    # ============================================================================
-    # VALIDACIONES ESPECIALIZADAS
-    # ============================================================================
-    
-    def validate_skills_json(self, skills_json: Optional[str]) -> Optional[List[str]]:
-        """
-        Valida y convierte un JSON de habilidades a lista.
-        
-        Args:
-            skills_json: JSON string con las habilidades
-            
-        Returns:
-            Lista de habilidades o None
-            
-        Raises:
-            ValidationError: Si el JSON no es válido
-        """
-        if not skills_json:
-            return None
-        
-        try:
-            skills = json.loads(skills_json)
-            self._validate_skills(skills)
-            return skills
-            
-        except json.JSONDecodeError as e:
-            raise ValidationError(f"El JSON de habilidades no es válido: {str(e)}")
-        except ValidationError:
-            raise
-        except Exception as e:
-            raise ValidationError(f"Error procesando habilidades: {str(e)}")
-    
-    def validate_search_term(self, search_term: str) -> str:
-        """
-        Valida y limpia un término de búsqueda.
-        
-        Args:
-            search_term: Término de búsqueda
-            
-        Returns:
-            Término de búsqueda limpio
-            
-        Raises:
-            ValidationError: Si el término no es válido
-        """
-        if not search_term:
-            raise ValidationError("El término de búsqueda es requerido")
-        
-        if not isinstance(search_term, str):
-            raise ValidationError("El término de búsqueda debe ser una cadena")
-        
-        search_term = search_term.strip()
-        if not search_term:
-            raise ValidationError("El término de búsqueda no puede estar vacío")
-        
-        if len(search_term) < 2:
-            raise ValidationError("El término de búsqueda debe tener al menos 2 caracteres")
-        
-        if len(search_term) > 100:
-            raise ValidationError("El término de búsqueda no puede exceder 100 caracteres")
-        
-        return search_term
-    
-    def validate_employee_id(self, employee_id: int) -> None:
-        """
-        Valida un ID de empleado.
-        
-        Args:
-            employee_id: ID del empleado
-            
-        Raises:
-            ValidationError: Si el ID no es válido
-        """
-        if not isinstance(employee_id, int):
-            raise ValidationError("El ID del empleado debe ser un número entero")
-        
-        if employee_id <= 0:
-            raise ValidationError("El ID del empleado debe ser un número positivo")
