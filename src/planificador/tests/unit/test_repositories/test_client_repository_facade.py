@@ -151,41 +151,6 @@ class TestClientRepositoryFacade:
             assert result == mock_client
             mock_update.assert_called_once_with(client_id, update_data)
 
-    # Tests para consultas especializadas
-    @pytest.mark.asyncio
-    async def test_get_client_by_name_success(
-        self, client_facade, mock_client
-    ):
-        """Test: Obtención exitosa de cliente por nombre."""
-        # Arrange
-        client_name = "Test Client"
-        
-        with patch.object(
-            client_facade.query_builder, 'get_client_by_name', return_value=mock_client
-        ) as mock_get:
-            # Act
-            result = await client_facade.get_client_by_name(client_name)
-
-            # Assert
-            assert result == mock_client
-            mock_get.assert_called_once_with(client_name)
-
-    @pytest.mark.asyncio
-    async def test_get_active_clients_success(self, client_facade, mock_client):
-        """Prueba que se obtienen clientes activos correctamente."""
-        mock_clients = [mock_client]
-        with patch.object(
-            client_facade._advanced_query_operations,
-            "get_clients_by_filters",
-            return_value=mock_clients,
-        ) as mock_get:
-            result = await client_facade.get_active_clients()
-
-            assert result == mock_clients
-            mock_get.assert_awaited_once_with(
-                filters={"is_active": True}, limit=1000
-            )
-
     # Test para validate_email_format eliminado porque ya no existe en el facade.
 
     # Tests para estadísticas

@@ -34,7 +34,7 @@ Módulos Delegados:
 - `_health_operations`: Verificación del estado de salud de los módulos.
 """
 
-from datetime import date
+from datetime import date, datetime
 from typing import Any
 
 from loguru import logger
@@ -96,7 +96,7 @@ class ClientRepositoryFacade:
         )
 
         # --- Módulos Legacy (para compatibilidad con tests) ---
-        # Estos atributos apuntan a los nuevos módulos para que los tests
+        # Estos atributos apuntan a los módulos para que los tests
         # que acceden a `facade.crud_ops` sigan funcionando sin cambios.
         self.crud_ops = self._crud_operations
         self.query_builder = self._query_operations
@@ -108,15 +108,59 @@ class ClientRepositoryFacade:
         # en cada módulo.
 
     # ==========================================================================
-    # MÉTODOS DELEGADOS A LOS NUEVOS MÓDULOS
+    # MÉTODOS DELEGADOS A LOS MÓDULOS
     # ==========================================================================
+
+    # --- Advanced Query Operations ---
+    async def search_clients_by_text(
+        self, 
+        search_text: str, 
+        fields: list[str] | None = None,
+        limit: int = 50,
+        offset: int = 0
+    ) -> list[Client]:
+        return await self._advanced_query_operations.search_clients_by_text(
+            search_text, fields, limit, offset
+        )
+
+    async def get_clients_by_filters(
+        self, 
+        filters: dict[str, Any],
+        limit: int = 50,
+        offset: int = 0,
+        order_by: str | None = None
+    ) -> list[Client]:
+        return await self._advanced_query_operations.get_clients_by_filters(
+            filters, limit, offset, order_by
+        )
+
+    async def get_clients_with_relationships(
+        self, 
+        include_projects: bool = False,
+        include_contacts: bool = False,
+        limit: int = 50,
+        offset: int = 0
+    ) -> list[Client]:
+        return await self._advanced_query_operations.get_clients_with_relationships(
+            include_projects, include_contacts, limit, offset
+        )
+
+    async def count_clients_by_filters(self, filters: dict[str, Any]) -> int:
+        return await self._advanced_query_operations.count_clients_by_filters(filters)
+
+    async def search_clients_fuzzy(
+        self, 
+        search_term: str, 
+        similarity_threshold: float = 0.3
+    ) -> list[Client]:
+        return await self._advanced_query_operations.search_clients_fuzzy(
+            search_term, similarity_threshold
+        )
+
 
     # --- CRUD Operations ---
     async def create_client(self, client_data: ClientCreate) -> Client:
         return await self._crud_operations.create_client(client_data.model_dump())
-
-    async def get_client_by_id(self, client_id: int) -> Client | None:
-        return await self._query_operations.get_client_by_id(client_id)
 
     async def update_client(
         self, client_id: int, client_data: ClientUpdate
@@ -126,129 +170,140 @@ class ClientRepositoryFacade:
     async def delete_client(self, client_id: int) -> bool:
         return await self._crud_operations.delete_client(client_id)
 
+
+    # --- Date Operations ---
+    async def get_clients_created_in_date_range(
+        self, start_date: datetime, end_date: datetime
+    ) -> list[Client]:
+        return await self._date_operations.get_clients_created_in_date_range(
+            start_date, end_date
+        )
+
+    async def get_clients_updated_in_date_range(
+        self, start_date: datetime, end_date: datetime
+    ) -> list[Client]:
+        return await self._date_operations.get_clients_updated_in_date_range(
+            start_date, end_date
+        )
+
+
+    # --- Health Operations ---
+    async def health_check(self) -> dict[str, Any]:
+        return await self._health_operations.health_check()
+
+    async def get_module_info(self) -> dict[str, Any]:
+        return await self._health_operations.get_module_info()
+
     # --- Query Operations ---
+    async def get_client_by_id(self, client_id: int) -> Client | None:
+        return await self._query_operations.get_client_by_id(client_id)
+
     async def get_client_by_name(self, name: str) -> Client | None:
         return await self._query_operations.get_client_by_name(name)
 
     async def get_client_by_code(self, code: str) -> Client | None:
         return await self._query_operations.get_client_by_code(code)
 
-    async def get_active_clients(self) -> list[Client]:
-        return await self._advanced_query_operations.get_clients_by_filters(
-            filters={"is_active": True}, limit=1000
-        )
-
     async def get_client_by_email(self, email: str) -> Client | None:
         return await self._query_operations.get_client_by_email(email)
 
-    # --- Advanced Query Operations ---
     async def search_clients_by_name(self, name_pattern: str) -> list[Client]:
-        return await self._advanced_query_operations.search_clients_by_name(
-            name_pattern
-        )
+        return await self._query_operations.search_clients_by_name(name_pattern)
 
-    async def search_with_advanced_filters(
-        self, **filters: Any
-    ) -> list[Client]:
-        return await self._advanced_query_operations.search_with_advanced_filters(
-            **filters
-        )
+    async def get_all_clients(self, limit: int | None = None, offset: int = 0) -> list[Client]:
+        return await self._query_operations.get_all_clients(limit, offset)
+    
+    # --- Relationship Operations ---
+    async def transfer_projects_to_client(self, from_client_id: int, to_client_id: int) -> bool:
+        return await self._relationship_operations.transfer_projects_to_client(from_client_id, to_client_id)
+
+    async def get_client_projects(self, client_id: int) -> list[Any]:
+        return await self._relationship_operations.get_client_projects(client_id)
+
+    async def get_client_project_count(self, client_id: int) -> int:
+        return await self._relationship_operations.get_client_project_count(client_id)
+
+    # --- Statistics Operations ---
+    async def get_client_statistics(self) -> dict[str, Any]:
+        return await self._statistics_operations.get_client_statistics()
+
+    async def get_client_counts_by_status(self) -> dict[str, int]:
+        return await self._statistics_operations.get_client_counts_by_status()
+
+    async def get_client_count(self) -> int:
+        return await self._statistics_operations.get_client_count()
+
+    async def get_client_stats_by_id(self, client_id: int) -> dict[str, Any]:
+        return await self._statistics_operations.get_client_stats_by_id(client_id)
+
+    async def get_client_creation_trends(self, days: int = 30, group_by: str = "day") -> list[dict[str, Any]]:
+        return await self._statistics_operations.get_client_creation_trends(days, group_by)
+
+    async def get_clients_by_project_count(self, limit: int = 10) -> list[dict[str, Any]]:
+        return await self._statistics_operations.get_clients_by_project_count(limit)
+
+    def get_comprehensive_dashboard_metrics(self) -> dict[str, Any]:
+        return self._statistics_operations.get_comprehensive_dashboard_metrics()
 
     # --- Validation Operations ---
+
+    async def validate_unique_fields(
+        self, 
+        client_data: dict[str, Any], 
+        exclude_id: int | None = None
+    ) -> None:
+        return await self._validation_operations.validate_unique_fields(
+            client_data, exclude_id
+        )
+
+    def validate_email_format(self, email: str) -> None:
+        return self._validation_operations.validate_email_format(email)
+
+    def validate_phone_format(self, phone: str) -> None:
+        return self._validation_operations.validate_phone_format(phone)
+
+    def validate_required_fields(self, client_data: dict[str, Any]) -> None:
+        return self._validation_operations.validate_required_fields(client_data)
+
+    def validate_field_lengths(self, client_data: dict[str, Any]) -> None:
+        return self._validation_operations.validate_field_lengths(client_data)
+
+    async def validate_client_data(
+        self, 
+        client_data: dict[str, Any], 
+        exclude_id: int | None = None,
+        validate_uniqueness: bool = True
+    ) -> None:
+        return await self._validation_operations.validate_client_data(
+            client_data, exclude_id, validate_uniqueness
+        )
+
+    def validate_code_format(self, code: str) -> None:
+        return self._validation_operations.validate_code_format(code)
+
+    async def validate_business_rules(
+        self, 
+        client_data: dict[str, Any], 
+        exclude_id: int | None = None
+    ) -> None:
+        return await self._validation_operations.validate_business_rules(
+            client_data, exclude_id
+        )
+
     async def validate_client_name_unique(
         self, name: str, exclude_id: int | None = None
     ) -> bool:
-        return await self._validation_operations.validate_name_unique(
+        return await self._validation_operations.validate_client_name_unique(
             name, exclude_id
         )
 
     async def validate_client_code_unique(
         self, code: str, exclude_id: int | None = None
     ) -> bool:
-        return await self._validation_operations.validate_code_unique(
+        return await self._validation_operations.validate_client_code_unique(
             code, exclude_id
         )
 
-    # --- Statistics Operations ---
-    async def get_client_statistics(self) -> dict[str, Any]:
-        return await self._statistics_operations.get_client_statistics()
-
-    async def get_comprehensive_dashboard_metrics(self) -> dict[str, Any]:
-        return (
-            await self._statistics_operations.get_comprehensive_dashboard_metrics()
-        )
-
-    async def get_client_segmentation_analysis(self) -> dict[str, Any]:
-        return (
-            await self._statistics_operations.get_client_segmentation_analysis()
-        )
-
-    async def get_client_value_analysis(self) -> dict[str, Any]:
-        return await self._statistics_operations.get_client_value_analysis()
-
-    async def get_client_retention_analysis(self) -> dict[str, Any]:
-        return await self._statistics_operations.get_client_retention_analysis()
-
-    # --- Relationship Operations ---
-    async def transfer_projects_to_client(
-        self, source_client_id: int, target_client_id: int
-    ) -> bool:
-        return (
-            await self._relationship_operations.transfer_projects_to_client(
-                source_client_id, target_client_id
-            )
-        )
-
-    async def get_client_projects(self, client_id: int) -> list[dict[str, Any]]:
-        return await self._relationship_operations.get_client_projects(client_id)
-
-    async def get_client_project_count(self, client_id: int) -> int:
-        return await self._relationship_operations.get_client_project_count(
-            client_id
-        )
-
-    # --- Date Operations ---
-    async def get_clients_created_current_week(self) -> list[Client]:
-        return await self._date_operations.get_clients_created_current_week()
-
-    async def get_clients_created_current_month(self) -> list[Client]:
-        return await self._date_operations.get_clients_created_current_month()
-
-    async def get_clients_by_date_range(
-        self, start_date: date, end_date: date
-    ) -> list[Client]:
-        return await self._date_operations.get_clients_by_date_range(
-            start_date, end_date
-        )
-
-    async def get_clients_by_age_range(
-        self, min_age_days: int, max_age_days: int
-    ) -> list[Client]:
-        return await self._date_operations.get_clients_by_age_range(
-            min_age_days, max_age_days
-        )
-
-    # --- Health Operations ---
-    async def health_check(self) -> dict[str, Any]:
-        return await self._health_operations.health_check()
-
-    # ==========================================================================
-    # MÉTODOS LEGACY (MANTENIDOS PARA COMPATIBILIDAD)
-    # ==========================================================================
-    # Estos métodos se mantienen por si alguna parte del código los llama
-    # directamente, aunque la funcionalidad ya está cubierta por los métodos
-    # delegados. En una futura refactorización, podrían ser eliminados.
-
-    async def create_client_with_date_validation(
-        self, client_data: ClientCreate
-    ) -> Client:
-        """Alias de create_client para compatibilidad."""
-        return await self.create_client(client_data)
-
-    async def get_clients_created_in_date_range(
-        self, start_date: str, end_date: str
-    ) -> list[Client]:
-        """Alias de get_clients_by_date_range para compatibilidad."""
-        start = date.fromisoformat(start_date)
-        end = date.fromisoformat(end_date)
-        return await self.get_clients_by_date_range(start, end)
+    async def validate_client_deletion(self, client_id: int) -> bool:
+        return await self._validation_operations.validate_client_deletion(client_id)
+        
