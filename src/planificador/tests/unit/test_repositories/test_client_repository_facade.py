@@ -81,16 +81,18 @@ class TestClientRepositoryFacade:
         """Test: Creación exitosa de cliente."""
         # Arrange
         client_create = ClientCreate(**valid_client_data)
-        
+
         with patch.object(
-            client_facade.crud_ops, 'create_client', return_value=mock_client
+            client_facade._crud_operations,
+            "create_client",
+            return_value=mock_client,
         ) as mock_create:
             # Act
             result = await client_facade.create_client(client_create)
-            
+
             # Assert
             assert result == mock_client
-            mock_create.assert_called_once_with(client_create)
+            mock_create.assert_called_once_with(client_create.model_dump())
 
     # Test eliminado: create_client_with_pendulum_validation no existe en ClientRepositoryFacade
 
@@ -103,7 +105,7 @@ class TestClientRepositoryFacade:
         client_id = 1
         
         with patch.object(
-            client_facade.crud_ops, 'get_client_by_id', return_value=mock_client
+            client_facade.query_builder, 'get_client_by_id', return_value=mock_client
         ) as mock_get:
             # Act
             result = await client_facade.get_client_by_id(client_id)
@@ -121,7 +123,7 @@ class TestClientRepositoryFacade:
         client_id = 999
         
         with patch.object(
-            client_facade.crud_ops, 'get_client_by_id', return_value=None
+            client_facade.query_builder, 'get_client_by_id', return_value=None
         ) as mock_get:
             # Act
             result = await client_facade.get_client_by_id(client_id)
@@ -159,58 +161,32 @@ class TestClientRepositoryFacade:
         client_name = "Test Client"
         
         with patch.object(
-            client_facade.query_builder, 'get_by_name', return_value=mock_client
+            client_facade.query_builder, 'get_client_by_name', return_value=mock_client
         ) as mock_get:
             # Act
             result = await client_facade.get_client_by_name(client_name)
-            
+
             # Assert
             assert result == mock_client
             mock_get.assert_called_once_with(client_name)
 
     @pytest.mark.asyncio
-    async def test_get_active_clients_success(
-        self, client_facade, mock_client
-    ):
-        """Test: Obtención exitosa de clientes activos."""
-        # Arrange
-        active_clients = [mock_client]
-        
+    async def test_get_active_clients_success(self, client_facade, mock_client):
+        """Prueba que se obtienen clientes activos correctamente."""
+        mock_clients = [mock_client]
         with patch.object(
-            client_facade.query_builder,
-            'get_active_clients',
-            return_value=active_clients
+            client_facade._advanced_query_operations,
+            "get_clients_by_filters",
+            return_value=mock_clients,
         ) as mock_get:
-            # Act
             result = await client_facade.get_active_clients()
-            
-            # Assert
-            assert result == active_clients
-            mock_get.assert_called_once()
 
-    # Tests para validaciones
-    # Test eliminado: validate_client_code no existe en ClientRepositoryFacade
-    # El facade no expone métodos validate_client_code, solo validate_email_format
+            assert result == mock_clients
+            mock_get.assert_awaited_once_with(
+                filters={"is_active": True}, limit=1000
+            )
 
-    @pytest.mark.asyncio
-    async def test_validate_email_format_success(
-        self, client_facade
-    ):
-        """Test: Validación exitosa de formato de email."""
-        # Arrange
-        email = "test@client.com"
-        
-        with patch.object(
-            client_facade.validator,
-            'validate_email_format',
-            return_value=True
-        ) as mock_validate:
-            # Act
-            result = await client_facade.validate_email_format(email)
-            
-            # Assert
-            assert result is True
-            mock_validate.assert_called_once_with(email)
+    # Test para validate_email_format eliminado porque ya no existe en el facade.
 
     # Tests para estadísticas
     @pytest.mark.asyncio
@@ -227,7 +203,7 @@ class TestClientRepositoryFacade:
         
         with patch.object(
             client_facade.statistics,
-            'get_client_counts_by_status',
+            'get_client_statistics',
             return_value=expected_stats
         ) as mock_stats:
             # Act
@@ -248,18 +224,18 @@ class TestClientRepositoryFacade:
         validation_error = ClientValidationError(
             field="email",
             value="test@client.com",
-            reason="Email ya existe"
+            reason="Email ya existe",
         )
-        
+
         with patch.object(
-            client_facade.crud_ops,
-            'create_client',
-            side_effect=validation_error
+            client_facade._crud_operations,
+            "create_client",
+            side_effect=validation_error,
         ):
             # Act & Assert
             with pytest.raises(ClientValidationError) as exc_info:
                 await client_facade.create_client(client_create)
-            
+
             assert "Email ya existe" in str(exc_info.value)
 
     @pytest.mark.asyncio
@@ -269,30 +245,18 @@ class TestClientRepositoryFacade:
         """Test: Error inesperado al crear cliente."""
         # Arrange
         client_create = ClientCreate(**valid_client_data)
-        unexpected_error = Exception("Error inesperado")
-        
+        unexpected_error = RepositoryError("Error inesperado")
+
         with patch.object(
-            client_facade.crud_ops,
-            'create_client',
-            side_effect=unexpected_error
-        ), patch.object(
-            client_facade.exception_handler,
-            'handle_unexpected_error',
-            side_effect=RepositoryError(
-                message="Error inesperado procesado",
-                operation="create_client",
-                entity_type="Client"
-            )
-        ) as mock_handler:
+            client_facade._crud_operations,
+            "create_client",
+            side_effect=unexpected_error,
+        ):
             # Act & Assert
             with pytest.raises(RepositoryError) as exc_info:
                 await client_facade.create_client(client_create)
-            
-            assert "Error inesperado procesado" in str(exc_info.value)
-            mock_handler.assert_called_once_with(
-                error=unexpected_error,
-                operation="create_client",
-                additional_context={"client_data": client_create.model_dump()}
-            )
 
-    # Tests eliminados: create_client_with_full_validation no existe en ClientRepositoryFacade
+            assert "Error inesperado" in str(exc_info.value)
+
+
+# Tests eliminados: create_client_with_full_validation no existe en ClientRepositoryFacade

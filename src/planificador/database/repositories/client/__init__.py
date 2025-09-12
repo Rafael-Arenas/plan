@@ -26,11 +26,17 @@ Uso recomendado:
     query_builder = ClientQueryBuilder(session)
 """
 
-from .client_query_builder import ClientQueryBuilder
-from .client_relationship_manager import ClientRelationshipManager
 from .client_repository_facade import ClientRepositoryFacade
-from .client_statistics import ClientStatistics
-from .client_validator import ClientValidator
+
+# Nuevos módulos extraídos (arquitectura modular)
+from .modules.crud_operations import CrudOperations
+from .modules.query_operations import QueryOperations
+from .modules.advanced_query_operations import AdvancedQueryOperations
+from .modules.validation_operations import ValidationOperations
+from .modules.statistics_operations import StatisticsOperations
+from .modules.relationship_operations import RelationshipOperations
+from .modules.date_operations import DateOperations
+from .modules.health_operations import HealthOperations
 
 
 # Alias para compatibilidad - ahora ClientRepository apunta al Facade
@@ -38,11 +44,16 @@ ClientRepository = ClientRepositoryFacade
 ClientRepositoryRefactored = ClientRepositoryFacade
 
 __all__ = [
-    "ClientQueryBuilder",
-    "ClientRelationshipManager",
     "ClientRepository",
     "ClientRepositoryFacade",
     "ClientRepositoryRefactored",
-    "ClientStatistics",
-    "ClientValidator",
+    # Nuevos módulos
+    "CrudOperations",
+    "QueryOperations",
+    "AdvancedQueryOperations",
+    "ValidationOperations",
+    "StatisticsOperations",
+    "RelationshipOperations",
+    "DateOperations",
+    "HealthOperations",
 ]

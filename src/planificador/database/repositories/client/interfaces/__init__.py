@@ -1,22 +1,27 @@
-"""Interfaces para romper dependencias circulares en repositorios de cliente.
+"""Interfaces para los módulos del ClientRepositoryFacade.
 
-Este módulo contiene las interfaces abstractas que permiten la inyección de
-dependencias y evitan las referencias circulares entre las clases especializadas
-del repositorio de cliente.
-
-Interfaces disponibles:
-    - IClientValidator: Interface para validación de datos de cliente
-    - IClientQueryBuilder: Interface para construcción de consultas
-    - IClientStatistics: Interface para operaciones estadísticas
-
-Example:
-    >>> from planificador.database.repositories.client.interfaces import IClientValidator
-    >>> # Usar la interface para inyección de dependencias
+Este paquete define los contratos que deben cumplir cada uno de los
+módulos especializados del facade.
 """
 
-from .i_client_query_builder import IClientQueryBuilder
-from .i_client_statistics import IClientStatistics
-from .i_client_validator import IClientValidator
+from .crud_interface import ICrudOperations
+from .query_interface import IQueryOperations
+from .advanced_query_interface import IAdvancedQueryOperations
+from .search_interface import ISearchOperations
+from .statistics_interface import IStatisticsOperations
+from .validation_interface import IValidationOperations
+from .relationship_interface import IRelationshipOperations
+from .date_interface import IDateOperations
+from .health_interface import IHealthOperations
 
-
-__all__ = ["IClientQueryBuilder", "IClientStatistics", "IClientValidator"]
+__all__ = [
+    "ICrudOperations",
+    "IQueryOperations",
+    "IAdvancedQueryOperations",
+    "ISearchOperations",
+    "IStatisticsOperations", 
+    "IValidationOperations",
+    "IRelationshipOperations",
+    "IDateOperations",
+    "IHealthOperations",
+]
