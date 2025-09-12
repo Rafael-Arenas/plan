@@ -8,7 +8,7 @@ import pendulum
 from pendulum import DateTime, Date
 from loguru import logger
 
-from ..base_repository import BaseRepository
+from ...base_repository import BaseRepository
 from .....models.employee import Employee, EmployeeStatus
 from .....utils.date_utils import (
     get_current_time,
@@ -42,6 +42,9 @@ class DateOperations(BaseRepository[Employee], IEmployeeDateOperations):
     def __init__(self, session: AsyncSession):
         super().__init__(session, Employee)
         self._logger = logger.bind(component="DateOperations")
+    
+    async def get_by_unique_field(self, field_name: str, value: Any) -> Optional[Employee]:
+        return await super().get_by_unique_field(field_name, value)
     
     # ============================================================================
     # CONSULTAS TEMPORALES

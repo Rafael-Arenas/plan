@@ -19,7 +19,7 @@ from .....exceptions.repository import (
     EmployeeRepositoryError,
     create_employee_validation_repository_error
 )
-from .....exceptions.validation_exceptions import ValidationError
+from .....exceptions.validation import ValidationError
 
 
 class RelationshipOperations(IEmployeeRelationshipOperations):

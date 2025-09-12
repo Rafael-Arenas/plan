@@ -1,5 +1,6 @@
 # src/planificador/database/repositories/employee/modules/crud_operations.py
 
+from uuid import UUID
 from typing import List, Dict, Any, Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import SQLAlchemyError
@@ -12,7 +13,7 @@ from .....exceptions.repository import (
     EmployeeRepositoryError,
     create_employee_validation_repository_error
 )
-from ..employee_validator import EmployeeValidator
+from .validation_operations import ValidationOperations as EmployeeValidator
 from ...base_repository import BaseRepository
 
 
@@ -140,7 +141,30 @@ class CrudOperations(BaseRepository[Employee], IEmployeeCrudOperations):
                 original_error=e
             )
     
-    async def delete_employee(self, employee_id: int) -> bool:
+    async def get_by_unique_field(self, field_name: str, value: Any) -> Optional[Employee]:
+        """
+        Obtiene un empleado por un campo único (DNI o email).
+
+        Args:
+            field_name: Nombre del campo único ('dni' o 'email').
+            value: Valor a buscar.
+
+        Returns:
+            El empleado encontrado o None si no existe.
+        
+        Raises:
+            RepositoryError: Si el campo no es válido o si ocurre un error.
+        """
+        if field_name not in ["dni", "email"]:
+            raise RepositoryError(
+                message=f"Campo '{field_name}' no es un campo único válido para buscar.",
+                operation="get_by_unique_field",
+                entity_type=self.model_class.__name__
+            )
+        
+        return await super().get_by_unique_field(field_name, value)
+
+    async def delete_employee(self, employee_id: UUID) -> bool:
         """
         Elimina un empleado por ID.
         

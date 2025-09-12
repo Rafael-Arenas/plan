@@ -10,7 +10,6 @@ from .statistics_operations import StatisticsOperations
 from .validation_operations import ValidationOperations
 from .relationship_operations import RelationshipOperations
 from .date_operations import DateOperations
-from .health_operations import HealthOperations
 
 __all__ = [
     "CrudOperations",
@@ -19,5 +18,4 @@ __all__ = [
     "ValidationOperations",
     "RelationshipOperations",
     "DateOperations",
-    "HealthOperations",
 ]

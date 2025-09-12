@@ -13,11 +13,17 @@ from .....models.team_membership import TeamMembership
 from .....models.project_assignment import ProjectAssignment
 from .....models.vacation import Vacation, VacationStatus
 from .....utils.date_utils import get_current_time
-from .....exceptions.repository.base_repository_exceptions import convert_sqlalchemy_error
-from .....exceptions.repository.base_repository_exceptions import ( # noqa: E501
-    EmployeeRepositoryError, convert_sqlalchemy_error
+from .....exceptions.repository.base_repository_exceptions import (
+    RepositoryError,
+    RepositoryConnectionError,
+    RepositoryTimeoutError,
+    RepositoryTransactionError,
+    convert_sqlalchemy_error
 )
-from .....exceptions.repository.employee_repository_exceptions import create_employee_query_error
+from .....exceptions.repository.employee_repository_exceptions import (
+    EmployeeRepositoryError,
+    create_employee_query_error
+)
 from ..interfaces.query_interface import IEmployeeQueryOperations
 
 
