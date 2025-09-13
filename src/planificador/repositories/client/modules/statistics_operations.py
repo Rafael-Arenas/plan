@@ -4,35 +4,35 @@ Este módulo implementa la interfaz IStatisticsOperations y proporciona
 funcionalidades para generar estadísticas, métricas y análisis de clientes.
 """
 
-from typing import Any
+from typing import Any, Coroutine
 
+import pendulum
 from loguru import logger
 from sqlalchemy import func, select
 from sqlalchemy.exc import SQLAlchemyError
-from sqlalchemy.ext.asyncio import AsyncSession
 
+from planificador.repositories.base_repository import BaseRepository
 from planificador.models.client import Client
-from planificador.exceptions.repository import convert_sqlalchemy_error
-from planificador.exceptions.repository.client_repository_exceptions import (
-    ClientRepositoryError,
+from planificador.models.project import Project
+from planificador.repositories.client.interfaces.statistics_interface import (
+    IClientStatistics as IStatisticsOperations,
 )
-from ..interfaces.statistics_interface import IClientStatistics as IStatisticsOperations
 
 
-class StatisticsOperations(IStatisticsOperations):
+class StatisticsOperations(BaseRepository[Client], IStatisticsOperations):
     """Implementación de operaciones de estadísticas para clientes.
     
     Esta clase encapsula todas las operaciones relacionadas con estadísticas,
     métricas y análisis de datos de clientes.
     """
 
-    def __init__(self, session: AsyncSession) -> None:
+    def __init__(self, session_factory: Coroutine) -> None:
         """Inicializa las operaciones de estadísticas.
         
         Args:
-            session: Sesión de base de datos asíncrona
+            session_factory: Factoría de sesiones de base de datos asíncrona
         """
-        self.session = session
+        super().__init__(session_factory, Client)
         self._logger = logger.bind(component="StatisticsOperations")
 
     async def get_client_statistics(self) -> dict[str, Any]:
@@ -40,114 +40,42 @@ class StatisticsOperations(IStatisticsOperations):
         
         Returns:
             Diccionario con estadísticas básicas de clientes
-            
-        Raises:
-            ClientRepositoryError: Si ocurre un error en el cálculo
         """
-        try:
-            self._logger.debug("Obteniendo estadísticas generales de clientes")
-            return await self.get_client_counts_by_status()
-        except SQLAlchemyError as e:
-            self._logger.error(
-                f"Error de BD obteniendo estadísticas de clientes: {e}"
-            )
-            raise convert_sqlalchemy_error(
-                error=e,
-                operation="get_client_statistics",
-                entity_type="Client",
-            )
-        except Exception as e:
-            self._logger.error(
-                f"Error inesperado obteniendo estadísticas de clientes: {e}"
-            )
-            raise ClientRepositoryError(
-                message=f"Error obteniendo estadísticas de clientes: {e}",
-                operation="get_client_statistics",
-                entity_type="Client",
-                original_error=e,
-            )
+        self._logger.debug("Obteniendo estadísticas generales de clientes")
+        return await self.get_client_counts_by_status()
 
     async def get_client_counts_by_status(self) -> dict[str, int]:
         """Obtiene el conteo de clientes por estado (activo/inactivo).
         
         Returns:
             Diccionario con el número de clientes activos e inactivos.
-            
-        Raises:
-            ClientRepositoryError: Si ocurre un error en la consulta.
         """
-        try:
-            self._logger.debug("Contando clientes por estado (activo/inactivo)")
-            query = (
-                select(Client.is_active, func.count(Client.id).label("count"))
-                .group_by(Client.is_active)
-            )
-            result = await self.session.execute(query)
-            rows = result.all()
+        self._logger.debug("Contando clientes por estado (activo/inactivo)")
+        active_count = await self.count([self.model_class.is_active == True])
+        inactive_count = await self.count([self.model_class.is_active == False])
+        
+        counts = {"active": active_count, "inactive": inactive_count}
+        self._logger.info(f"Clientes por estado: {counts}")
+        return counts
 
-            counts = {"active": 0, "inactive": 0}
-            for row in rows:
-                if row.is_active:
-                    counts["active"] = row.count
-                else:
-                    counts["inactive"] = row.count
-
-            self._logger.info(f"Clientes por estado: {counts}")
-            return counts
-        except SQLAlchemyError as e:
-            self._logger.error(
-                f"Error de BD contando clientes por estado: {e}"
-            )
-            raise convert_sqlalchemy_error(
-                error=e,
-                operation="get_client_counts_by_status",
-                entity_type="Client",
-            )
-        except Exception as e:
-            self._logger.error(
-                f"Error inesperado contando clientes por estado: {e}"
-            )
-            raise ClientRepositoryError(
-                message=f"Error contando clientes por estado: {e}",
-                operation="get_client_counts_by_status",
-                entity_type="Client",
-                original_error=e,
-            )
-
-    async def get_client_count(self) -> int:
+    async def get_client_count(self, is_active: bool | None = None) -> int:
         """Obtiene el número total de clientes.
+        
+        Args:
+            is_active: Filtra por estado de actividad si se proporciona.
         
         Returns:
             Número total de clientes registrados
-            
-        Raises:
-            ClientRepositoryError: Si ocurre un error en el conteo
         """
-        try:
-            self._logger.debug("Obteniendo conteo total de clientes")
-            query = select(func.count(Client.id))
-            result = await self.session.execute(query)
-            count = result.scalar_one()
-            self._logger.info(f"Conteo total de clientes: {count}")
-            return count
-        except SQLAlchemyError as e:
-            self._logger.error(f"Error de base de datos obteniendo conteo de clientes: {e}")
-            raise convert_sqlalchemy_error(
-                error=e,
-                operation="get_client_count",
-                entity_type="Client"
-            )
-        except Exception as e:
-            self._logger.error(f"Error inesperado obteniendo conteo de clientes: {e}")
-            raise ClientRepositoryError(
-                message=f"Error obteniendo conteo de clientes: {e}",
-                operation="get_client_count",
-                entity_type="Client",
-                original_error=e
-            )
+        self._logger.debug("Obteniendo conteo total de clientes")
+        criteria = []
+        if is_active is not None:
+            criteria.append(self.model_class.is_active == is_active)
+        
+        count = await self.count(criteria)
+        self._logger.info(f"Conteo total de clientes: {count}")
+        return count
 
-    # Métodos adicionales de estadísticas específicas
-    
     async def get_client_stats_by_id(self, client_id: int) -> dict[str, Any]:
         """Obtiene estadísticas de un cliente específico.
         
@@ -156,32 +84,28 @@ class StatisticsOperations(IStatisticsOperations):
             
         Returns:
             Diccionario con estadísticas del cliente
-            
-        Raises:
-            ClientRepositoryError: Si ocurre un error en el cálculo
         """
-        try:
-            self._logger.debug(f"Obteniendo estadísticas del cliente {client_id}")
-            return await self.statistics.get_client_stats(client_id)
-        except SQLAlchemyError as e:
-            self._logger.error(f"Error de base de datos obteniendo estadísticas del cliente {client_id}: {e}")
-            raise convert_sqlalchemy_error(
-                error=e,
-                operation="get_client_stats_by_id",
-                entity_type="Client",
-                entity_id=client_id
-            )
-        except Exception as e:
-            self._logger.error(f"Error inesperado obteniendo estadísticas del cliente {client_id}: {e}")
-            raise ClientRepositoryError(
-                message=f"Error obteniendo estadísticas del cliente {client_id}: {e}",
-                operation="get_client_stats_by_id",
-                entity_type="Client",
-                entity_id=client_id,
-                original_error=e
-            )
+        self._logger.debug(f"Obteniendo estadísticas del cliente {client_id}")
+        client = await self.get_by_id(client_id)
+        if not client:
+            return {}
 
-    async def get_client_creation_trends(self, days: int = 30, group_by: str = "day") -> list[dict[str, Any]]:
+        project_count = await self.count_related(
+            Project, Project.client_id == client_id
+        )
+        
+        return {
+            "client_id": client.id,
+            "name": client.name,
+            "is_active": client.is_active,
+            "project_count": project_count,
+            "created_at": client.created_at,
+            "updated_at": client.updated_at,
+        }
+
+    async def get_client_creation_trends(
+        self, days: int = 30, group_by: str = "day"
+    ) -> list[dict[str, Any]]:
         """Obtiene tendencias de creación de clientes.
         
         Args:
@@ -190,30 +114,38 @@ class StatisticsOperations(IStatisticsOperations):
             
         Returns:
             Lista con tendencias de creación de clientes
-            
-        Raises:
-            ClientRepositoryError: Si ocurre un error en el cálculo
         """
-        try:
-            self._logger.debug(f"Obteniendo tendencias de creación para {days} días agrupadas por {group_by}")
-            return await self.statistics.get_client_creation_trends(days, group_by)
-        except SQLAlchemyError as e:
-            self._logger.error(f"Error de base de datos obteniendo tendencias de creación: {e}")
-            raise convert_sqlalchemy_error(
-                error=e,
-                operation="get_client_creation_trends",
-                entity_type="Client"
-            )
-        except Exception as e:
-            self._logger.error(f"Error inesperado obteniendo tendencias de creación: {e}")
-            raise ClientRepositoryError(
-                message=f"Error obteniendo tendencias de creación: {e}",
-                operation="get_client_creation_trends",
-                entity_type="Client",
-                original_error=e
-            )
+        self._logger.debug(
+            f"Obteniendo tendencias de creación para {days} días agrupadas por {group_by}"
+        )
+        end_date = pendulum.now()
+        start_date = end_date.subtract(days=days)
 
-    async def get_clients_by_project_count(self, limit: int = 10) -> list[dict[str, Any]]:
+        if group_by == "day":
+            trunc_func = func.date
+        elif group_by == "week":
+            trunc_func = func.strftime("%Y-%W", self.model_class.created_at)
+        elif group_by == "month":
+            trunc_func = func.strftime("%Y-%m", self.model_class.created_at)
+        else:
+            raise ValueError("group_by debe ser 'day', 'week' o 'month'")
+
+        async with self.get_session() as session:
+            query = (
+                select(
+                    trunc_func(self.model_class.created_at).label("period"),
+                    func.count(self.model_class.id).label("count"),
+                )
+                .where(self.model_class.created_at.between(start_date, end_date))
+                .group_by("period")
+                .order_by("period")
+            )
+            result = await session.execute(query)
+            return [{"period": row.period, "count": row.count} for row in result]
+
+    async def get_clients_by_project_count(
+        self, limit: int = 10
+    ) -> list[dict[str, Any]]:
         """Obtiene clientes ordenados por número de proyectos.
         
         Args:
@@ -221,30 +153,31 @@ class StatisticsOperations(IStatisticsOperations):
             
         Returns:
             Lista de clientes con conteo de proyectos
-            
-        Raises:
-            ClientRepositoryError: Si ocurre un error en la consulta
         """
-        try:
-            self._logger.debug(f"Obteniendo top {limit} clientes por número de proyectos")
-            return await self.statistics.get_clients_by_project_count(limit)
-        except SQLAlchemyError as e:
-            self._logger.error(f"Error de base de datos obteniendo clientes por proyectos: {e}")
-            raise convert_sqlalchemy_error(
-                error=e,
-                operation="get_clients_by_project_count",
-                entity_type="Client"
+        self._logger.debug(f"Obteniendo top {limit} clientes por número de proyectos")
+        async with self.get_session() as session:
+            query = (
+                select(
+                    self.model_class.id,
+                    self.model_class.name,
+                    func.count(Project.id).label("project_count"),
+                )
+                .join(Project, self.model_class.id == Project.client_id)
+                .group_by(self.model_class.id)
+                .order_by(func.count(Project.id).desc())
+                .limit(limit)
             )
-        except Exception as e:
-            self._logger.error(f"Error inesperado obteniendo clientes por proyectos: {e}")
-            raise ClientRepositoryError(
-                message=f"Error obteniendo clientes por proyectos: {e}",
-                operation="get_clients_by_project_count",
-                entity_type="Client",
-                original_error=e
-            )
+            result = await session.execute(query)
+            return [
+                {
+                    "client_id": row.id,
+                    "name": row.name,
+                    "project_count": row.project_count,
+                }
+                for row in result
+            ]
 
-    def get_comprehensive_dashboard_metrics(self) -> dict[str, Any]:
+    async def get_comprehensive_dashboard_metrics(self) -> dict[str, Any]:
         """
         Recopila una serie de métricas clave sobre los clientes para un
         dashboard.
@@ -252,22 +185,12 @@ class StatisticsOperations(IStatisticsOperations):
         Returns:
             Un diccionario con métricas completas.
         """
-        try:
-            total_clients = self.get_client_count()
-            active_clients = self.get_client_count(is_active=True)
-            inactive_clients = self.get_client_count(is_active=False)
+        total_clients = await self.get_client_count()
+        clients_by_status = await self.get_client_counts_by_status()
+        trends = await self.get_client_creation_trends(days=30)
 
-            trends = self.get_client_creation_trends(days=30)
-
-            return {
-                "total_clients": total_clients,
-                "clients_by_status": {
-                    "active": active_clients,
-                    "inactive": inactive_clients,
-                },
-                "creation_trends_last_30_days": trends,
-            }
-        except SQLAlchemyError as e:
-            raise convert_sqlalchemy_error(
-                e, "Error al obtener métricas del dashboard."
-            ) from e
+        return {
+            "total_clients": total_clients,
+            "clients_by_status": clients_by_status,
+            "creation_trends_last_30_days": trends,
+        }

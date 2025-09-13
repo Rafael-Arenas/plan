@@ -26,6 +26,20 @@ class IEmployeeQueryOperations(ABC):
         pass
 
     @abstractmethod
+    async def get_by_unique_field(self, field_name: str, value: Any) -> Optional[Employee]:
+        """
+        Obtiene un empleado por un campo único.
+
+        Args:
+            field_name: Nombre del campo único
+            value: Valor del campo
+
+        Returns:
+            Empleado o None si no se encuentra
+        """
+        pass
+
+    @abstractmethod
     async def get_all(self, skip: int = 0, limit: int = 100) -> List[Employee]:
         """
         Obtiene una lista paginada de todos los empleados.

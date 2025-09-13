@@ -190,3 +190,17 @@ class IEmployeeRelationshipOperations(ABC):
             True si tiene dependencias, False en caso contrario
         """
         pass
+
+    @abstractmethod
+    async def get_by_unique_field(self, field_name: str, value: Any) -> Optional[Employee]:
+        """
+        Obtiene un empleado por un campo único.
+
+        Args:
+            field_name: Nombre del campo único.
+            value: Valor del campo único.
+
+        Returns:
+            El empleado si se encuentra, de lo contrario None.
+        """
+        pass

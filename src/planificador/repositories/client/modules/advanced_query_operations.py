@@ -1,7 +1,8 @@
 """Módulo de operaciones de consulta avanzadas para clientes.
 
 Este módulo implementa funcionalidades especializadas para consultas
-complejas y filtros avanzados sobre la entidad Client.
+complejas y filtros avanzados sobre la entidad Client, aprovechando
+las capacidades del BaseRepository.
 
 Características principales:
 - Búsquedas por texto completo
@@ -12,34 +13,27 @@ Características principales:
 - Operaciones asíncronas optimizadas
 
 Autor: Sistema de Repositorios
-Versión: 1.0.0
+Versión: 2.0.0
 """
 
 from typing import Any, Dict, List, Optional
 
-from loguru import logger
-from sqlalchemy import and_, or_, text
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
 
-from planificador.exceptions.repository.client_repository_exceptions import (
-    ClientRepositoryError,
-    ClientValidationError,
-)
 from planificador.models.client import Client
-from ..interfaces.query_interface import IAdvancedQueryOperations
+from planificador.repositories.base_repository import BaseRepository
+from planificador.exceptions import (
+    RepositoryError,
+    ValidationError,
+)
+from ..interfaces.query_interface import IQueryOperations
 
 
-class AdvancedQueryOperations(IAdvancedQueryOperations):
+class AdvancedQueryOperations(BaseRepository[Client], IQueryOperations):
     """Implementación de operaciones de consulta avanzadas para clientes.
     
-    Esta clase proporciona métodos especializados para realizar consultas
-    complejas sobre la entidad Client, incluyendo búsquedas por texto,
-    filtros múltiples y criterios avanzados.
-    
-    Attributes:
-        session: Sesión asíncrona de SQLAlchemy
-        _logger: Logger estructurado para la clase
+    Hereda de BaseRepository para reutilizar la lógica CRUD y de consulta
+    básica, y se especializa en búsquedas complejas para la entidad Client.
     """
 
     def __init__(self, session: AsyncSession):
@@ -48,9 +42,8 @@ class AdvancedQueryOperations(IAdvancedQueryOperations):
         Args:
             session: Sesión asíncrona de SQLAlchemy
         """
-        self.session = session
-        self._logger = logger.bind(component="AdvancedQueryOperations")
-        
+        super().__init__(session, Client)
+        self._logger = self._logger.bind(component="AdvancedQueryOperations")
         self._logger.debug("AdvancedQueryOperations inicializado")
 
     async def search_clients_by_text(
@@ -72,80 +65,58 @@ class AdvancedQueryOperations(IAdvancedQueryOperations):
             Lista de clientes que coinciden con el texto
             
         Raises:
-            ClientRepositoryError: Si ocurre un error en la consulta
-            ClientValidationError: Si los parámetros son inválidos
+            ValidationError: Si los parámetros son inválidos
+            RepositoryError: Si ocurre un error en la consulta
         """
-        try:
-            if not search_text or not search_text.strip():
-                raise ClientValidationError(
-                    message="El texto de búsqueda no puede estar vacío",
-                    field="search_text",
-                    value=search_text
-                )
-                
-            self._logger.debug(
-                f"Búsqueda de texto: '{search_text}' en campos: {fields}"
+        if not search_text or not search_text.strip():
+            raise ValidationError(
+                message="El texto de búsqueda no puede estar vacío",
+                field="search_text",
+                value=search_text
             )
             
-            from sqlalchemy import select
-            
-            # Campos por defecto para búsqueda
-            default_fields = ['name', 'email', 'phone', 'address', 'code']
-            search_fields = fields if fields else default_fields
-            
-            # Construir patrón de búsqueda
-            pattern = f"%{search_text.strip()}%"
-            
-            # Construir condiciones OR para cada campo
-            conditions = []
-            for field in search_fields:
-                if hasattr(Client, field):
-                    field_attr = getattr(Client, field)
-                    conditions.append(field_attr.ilike(pattern))
-            
-            if not conditions:
-                raise ClientValidationError(
-                    message="No se encontraron campos válidos para búsqueda",
-                    field="fields",
-                    value=fields
-                )
-            
-            # Ejecutar consulta con condiciones OR
-            stmt = (
-                select(Client)
-                .where(or_(*conditions))
-                .order_by(Client.name)
-                .offset(offset)
-                .limit(limit)
+        self._logger.debug(
+            f"Búsqueda de texto: '{search_text}' en campos: {fields}"
+        )
+        
+        default_fields = ['name', 'email', 'phone', 'address', 'code']
+        search_fields = fields if fields else default_fields
+        
+        pattern = f"%{search_text.strip()}%"
+        
+        # Usamos un OR para buscar en múltiples campos
+        criteria = {
+            "or": [
+                {field: {"operator": "ilike", "value": pattern}}
+                for field in search_fields if hasattr(self.model_class, field)
+            ]
+        }
+        
+        if not criteria["or"]:
+            raise ValidationError(
+                message="No se encontraron campos válidos para búsqueda",
+                field="fields",
+                value=fields
             )
-            
-            result = await self.session.execute(stmt)
-            clients = result.scalars().all()
-            
-            self._logger.info(
-                f"Encontrados {len(clients)} clientes con texto '{search_text}'"
-            )
-            return list(clients)
-            
-        except ClientValidationError:
-            raise
-        except Exception as e:
-            self._logger.error(f"Error en búsqueda por texto '{search_text}': {e}")
-            raise ClientRepositoryError(
-                message=f"Error en búsqueda por texto: {e}",
-                operation="search_clients_by_text",
-                entity_type="Client",
-                original_error=e
-            )
+
+        return await self.find_by_criteria(
+            criteria=criteria,
+            limit=limit,
+            offset=offset,
+            order_by="name"
+        )
 
     async def get_clients_by_filters(
         self, 
         filters: Dict[str, Any],
         limit: int = 50,
         offset: int = 0,
-        order_by: Optional[str] = None
+        order_by: Optional[str] = "name"
     ) -> List[Client]:
         """Obtiene clientes aplicando múltiples filtros.
+        
+        Este método actúa como un alias para find_by_criteria, garantizando
+        la compatibilidad con la interfaz anterior.
         
         Args:
             filters: Diccionario con filtros a aplicar
@@ -157,90 +128,24 @@ class AdvancedQueryOperations(IAdvancedQueryOperations):
             Lista de clientes que cumplen los filtros
             
         Raises:
-            ClientRepositoryError: Si ocurre un error en la consulta
-            ClientValidationError: Si los filtros son inválidos
+            RepositoryError: Si ocurre un error en la consulta
+            ValidationError: Si los filtros son inválidos
         """
-        try:
-            if not filters:
-                raise ClientValidationError(
-                    message="Debe proporcionar al menos un filtro",
-                    field="filters",
-                    value=filters
-                )
-                
-            self._logger.debug(f"Aplicando filtros: {filters}")
-            
-            from sqlalchemy import select
-            
-            # Construir condiciones de filtro
-            conditions = []
-            
-            for field, value in filters.items():
-                if not hasattr(Client, field):
-                    raise ClientValidationError(
-                        message=f"Campo '{field}' no existe en Client",
-                        field=field,
-                        value=value
-                    )
-                
-                field_attr = getattr(Client, field)
-                
-                # Manejar diferentes tipos de filtros
-                if isinstance(value, str) and '%' in value:
-                    # Filtro LIKE para patrones
-                    conditions.append(field_attr.ilike(value))
-                elif isinstance(value, list):
-                    # Filtro IN para listas
-                    conditions.append(field_attr.in_(value))
-                elif isinstance(value, dict):
-                    # Filtros de rango (gte, lte, gt, lt)
-                    if 'gte' in value:
-                        conditions.append(field_attr >= value['gte'])
-                    if 'lte' in value:
-                        conditions.append(field_attr <= value['lte'])
-                    if 'gt' in value:
-                        conditions.append(field_attr > value['gt'])
-                    if 'lt' in value:
-                        conditions.append(field_attr < value['lt'])
-                else:
-                    # Filtro de igualdad exacta
-                    conditions.append(field_attr == value)
-            
-            # Construir consulta base
-            stmt = select(Client).where(and_(*conditions))
-            
-            # Aplicar ordenamiento
-            if order_by:
-                if hasattr(Client, order_by):
-                    order_field = getattr(Client, order_by)
-                    stmt = stmt.order_by(order_field)
-                else:
-                    self._logger.warning(f"Campo de ordenamiento '{order_by}' no existe")
-                    stmt = stmt.order_by(Client.name)
-            else:
-                stmt = stmt.order_by(Client.name)
-            
-            # Aplicar paginación
-            stmt = stmt.offset(offset).limit(limit)
-            
-            result = await self.session.execute(stmt)
-            clients = result.scalars().all()
-            
-            self._logger.info(
-                f"Encontrados {len(clients)} clientes con filtros aplicados"
+        if not filters:
+            raise ValidationError(
+                message="Debe proporcionar al menos un filtro",
+                field="filters",
+                value=filters
             )
-            return list(clients)
             
-        except ClientValidationError:
-            raise
-        except Exception as e:
-            self._logger.error(f"Error al aplicar filtros {filters}: {e}")
-            raise ClientRepositoryError(
-                message=f"Error al aplicar filtros: {e}",
-                operation="get_clients_by_filters",
-                entity_type="Client",
-                original_error=e
-            )
+        self._logger.debug(f"Aplicando filtros: {filters}")
+        
+        return await self.find_by_criteria(
+            criteria=filters,
+            limit=limit,
+            offset=offset,
+            order_by=order_by
+        )
 
     async def get_clients_with_relationships(
         self, 
@@ -249,7 +154,7 @@ class AdvancedQueryOperations(IAdvancedQueryOperations):
         limit: int = 50,
         offset: int = 0
     ) -> List[Client]:
-        """Obtiene clientes con sus relaciones cargadas.
+        """Obtiene clientes con sus relaciones cargadas (eager loading).
         
         Args:
             include_projects: Si incluir proyectos relacionados
@@ -261,51 +166,31 @@ class AdvancedQueryOperations(IAdvancedQueryOperations):
             Lista de clientes con relaciones cargadas
             
         Raises:
-            ClientRepositoryError: Si ocurre un error en la consulta
+            RepositoryError: Si ocurre un error en la consulta
         """
-        try:
-            self._logger.debug(
-                f"Obteniendo clientes con relaciones (projects: {include_projects}, "
-                f"contacts: {include_contacts})"
-            )
-            
-            from sqlalchemy import select
-            
-            # Construir consulta base
-            stmt = select(Client)
-            
-            # Agregar eager loading según sea necesario
-            options = []
-            if include_projects and hasattr(Client, 'projects'):
-                options.append(selectinload(Client.projects))
-            if include_contacts and hasattr(Client, 'contacts'):
-                options.append(selectinload(Client.contacts))
-            
-            if options:
-                stmt = stmt.options(*options)
-            
-            # Aplicar ordenamiento y paginación
-            stmt = stmt.order_by(Client.name).offset(offset).limit(limit)
-            
-            result = await self.session.execute(stmt)
-            clients = result.scalars().all()
-            
-            self._logger.info(
-                f"Obtenidos {len(clients)} clientes con relaciones cargadas"
-            )
-            return list(clients)
-            
-        except Exception as e:
-            self._logger.error(f"Error al obtener clientes con relaciones: {e}")
-            raise ClientRepositoryError(
-                message=f"Error al obtener clientes con relaciones: {e}",
-                operation="get_clients_with_relationships",
-                entity_type="Client",
-                original_error=e
-            )
+        self._logger.debug(
+            f"Obteniendo clientes con relaciones (projects: {include_projects}, "
+            f"contacts: {include_contacts})"
+        )
+        
+        relationships_to_load = []
+        if include_projects and hasattr(self.model_class, 'projects'):
+            relationships_to_load.append('projects')
+        if include_contacts and hasattr(self.model_class, 'contacts'):
+            relationships_to_load.append('contacts')
+        
+        return await self.get_all_with_relationships(
+            relationships=relationships_to_load,
+            limit=limit,
+            offset=offset,
+            order_by="name"
+        )
 
     async def count_clients_by_filters(self, filters: Dict[str, Any]) -> int:
         """Cuenta clientes que cumplen los filtros especificados.
+        
+        Este método actúa como un alias para el método `count` del
+        repositorio base.
         
         Args:
             filters: Diccionario con filtros a aplicar
@@ -314,57 +199,10 @@ class AdvancedQueryOperations(IAdvancedQueryOperations):
             Número de clientes que cumplen los filtros
             
         Raises:
-            ClientRepositoryError: Si ocurre un error en la consulta
+            RepositoryError: Si ocurre un error en la consulta
         """
-        try:
-            self._logger.debug(f"Contando clientes con filtros: {filters}")
-            
-            from sqlalchemy import select, func
-            
-            # Reutilizar lógica de filtros de get_clients_by_filters
-            conditions = []
-            
-            for field, value in filters.items():
-                if not hasattr(Client, field):
-                    continue
-                    
-                field_attr = getattr(Client, field)
-                
-                if isinstance(value, str) and '%' in value:
-                    conditions.append(field_attr.ilike(value))
-                elif isinstance(value, list):
-                    conditions.append(field_attr.in_(value))
-                elif isinstance(value, dict):
-                    if 'gte' in value:
-                        conditions.append(field_attr >= value['gte'])
-                    if 'lte' in value:
-                        conditions.append(field_attr <= value['lte'])
-                    if 'gt' in value:
-                        conditions.append(field_attr > value['gt'])
-                    if 'lt' in value:
-                        conditions.append(field_attr < value['lt'])
-                else:
-                    conditions.append(field_attr == value)
-            
-            # Consulta de conteo
-            stmt = select(func.count(Client.id))
-            if conditions:
-                stmt = stmt.where(and_(*conditions))
-            
-            result = await self.session.execute(stmt)
-            count = result.scalar()
-            
-            self._logger.info(f"Contados {count} clientes con filtros aplicados")
-            return count
-            
-        except Exception as e:
-            self._logger.error(f"Error al contar clientes con filtros {filters}: {e}")
-            raise ClientRepositoryError(
-                message=f"Error al contar clientes: {e}",
-                operation="count_clients_by_filters",
-                entity_type="Client",
-                original_error=e
-            )
+        self._logger.debug(f"Contando clientes con filtros: {filters}")
+        return await self.count(filters=filters)
 
     async def search_clients_fuzzy(
         self, 
@@ -373,56 +211,39 @@ class AdvancedQueryOperations(IAdvancedQueryOperations):
     ) -> List[Client]:
         """Realiza búsqueda difusa de clientes.
         
+        En esta implementación, se simula una búsqueda difusa usando ILIKE.
+        Para una búsqueda más avanzada, se recomienda usar extensiones de
+        base de datos como pg_trgm en PostgreSQL.
+        
         Args:
             search_term: Término de búsqueda
-            similarity_threshold: Umbral de similitud (0.0 a 1.0)
+            similarity_threshold: Umbral de similitud (no utilizado en esta simulación)
             
         Returns:
             Lista de clientes ordenados por relevancia
             
         Raises:
-            ClientRepositoryError: Si ocurre un error en la consulta
+            RepositoryError: Si ocurre un error en la consulta
         """
-        try:
-            if not search_term or not search_term.strip():
-                return []
-                
-            self._logger.debug(
-                f"Búsqueda difusa: '{search_term}' (umbral: {similarity_threshold})"
-            )
+        if not search_term or not search_term.strip():
+            return []
             
-            from sqlalchemy import select, func
-            
-            # Búsqueda básica con LIKE para simulación de fuzzy search
-            # En producción se podría usar extensiones como pg_trgm para PostgreSQL
-            search_pattern = f"%{search_term.strip()}%"
-            
-            stmt = (
-                select(Client)
-                .where(
-                    or_(
-                        Client.name.ilike(search_pattern),
-                        Client.email.ilike(search_pattern),
-                        Client.code.ilike(search_pattern)
-                    )
-                )
-                .order_by(Client.name)
-                .limit(50)
-            )
-            
-            result = await self.session.execute(stmt)
-            clients = result.scalars().all()
-            
-            self._logger.info(
-                f"Búsqueda difusa encontró {len(clients)} clientes para '{search_term}'"
-            )
-            return list(clients)
-            
-        except Exception as e:
-            self._logger.error(f"Error en búsqueda difusa '{search_term}': {e}")
-            raise ClientRepositoryError(
-                message=f"Error en búsqueda difusa: {e}",
-                operation="search_clients_fuzzy",
-                entity_type="Client",
-                original_error=e
-            )
+        self._logger.debug(
+            f"Búsqueda difusa (simulada): '{search_term}'"
+        )
+        
+        search_pattern = f"%{search_term.strip()}%"
+        
+        criteria = {
+            "or": [
+                {"name": {"operator": "ilike", "value": search_pattern}},
+                {"email": {"operator": "ilike", "value": search_pattern}},
+                {"code": {"operator": "ilike", "value": search_pattern}},
+            ]
+        }
+        
+        return await self.find_by_criteria(
+            criteria=criteria,
+            limit=50,
+            order_by="name"
+        )

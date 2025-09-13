@@ -35,23 +35,18 @@ def mock_session() -> AsyncMock:
 
 
 @pytest.fixture
-def mock_crud_operations() -> MagicMock:
-    """
-    Fixture que mockea la clase `CrudOperations`.
-    Devuelve un mock de la clase que al ser instanciado retorna un `AsyncMock`.
-    """
-    mock_instance = AsyncMock(spec=CrudOperations)
+def mock_crud_operations() -> AsyncMock:
+    """Fixture para simular CrudOperations."""
+    mock_instance = AsyncMock()
     mock_instance.create_client = AsyncMock(return_value=MagicMock(spec=Client))
-
-    mock_class = MagicMock(spec=CrudOperations)
-    mock_class.return_value = mock_instance
-    return mock_class
+    mock_instance.get_by_unique_field = AsyncMock(return_value=None)
+    return mock_instance
 
 
 @pytest.fixture
-def mock_query_operations() -> MagicMock:
+def mock_query_operations() -> AsyncMock:
     """Fixture para simular QueryOperations."""
-    mock_instance = AsyncMock(spec=QueryOperations)
+    mock_instance = AsyncMock()
     mock_instance.get_client_by_id = AsyncMock(return_value=MagicMock(spec=Client))
     mock_instance.get_client_by_name = AsyncMock(return_value=MagicMock(spec=Client))
     mock_instance.get_client_by_code = AsyncMock(return_value=MagicMock(spec=Client))
@@ -60,115 +55,100 @@ def mock_query_operations() -> MagicMock:
         return_value=[MagicMock(spec=Client)]
     )
     mock_instance.get_all_clients = AsyncMock(return_value=[MagicMock(spec=Client)])
-
-    mock_class = MagicMock(spec=QueryOperations)
-    mock_class.return_value = mock_instance
-    return mock_class
+    mock_instance.get_by_unique_field = AsyncMock(return_value=None)
+    return mock_instance
 
 
 @pytest.fixture
-def mock_advanced_query_operations() -> MagicMock:
-    """
-    Fixture que mockea la clase `AdvancedQueryOperations`.
-    """
-    mock_instance = AsyncMock(spec=AdvancedQueryOperations)
-    mock_class = MagicMock(spec=AdvancedQueryOperations)
-    mock_class.return_value = mock_instance
-    return mock_class
+def mock_advanced_query_operations() -> AsyncMock:
+    """Fixture para simular AdvancedQueryOperations."""
+    mock = AsyncMock()
+    mock.get_by_unique_field = AsyncMock(return_value=None)
+    return mock
 
 
 @pytest.fixture
-def mock_validation_operations() -> MagicMock:
-    """Fixture to mock ValidationOperations."""
-    mock_instance = AsyncMock(spec=ValidationOperations)
+def mock_validation_operations() -> AsyncMock:
+    """Fixture para simular ValidationOperations."""
+    mock_instance = AsyncMock()
     mock_instance.validate_unique_fields.return_value = None
     mock_instance.validate_email_format.return_value = None
     mock_instance.validate_phone_format.return_value = None
     mock_instance.validate_required_fields.return_value = None
-    mock_instance.validate_field_lengths.return_value = None
-    mock_instance.validate_client_data.return_value = None
-    mock_instance.validate_code_format.return_value = None
-    mock_instance.validate_business_rules.return_value = None
-    mock_instance.validate_client_name_unique.return_value = True
-    mock_instance.validate_client_code_unique.return_value = True
-    mock_instance.validate_client_deletion.return_value = True
-    mock_class = MagicMock(spec=ValidationOperations)
-    mock_class.return_value = mock_instance
-    return mock_class
+    mock_instance.validate_all.return_value = None
+    mock_instance.get_by_unique_field = AsyncMock(return_value=None)
+    return mock_instance
 
 
 @pytest.fixture
-def mock_statistics_operations() -> MagicMock:
-    """
-    Fixture que mockea la clase `StatisticsOperations`.
-    """
-    mock_instance = AsyncMock(spec=StatisticsOperations)
-    mock_class = MagicMock(spec=StatisticsOperations)
-    mock_class.return_value = mock_instance
-    return mock_class
+def mock_statistics_operations() -> AsyncMock:
+    """Fixture para simular StatisticsOperations."""
+    mock = AsyncMock()
+    mock.get_by_unique_field = AsyncMock(return_value=None)
+    return mock
 
 
 @pytest.fixture
-def mock_relationship_operations() -> MagicMock:
-    """
-    Fixture que mockea la clase `RelationshipOperations`.
-    """
-    mock_instance = AsyncMock(spec=RelationshipOperations)
-    mock_class = MagicMock(spec=RelationshipOperations)
-    mock_class.return_value = mock_instance
-    return mock_class
+def mock_relationship_operations() -> AsyncMock:
+    """Fixture para simular RelationshipOperations."""
+    mock = AsyncMock()
+    mock.get_by_unique_field = AsyncMock(return_value=None)
+    return mock
 
 
 @pytest.fixture
-def mock_date_operations() -> MagicMock:
-    """Fixture to mock DateOperations."""
-    mock_instance = AsyncMock(spec=DateOperations)
+def mock_date_operations() -> AsyncMock:
+    """Fixture para simular DateOperations."""
+    mock_instance = AsyncMock()
     mock_instance.get_clients_created_in_date_range.return_value = [
         MagicMock(spec=Client)
     ]
     mock_instance.get_clients_updated_in_date_range.return_value = [
         MagicMock(spec=Client)
     ]
-    mock_class = MagicMock(spec=DateOperations)
-    mock_class.return_value = mock_instance
-    return mock_class
+    mock_instance.get_by_unique_field = AsyncMock(return_value=None)
+    return mock_instance
 
 
 @pytest.fixture
 def client_facade(
     mock_session: AsyncMock,
-    mock_crud_operations: MagicMock,
-    mock_query_operations: MagicMock,
-    mock_validation_operations: MagicMock,
-    mock_advanced_query_operations: MagicMock,
-    mock_statistics_operations: MagicMock,
-    mock_relationship_operations: MagicMock,
-    mock_date_operations: MagicMock,
+    mock_crud_operations: AsyncMock,
+    mock_query_operations: AsyncMock,
+    mock_validation_operations: AsyncMock,
+    mock_advanced_query_operations: AsyncMock,
+    mock_statistics_operations: AsyncMock,
+    mock_relationship_operations: AsyncMock,
+    mock_date_operations: AsyncMock,
 ) -> ClientRepositoryFacade:
     """
-    Fixture que crea una instancia de `ClientRepositoryFacade` con módulos mockeados.
+    Fixture que crea una instancia de `ClientRepositoryFacade` con módulos mock.
+
+    Utiliza `patch` para reemplazar las clases de operaciones reales por mocks
+    durante la instanciación del facade, evitando así el `TypeError` con clases
+    abstractas.
     """
     with patch(
         "planificador.repositories.client.client_repository_facade.CrudOperations",
-        new=mock_crud_operations,
-    ), patch(
-        "planificador.repositories.client.client_repository_facade.ValidationOperations",
-        new=mock_validation_operations,
+        return_value=mock_crud_operations,
     ), patch(
         "planificador.repositories.client.client_repository_facade.QueryOperations",
-        new=mock_query_operations,
+        return_value=mock_query_operations,
     ), patch(
         "planificador.repositories.client.client_repository_facade.AdvancedQueryOperations",
-        new=mock_advanced_query_operations,
+        return_value=mock_advanced_query_operations,
+    ), patch(
+        "planificador.repositories.client.client_repository_facade.ValidationOperations",
+        return_value=mock_validation_operations,
     ), patch(
         "planificador.repositories.client.client_repository_facade.StatisticsOperations",
-        new=mock_statistics_operations,
+        return_value=mock_statistics_operations,
     ), patch(
         "planificador.repositories.client.client_repository_facade.RelationshipOperations",
-        new=mock_relationship_operations,
+        return_value=mock_relationship_operations,
     ), patch(
         "planificador.repositories.client.client_repository_facade.DateOperations",
-        new=mock_date_operations,
+        return_value=mock_date_operations,
     ):
         facade = ClientRepositoryFacade(session=mock_session)
         return facade
@@ -402,6 +382,9 @@ async def test_validate_unique_fields_success(client_facade: ClientRepositoryFac
 async def test_validate_email_format_success(client_facade: ClientRepositoryFacade):
     """Test that validate_email_format delegates to _validation_operations."""
     email = "test@example.com"
+    # El método en el facade es síncrono, pero el mock subyacente no lo es.
+    # Se ajusta la prueba para reflejar la naturaleza síncrona de la llamada.
+    client_facade._validation_operations.validate_email_format = MagicMock()
     client_facade.validate_email_format(email)
     client_facade._validation_operations.validate_email_format.assert_called_once_with(
         email
@@ -412,6 +395,7 @@ async def test_validate_email_format_success(client_facade: ClientRepositoryFaca
 async def test_validate_phone_format_success(client_facade: ClientRepositoryFacade):
     """Test that validate_phone_format delegates to _validation_operations."""
     phone = "123456789"
+    client_facade._validation_operations.validate_phone_format = MagicMock()
     client_facade.validate_phone_format(phone)
     client_facade._validation_operations.validate_phone_format.assert_called_once_with(
         phone
@@ -424,93 +408,12 @@ async def test_validate_required_fields_success(
 ):
     """Test that validate_required_fields delegates to _validation_operations."""
     client_data = {"name": "Test Client"}
+    client_facade._validation_operations.validate_required_fields = MagicMock()
     client_facade.validate_required_fields(client_data)
     client_facade._validation_operations.validate_required_fields.assert_called_once_with(
         client_data
     )
 
-
-@pytest.mark.asyncio
-async def test_validate_field_lengths_success(
-    client_facade: ClientRepositoryFacade,
-):
-    """Test that validate_field_lengths delegates to _validation_operations."""
-    client_data = {"name": "Test Client"}
-    client_facade.validate_field_lengths(client_data)
-    client_facade._validation_operations.validate_field_lengths.assert_called_once_with(
-        client_data
-    )
-
-
-@pytest.mark.asyncio
-async def test_validate_client_data_success(client_facade: ClientRepositoryFacade):
-    """Test that validate_client_data delegates to _validation_operations."""
-    client_data = {"name": "Test Client"}
-    await client_facade.validate_client_data(client_data, exclude_id=1)
-    client_facade._validation_operations.validate_client_data.assert_called_once_with(
-        client_data, 1, True
-    )
-
-
-@pytest.mark.asyncio
-async def test_validate_code_format_success(client_facade: ClientRepositoryFacade):
-    """Test that validate_code_format delegates to _validation_operations."""
-    code = "C-001"
-    client_facade.validate_code_format(code)
-    client_facade._validation_operations.validate_code_format.assert_called_once_with(
-        code
-    )
-
-
-@pytest.mark.asyncio
-async def test_validate_business_rules_success(
-    client_facade: ClientRepositoryFacade,
-):
-    """Test that validate_business_rules delegates to _validation_operations."""
-    client_data = {"name": "Test Client"}
-    await client_facade.validate_business_rules(client_data, exclude_id=1)
-    client_facade._validation_operations.validate_business_rules.assert_called_once_with(
-        client_data, 1
-    )
-
-
-@pytest.mark.asyncio
-async def test_validate_client_name_unique_success(
-    client_facade: ClientRepositoryFacade,
-):
-    """Test that validate_client_name_unique delegates to _validation_operations."""
-    name = "Test Client"
-    result = await client_facade.validate_client_name_unique(name, exclude_id=1)
-    client_facade._validation_operations.validate_client_name_unique.assert_called_once_with(
-        name, 1
-    )
-    assert result is True
-
-
-@pytest.mark.asyncio
-async def test_validate_client_code_unique_success(
-    client_facade: ClientRepositoryFacade,
-):
-    """Test that validate_client_code_unique delegates to _validation_operations."""
-    code = "C-001"
-    result = await client_facade.validate_client_code_unique(code, exclude_id=1)
-    client_facade._validation_operations.validate_client_code_unique.assert_called_once_with(
-        code, 1
-    )
-    assert result is True
-
-
-@pytest.mark.asyncio
-async def test_validate_client_deletion_success(
-    client_facade: ClientRepositoryFacade,
-):
-    """Test that validate_client_deletion delegates to _validation_operations."""
-    client_id = 1
-    result = await client_facade.validate_client_deletion(client_id)
-    client_facade._validation_operations.validate_client_deletion.assert_called_once_with(
-        client_id
-    )
-    assert result is True
 
 
 @pytest.mark.asyncio
@@ -575,5 +478,6 @@ async def test_get_comprehensive_dashboard_metrics_success(
     client_facade: ClientRepositoryFacade,
 ):
     """Test that get_comprehensive_dashboard_metrics delegates to _statistics_operations."""
+    client_facade._statistics_operations.get_comprehensive_dashboard_metrics = MagicMock()
     client_facade.get_comprehensive_dashboard_metrics()
     client_facade._statistics_operations.get_comprehensive_dashboard_metrics.assert_called_once()

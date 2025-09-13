@@ -29,6 +29,20 @@ class IEmployeeCrudOperations(ABC):
             RepositoryError: Si ocurre un error en la base de datos
         """
         pass
+
+    @abstractmethod
+    async def get_by_unique_field(self, field_name: str, value: Any) -> Optional[Employee]:
+        """
+        Obtiene un empleado por un campo único.
+
+        Args:
+            field_name: Nombre del campo único
+            value: Valor del campo
+
+        Returns:
+            Empleado o None si no se encuentra
+        """
+        pass
     
     @abstractmethod
     async def update_employee(self, employee_id: int, update_data: Dict[str, Any]) -> Optional[Employee]:

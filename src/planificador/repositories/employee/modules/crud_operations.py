@@ -4,12 +4,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import SQLAlchemyError
 from loguru import logger
 
+from planificador.exceptions import ValidationError
 from ..interfaces.crud_interface import IEmployeeCrudOperations
 from ....models.employee import Employee
 from ....exceptions.repository import (
     convert_sqlalchemy_error,
     EmployeeRepositoryError,
-    create_employee_validation_repository_error
+    RepositoryValidationError,
 )
 from .validation_operations import ValidationOperations as EmployeeValidator
 from planificador.repositories.base_repository import BaseRepository
@@ -35,7 +36,7 @@ class CrudOperations(BaseRepository[Employee], IEmployeeCrudOperations):
         Args:
             session: Sesión de base de datos SQLAlchemy
         """
-        super().__init__(Employee, session)
+        super().__init__(session, Employee)
         self.validator = EmployeeValidator()
         self.logger = logger.bind(component="EmployeeCrudOperations")
     
@@ -62,20 +63,21 @@ class CrudOperations(BaseRepository[Employee], IEmployeeCrudOperations):
             self.logger.info(f"Empleado creado exitosamente: {employee.full_name} (ID: {employee.id})")
             return employee
             
-        except ValueError as e:
+        except ValidationError as e:
             await self.session.rollback()
-            raise create_employee_validation_repository_error(
+            raise RepositoryValidationError(
+                message=str(e),
+                operation="create_employee",
+                entity_type=self.model_class.__name__,
                 field="employee_data",
-                value=str(employee_data),
-                reason=f"Error de validación: {str(e)}",
-                operation="create_employee"
+                invalid_value=str(employee_data),
             )
         except SQLAlchemyError as e:
             await self.session.rollback()
             raise convert_sqlalchemy_error(
                 error=e,
                 operation="create_employee",
-                entity_type="Employee"
+                entity_type=self.model_class.__name__
             )
         except Exception as e:
             await self.session.rollback()
@@ -83,7 +85,7 @@ class CrudOperations(BaseRepository[Employee], IEmployeeCrudOperations):
             raise EmployeeRepositoryError(
                 message=f"Error inesperado creando empleado: {e}",
                 operation="create_employee",
-                entity_type="Employee",
+                entity_type=self.model_class.__name__,
                 original_error=e
             )
     
@@ -112,20 +114,22 @@ class CrudOperations(BaseRepository[Employee], IEmployeeCrudOperations):
                 self.logger.info(f"Empleado actualizado exitosamente: {employee.full_name} (ID: {employee.id})")
             return employee
             
-        except ValueError as e:
+        except ValidationError as e:
             await self.session.rollback()
-            raise create_employee_validation_repository_error(
+            raise RepositoryValidationError(
+                message=str(e),
+                operation="update_employee",
+                entity_type=self.model_class.__name__,
+                entity_id=employee_id,
                 field="update_data",
-                value=str(update_data),
-                reason=f"Error de validación: {str(e)}",
-                operation="update_employee"
+                invalid_value=str(update_data),
             )
         except SQLAlchemyError as e:
             await self.session.rollback()
             raise convert_sqlalchemy_error(
                 error=e,
                 operation="update_employee",
-                entity_type="Employee",
+                entity_type=self.model_class.__name__,
                 entity_id=employee_id
             )
         except Exception as e:
@@ -134,7 +138,7 @@ class CrudOperations(BaseRepository[Employee], IEmployeeCrudOperations):
             raise EmployeeRepositoryError(
                 message=f"Error inesperado actualizando empleado: {e}",
                 operation="update_employee",
-                entity_type="Employee",
+                entity_type=self.model_class.__name__,
                 entity_id=employee_id,
                 original_error=e
             )
@@ -159,12 +163,22 @@ class CrudOperations(BaseRepository[Employee], IEmployeeCrudOperations):
                 self.logger.info(f"Empleado eliminado exitosamente (ID: {employee_id})")
             return result
             
+        except ValidationError as e:
+            await self.session.rollback()
+            raise RepositoryValidationError(
+                message=str(e),
+                operation="delete_employee",
+                entity_type=self.model_class.__name__,
+                entity_id=employee_id,
+                field="employee_id",
+                invalid_value=str(employee_id),
+            )
         except SQLAlchemyError as e:
             await self.session.rollback()
             raise convert_sqlalchemy_error(
                 error=e,
                 operation="delete_employee",
-                entity_type="Employee",
+                entity_type=self.model_class.__name__,
                 entity_id=employee_id
             )
         except Exception as e:
@@ -173,8 +187,11 @@ class CrudOperations(BaseRepository[Employee], IEmployeeCrudOperations):
             raise EmployeeRepositoryError(
                 message=f"Error inesperado eliminando empleado: {e}",
                 operation="delete_employee",
-                entity_type="Employee",
+                entity_type=self.model_class.__name__,
                 entity_id=employee_id,
                 original_error=e
             )
+
+    async def get_by_unique_field(self, field_name: str, value: Any) -> Optional[Employee]:
+        return await self.get_by_field(field_name, value)
     

@@ -103,3 +103,16 @@ class IEmployeeStatisticsOperations(ABC):
     async def get_comprehensive_summary(self) -> Dict[str, Any]:
         """Obtiene un resumen completo de estadísticas de empleados."""
         pass
+
+    async def get_by_unique_field(self, field_name: str, value: Any) -> Optional[Any]:
+        """
+        Obtiene una entidad por un campo único.
+
+        Args:
+            field_name: Nombre del campo único.
+            value: Valor del campo único.
+
+        Returns:
+            La entidad si se encuentra, de lo contrario None.
+        """
+        pass

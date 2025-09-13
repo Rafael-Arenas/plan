@@ -12,15 +12,25 @@ from planificador.models.project import Project
 from planificador.models.vacation import Vacation
 from planificador.models.team_membership import TeamMembership
 from planificador.models.project_assignment import ProjectAssignment
+from planificador.repositories.base_repository import BaseRepository
+from planificador.models import (
+    Employee, Project, ProjectAssignment, Team, TeamMembership, Vacation
+)
 from planificador.exceptions.repository import (
-    convert_sqlalchemy_error,
     EmployeeRepositoryError,
-    create_employee_validation_repository_error
+    RepositoryValidationError,
+)
+from planificador.exceptions import NotFoundError
+from planificador.exceptions import (
+    convert_sqlalchemy_error,
+)
+from planificador.repositories.employee.interfaces.relationship_interface import (
+    IEmployeeRelationshipOperations,
 )
 from planificador.exceptions.validation import ValidationError
 
 
-class RelationshipOperations(IEmployeeRelationshipOperations):
+class RelationshipOperations(BaseRepository[Employee], IEmployeeRelationshipOperations):
     """
     Implementación de operaciones de relaciones para empleados.
     
@@ -34,12 +44,14 @@ class RelationshipOperations(IEmployeeRelationshipOperations):
     
     def __init__(self, session: AsyncSession):
         """
-        Inicializa las operaciones de relaciones.
+        
+        super().__init__(session, Employee)
+        self._logger = logger.bind(component="RelationshipOperations")Inicializa las operaciones de relaciones.
         
         Args:
             session: Sesión de base de datos SQLAlchemy
         """
-        self.session = session
+        super().__init__(session, Employee)
         self.logger = logger.bind(component="EmployeeRelationshipOperations")
     
     async def get_employee_teams(self, employee_id: int) -> List[Team]:
@@ -53,32 +65,25 @@ class RelationshipOperations(IEmployeeRelationshipOperations):
             Lista de equipos del empleado
         """
         try:
-            stmt = (
-                select(Team)
-                .join(TeamMembership)
-                .where(TeamMembership.employee_id == employee_id)
+            employee = await self.find_by_criteria(
+                criteria={"id": employee_id},
+                options=[selectinload(self.model_class.teams)]
             )
-            result = await self.session.execute(stmt)
-            teams = result.scalars().all()
-            
-            self.logger.info(f"Obtenidos {len(teams)} equipos para empleado {employee_id}")
-            return list(teams)
-            
+            if not employee:
+                raise NotFoundError(
+                    message=f"Empleado con id {employee_id} no fue encontrado",
+                    operation="get_employee_teams",
+                    entity_type=self.model_class.__name__,
+                    entity_id=employee_id
+                )
+            return employee.teams
         except SQLAlchemyError as e:
+            self.logger.error(f"Error al obtener equipos del empleado {employee_id}: {e}")
             raise convert_sqlalchemy_error(
-                error=e,
-                operation="get_employee_teams",
-                entity_type="Employee",
-                entity_id=employee_id
-            )
-        except Exception as e:
-            self.logger.error(f"Error inesperado obteniendo equipos del empleado {employee_id}: {e}")
-            raise EmployeeRepositoryError(
-                message=f"Error inesperado obteniendo equipos del empleado: {e}",
-                operation="get_employee_teams",
-                entity_type="Employee",
-                entity_id=employee_id,
-                original_error=e
+                error=e, 
+                operation="get_employee_teams", 
+                entity_type=self.model_class.__name__, 
+                context={"employee_id": employee_id}
             )
     
     async def get_employee_projects(self, employee_id: int) -> List[Project]:
@@ -92,32 +97,25 @@ class RelationshipOperations(IEmployeeRelationshipOperations):
             Lista de proyectos del empleado
         """
         try:
-            stmt = (
-                select(Project)
-                .join(ProjectAssignment)
-                .where(ProjectAssignment.employee_id == employee_id)
+            employee = await self.find_by_criteria(
+                criteria={"id": employee_id},
+                options=[selectinload(self.model_class.projects)]
             )
-            result = await self.session.execute(stmt)
-            projects = result.scalars().all()
-            
-            self.logger.info(f"Obtenidos {len(projects)} proyectos para empleado {employee_id}")
-            return list(projects)
-            
+            if not employee:
+                raise NotFoundError(
+                    message=f"Empleado con id {employee_id} no fue encontrado",
+                    operation="get_employee_projects",
+                    entity_type=self.model_class.__name__,
+                    entity_id=employee_id
+                )
+            return employee.projects
         except SQLAlchemyError as e:
+            self.logger.error(f"Error al obtener proyectos del empleado {employee_id}: {e}")
             raise convert_sqlalchemy_error(
                 error=e,
                 operation="get_employee_projects",
-                entity_type="Employee",
-                entity_id=employee_id
-            )
-        except Exception as e:
-            self.logger.error(f"Error inesperado obteniendo proyectos del empleado {employee_id}: {e}")
-            raise EmployeeRepositoryError(
-                message=f"Error inesperado obteniendo proyectos del empleado: {e}",
-                operation="get_employee_projects",
-                entity_type="Employee",
-                entity_id=employee_id,
-                original_error=e
+                entity_type=self.model_class.__name__,
+                context={"employee_id": employee_id}
             )
     
     async def get_employee_vacations(self, employee_id: int) -> List[Vacation]:
@@ -131,28 +129,25 @@ class RelationshipOperations(IEmployeeRelationshipOperations):
             Lista de vacaciones del empleado
         """
         try:
-            stmt = select(Vacation).where(Vacation.employee_id == employee_id)
-            result = await self.session.execute(stmt)
-            vacations = result.scalars().all()
-            
-            self.logger.info(f"Obtenidas {len(vacations)} vacaciones para empleado {employee_id}")
-            return list(vacations)
-            
+            employee = await self.find_by_criteria(
+                criteria={"id": employee_id},
+                options=[selectinload(self.model_class.vacations)]
+            )
+            if not employee:
+                raise NotFoundError(
+                    message=f"Empleado con id {employee_id} no fue encontrado",
+                    operation="get_employee_vacations",
+                    entity_type=self.model_class.__name__,
+                    entity_id=employee_id
+                )
+            return employee.vacations
         except SQLAlchemyError as e:
+            self.logger.error(f"Error al obtener vacaciones del empleado {employee_id}: {e}")
             raise convert_sqlalchemy_error(
                 error=e,
                 operation="get_employee_vacations",
-                entity_type="Employee",
-                entity_id=employee_id
-            )
-        except Exception as e:
-            self.logger.error(f"Error inesperado obteniendo vacaciones del empleado {employee_id}: {e}")
-            raise EmployeeRepositoryError(
-                message=f"Error inesperado obteniendo vacaciones del empleado: {e}",
-                operation="get_employee_vacations",
-                entity_type="Employee",
-                entity_id=employee_id,
-                original_error=e
+                entity_type=self.model_class.__name__,
+                context={"employee_id": employee_id}
             )
     
     async def get_team_memberships(self, employee_id: int) -> List[TeamMembership]:
@@ -166,28 +161,25 @@ class RelationshipOperations(IEmployeeRelationshipOperations):
             Lista de membresías de equipo
         """
         try:
-            stmt = select(TeamMembership).where(TeamMembership.employee_id == employee_id)
-            result = await self.session.execute(stmt)
-            memberships = result.scalars().all()
-            
-            self.logger.info(f"Obtenidas {len(memberships)} membresías para empleado {employee_id}")
-            return list(memberships)
-            
+            employee = await self.find_by_criteria(
+                criteria={"id": employee_id},
+                options=[selectinload(self.model_class.team_memberships)]
+            )
+            if not employee:
+                raise NotFoundError(
+                    message=f"Empleado con id {employee_id} no fue encontrado",
+                    operation="get_team_memberships",
+                    entity_type=self.model_class.__name__,
+                    entity_id=employee_id
+                )
+            return employee.team_memberships
         except SQLAlchemyError as e:
+            self.logger.error(f"Error al obtener membresías de equipo del empleado {employee_id}: {e}")
             raise convert_sqlalchemy_error(
                 error=e,
                 operation="get_team_memberships",
-                entity_type="Employee",
-                entity_id=employee_id
-            )
-        except Exception as e:
-            self.logger.error(f"Error inesperado obteniendo membresías del empleado {employee_id}: {e}")
-            raise EmployeeRepositoryError(
-                message=f"Error inesperado obteniendo membresías del empleado: {e}",
-                operation="get_team_memberships",
-                entity_type="Employee",
-                entity_id=employee_id,
-                original_error=e
+                entity_type=self.model_class.__name__,
+                context={"employee_id": employee_id}
             )
     
     async def get_project_assignments(self, employee_id: int) -> List[ProjectAssignment]:
@@ -201,28 +193,25 @@ class RelationshipOperations(IEmployeeRelationshipOperations):
             Lista de asignaciones de proyecto
         """
         try:
-            stmt = select(ProjectAssignment).where(ProjectAssignment.employee_id == employee_id)
-            result = await self.session.execute(stmt)
-            assignments = result.scalars().all()
-            
-            self.logger.info(f"Obtenidas {len(assignments)} asignaciones para empleado {employee_id}")
-            return list(assignments)
-            
+            employee = await self.find_by_criteria(
+                criteria={"id": employee_id},
+                options=[selectinload(self.model_class.project_assignments)]
+            )
+            if not employee:
+                raise NotFoundError(
+                    message=f"Empleado con id {employee_id} no fue encontrado",
+                    operation="get_project_assignments",
+                    entity_type=self.model_class.__name__,
+                    entity_id=employee_id
+                )
+            return employee.project_assignments
         except SQLAlchemyError as e:
+            self.logger.error(f"Error al obtener asignaciones de proyecto del empleado {employee_id}: {e}")
             raise convert_sqlalchemy_error(
                 error=e,
                 operation="get_project_assignments",
-                entity_type="Employee",
-                entity_id=employee_id
-            )
-        except Exception as e:
-            self.logger.error(f"Error inesperado obteniendo asignaciones del empleado {employee_id}: {e}")
-            raise EmployeeRepositoryError(
-                message=f"Error inesperado obteniendo asignaciones del empleado: {e}",
-                operation="get_project_assignments",
-                entity_type="Employee",
-                entity_id=employee_id,
-                original_error=e
+                entity_type=self.model_class.__name__,
+                context={"employee_id": employee_id}
             )
     
     async def check_team_membership(self, employee_id: int, team_id: int) -> bool:
@@ -238,31 +227,21 @@ class RelationshipOperations(IEmployeeRelationshipOperations):
         """
         try:
             stmt = select(TeamMembership).where(
-                TeamMembership.employee_id == employee_id,
+                TeamMembership.employee_id == employee_id, 
                 TeamMembership.team_id == team_id
             )
             result = await self.session.execute(stmt)
-            membership = result.scalar_one_or_none()
-            
-            exists = membership is not None
-            self.logger.debug(f"Empleado {employee_id} {'pertenece' if exists else 'no pertenece'} al equipo {team_id}")
-            return exists
-            
+            membership = result.scalars().first()
+            is_member = membership is not None
+            self.logger.info(f"Verificación de membresía: Empleado {employee_id} en equipo {team_id} -> {is_member}")
+            return is_member
         except SQLAlchemyError as e:
+            self.logger.error(f"Error al verificar la membresía del empleado {employee_id} en el equipo {team_id}: {e}")
             raise convert_sqlalchemy_error(
-                error=e,
-                operation="check_team_membership",
-                entity_type="Employee",
-                entity_id=employee_id
-            )
-        except Exception as e:
-            self.logger.error(f"Error inesperado verificando membresía del empleado {employee_id} en equipo {team_id}: {e}")
-            raise EmployeeRepositoryError(
-                message=f"Error inesperado verificando membresía: {e}",
-                operation="check_team_membership",
-                entity_type="Employee",
-                entity_id=employee_id,
-                original_error=e
+                error=e, 
+                operation="check_team_membership", 
+                entity_type=self.model_class.__name__, 
+                context={"employee_id": employee_id, "team_id": team_id}
             )
     
     async def check_project_assignment(self, employee_id: int, project_id: int) -> bool:
@@ -282,27 +261,17 @@ class RelationshipOperations(IEmployeeRelationshipOperations):
                 ProjectAssignment.project_id == project_id
             )
             result = await self.session.execute(stmt)
-            assignment = result.scalar_one_or_none()
-            
-            exists = assignment is not None
-            self.logger.debug(f"Empleado {employee_id} {'está asignado' if exists else 'no está asignado'} al proyecto {project_id}")
-            return exists
-            
+            assignment = result.scalars().first()
+            is_assigned = assignment is not None
+            self.logger.info(f"Verificación de asignación: Empleado {employee_id} en proyecto {project_id} -> {is_assigned}")
+            return is_assigned
         except SQLAlchemyError as e:
+            self.logger.error(f"Error al verificar la asignación del empleado {employee_id} al proyecto {project_id}: {e}")
             raise convert_sqlalchemy_error(
                 error=e,
                 operation="check_project_assignment",
-                entity_type="Employee",
-                entity_id=employee_id
-            )
-        except Exception as e:
-            self.logger.error(f"Error inesperado verificando asignación del empleado {employee_id} al proyecto {project_id}: {e}")
-            raise EmployeeRepositoryError(
-                message=f"Error inesperado verificando asignación: {e}",
-                operation="check_project_assignment",
-                entity_type="Employee",
-                entity_id=employee_id,
-                original_error=e
+                entity_type=self.model_class.__name__,
+                context={"employee_id": employee_id, "project_id": project_id}
             )
     
     async def get_employees_by_team(self, team_id: int) -> List[Employee]:
@@ -316,32 +285,17 @@ class RelationshipOperations(IEmployeeRelationshipOperations):
             Lista de empleados del equipo
         """
         try:
-            stmt = (
-                select(Employee)
-                .join(TeamMembership)
-                .where(TeamMembership.team_id == team_id)
+            return await self.find_all_by_criteria(
+                criteria={"teams.id": team_id},
+                options=[joinedload(self.model_class.teams)]
             )
-            result = await self.session.execute(stmt)
-            employees = result.scalars().all()
-            
-            self.logger.info(f"Obtenidos {len(employees)} empleados para equipo {team_id}")
-            return list(employees)
-            
         except SQLAlchemyError as e:
+            self.logger.error(f"Error al obtener empleados del equipo {team_id}: {e}")
             raise convert_sqlalchemy_error(
                 error=e,
                 operation="get_employees_by_team",
-                entity_type="Team",
-                entity_id=team_id
-            )
-        except Exception as e:
-            self.logger.error(f"Error inesperado obteniendo empleados del equipo {team_id}: {e}")
-            raise EmployeeRepositoryError(
-                message=f"Error inesperado obteniendo empleados del equipo: {e}",
-                operation="get_employees_by_team",
-                entity_type="Team",
-                entity_id=team_id,
-                original_error=e
+                entity_type=self.model_class.__name__,
+                context={"team_id": team_id}
             )
     
     async def get_employees_by_project(self, project_id: int) -> List[Employee]:
@@ -355,32 +309,17 @@ class RelationshipOperations(IEmployeeRelationshipOperations):
             Lista de empleados del proyecto
         """
         try:
-            stmt = (
-                select(Employee)
-                .join(ProjectAssignment)
-                .where(ProjectAssignment.project_id == project_id)
+            return await self.find_all_by_criteria(
+                criteria={"projects.id": project_id},
+                options=[joinedload(self.model_class.projects)]
             )
-            result = await self.session.execute(stmt)
-            employees = result.scalars().all()
-            
-            self.logger.info(f"Obtenidos {len(employees)} empleados para proyecto {project_id}")
-            return list(employees)
-            
         except SQLAlchemyError as e:
+            self.logger.error(f"Error al obtener empleados del proyecto {project_id}: {e}")
             raise convert_sqlalchemy_error(
                 error=e,
                 operation="get_employees_by_project",
-                entity_type="Project",
-                entity_id=project_id
-            )
-        except Exception as e:
-            self.logger.error(f"Error inesperado obteniendo empleados del proyecto {project_id}: {e}")
-            raise EmployeeRepositoryError(
-                message=f"Error inesperado obteniendo empleados del proyecto: {e}",
-                operation="get_employees_by_project",
-                entity_type="Project",
-                entity_id=project_id,
-                original_error=e
+                entity_type=self.model_class.__name__,
+                context={"project_id": project_id}
             )
     
     async def validate_employee_exists(self, employee_id: int) -> Employee:
@@ -397,37 +336,22 @@ class RelationshipOperations(IEmployeeRelationshipOperations):
             ValidationError: Si el empleado no existe
         """
         try:
-            stmt = select(Employee).where(Employee.id == employee_id)
-            result = await self.session.execute(stmt)
-            employee = result.scalar_one_or_none()
-            
-            if employee is None:
-                raise ValidationError(
-                    message=f"Empleado con ID {employee_id} no existe",
-                    field="employee_id",
-                    value=employee_id
+            employee = await self.find_by_id(employee_id)
+            if not employee:
+                raise NotFoundError(
+                    message=f"Empleado con id {employee_id} no fue encontrado",
+                    operation="validate_employee_exists",
+                    entity_type=self.model_class.__name__,
+                    entity_id=employee_id
                 )
-            
-            self.logger.debug(f"Empleado {employee_id} validado exitosamente")
             return employee
-            
-        except ValidationError:
-            raise
         except SQLAlchemyError as e:
+            self.logger.error(f"Error al validar la existencia del empleado {employee_id}: {e}")
             raise convert_sqlalchemy_error(
-                error=e,
-                operation="validate_employee_exists",
-                entity_type="Employee",
-                entity_id=employee_id
-            )
-        except Exception as e:
-            self.logger.error(f"Error inesperado validando empleado {employee_id}: {e}")
-            raise EmployeeRepositoryError(
-                message=f"Error inesperado validando empleado: {e}",
-                operation="validate_employee_exists",
-                entity_type="Employee",
-                entity_id=employee_id,
-                original_error=e
+                error=e, 
+                operation="validate_employee_exists", 
+                entity_type=self.model_class.__name__, 
+                context={"employee_id": employee_id}
             )
     
     async def get_employee_with_all_relations(self, employee_id: int) -> Optional[Employee]:
@@ -441,40 +365,23 @@ class RelationshipOperations(IEmployeeRelationshipOperations):
             Empleado con todas las relaciones cargadas o None
         """
         try:
-            stmt = (
-                select(Employee)
-                .options(
-                    selectinload(Employee.team_memberships),
-                    selectinload(Employee.project_assignments),
-                    selectinload(Employee.vacations)
-                )
-                .where(Employee.id == employee_id)
+            return await self.find_by_criteria(
+                criteria={"id": employee_id},
+                options=[
+                    selectinload(self.model_class.teams),
+                    selectinload(self.model_class.projects),
+                    selectinload(self.model_class.vacations),
+                    selectinload(self.model_class.team_memberships),
+                    selectinload(self.model_class.project_assignments),
+                ]
             )
-            result = await self.session.execute(stmt)
-            employee = result.scalar_one_or_none()
-            
-            if employee:
-                self.logger.info(f"Empleado {employee_id} obtenido con todas las relaciones")
-            else:
-                self.logger.warning(f"Empleado {employee_id} no encontrado")
-            
-            return employee
-            
         except SQLAlchemyError as e:
+            self.logger.error(f"Error al obtener el empleado con todas las relaciones para el id {employee_id}: {e}")
             raise convert_sqlalchemy_error(
-                error=e,
-                operation="get_employee_with_all_relations",
-                entity_type="Employee",
-                entity_id=employee_id
-            )
-        except Exception as e:
-            self.logger.error(f"Error inesperado obteniendo empleado {employee_id} con relaciones: {e}")
-            raise EmployeeRepositoryError(
-                message=f"Error inesperado obteniendo empleado con relaciones: {e}",
-                operation="get_employee_with_all_relations",
-                entity_type="Employee",
-                entity_id=employee_id,
-                original_error=e
+                error=e, 
+                operation="get_employee_with_all_relations", 
+                entity_type=self.model_class.__name__, 
+                context={"employee_id": employee_id}
             )
     
     async def count_employee_relationships(self, employee_id: int) -> Dict[str, int]:
@@ -488,21 +395,24 @@ class RelationshipOperations(IEmployeeRelationshipOperations):
             Diccionario con conteos de relaciones
         """
         try:
-            # Contar membresías de equipo
-            team_stmt = select(TeamMembership).where(TeamMembership.employee_id == employee_id)
-            team_result = await self.session.execute(team_stmt)
-            team_count = len(team_result.scalars().all())
-            
-            # Contar asignaciones de proyecto
-            project_stmt = select(ProjectAssignment).where(ProjectAssignment.employee_id == employee_id)
-            project_result = await self.session.execute(project_stmt)
-            project_count = len(project_result.scalars().all())
-            
-            # Contar vacaciones
-            vacation_stmt = select(Vacation).where(Vacation.employee_id == employee_id)
-            vacation_result = await self.session.execute(vacation_stmt)
-            vacation_count = len(vacation_result.scalars().all())
-            
+            employee = await self.find_one_by_criteria(
+                criteria={"id": employee_id},
+                options=[
+                    selectinload(self.model_class.teams),
+                    selectinload(self.model_class.projects),
+                    selectinload(self.model_class.vacations),
+                ]
+            )
+
+            if not employee:
+                counts = {"teams": 0, "projects": 0, "vacations": 0, "total": 0}
+                self.logger.info(f"No se encontró empleado {employee_id}, no hay relaciones que contar.")
+                return counts
+
+            team_count = len(employee.teams)
+            project_count = len(employee.projects)
+            vacation_count = len(employee.vacations)
+
             counts = {
                 "teams": team_count,
                 "projects": project_count,
@@ -512,22 +422,13 @@ class RelationshipOperations(IEmployeeRelationshipOperations):
             
             self.logger.info(f"Conteos de relaciones para empleado {employee_id}: {counts}")
             return counts
-            
         except SQLAlchemyError as e:
+            self.logger.error(f"Error al contar las relaciones del empleado {employee_id}: {e}")
             raise convert_sqlalchemy_error(
-                error=e,
-                operation="count_employee_relationships",
-                entity_type="Employee",
-                entity_id=employee_id
-            )
-        except Exception as e:
-            self.logger.error(f"Error inesperado contando relaciones del empleado {employee_id}: {e}")
-            raise EmployeeRepositoryError(
-                message=f"Error inesperado contando relaciones del empleado: {e}",
-                operation="count_employee_relationships",
-                entity_type="Employee",
-                entity_id=employee_id,
-                original_error=e
+                error=e, 
+                operation="count_employee_relationships", 
+                entity_type=self.model_class.__name__, 
+                context={"employee_id": employee_id}
             )
     
     async def has_dependencies(self, employee_id: int) -> bool:
@@ -542,17 +443,45 @@ class RelationshipOperations(IEmployeeRelationshipOperations):
         """
         try:
             counts = await self.count_employee_relationships(employee_id)
-            has_deps = counts["total"] > 0
-            
-            self.logger.debug(f"Empleado {employee_id} {'tiene' if has_deps else 'no tiene'} dependencias")
-            return has_deps
-            
-        except Exception as e:
-            self.logger.error(f"Error verificando dependencias del empleado {employee_id}: {e}")
-            raise EmployeeRepositoryError(
-                message=f"Error verificando dependencias del empleado: {e}",
-                operation="has_dependencies",
-                entity_type="Employee",
-                entity_id=employee_id,
-                original_error=e
+            has_dependencies = counts["total"] > 0
+            self.logger.info(f"El empleado {employee_id} {'tiene' if has_dependencies else 'no tiene'} dependencias.")
+            return has_dependencies
+        except SQLAlchemyError as e:
+            self.logger.error(f"Error al verificar las dependencias del empleado {employee_id}: {e}")
+            raise convert_sqlalchemy_error(
+                error=e, 
+                operation="has_dependencies", 
+                entity_type=self.model_class.__name__, 
+                context={"employee_id": employee_id}
+            )
+
+    async def get_by_unique_field(self, field_name: str, value: Any) -> Optional[Employee]:
+        """
+        Obtiene un empleado por un campo único.
+
+        Args:
+            field_name: Nombre del campo único.
+            value: Valor del campo único.
+
+        Returns:
+            El empleado si se encuentra, de lo contrario None.
+        """
+        try:
+            return await self.find_by_criteria(criteria={field_name: value})
+        except SQLAlchemyError as e:
+            self.logger.error(
+                f'Error al buscar empleado por campo único ' 
+                f'{field_name}={value}: {e}'
+            )
+            raise convert_sqlalchemy_error(
+                error=e,
+                operation="get_by_unique_field",
+                entity_type=self.model_class.__name__,
+                context={"field_name": field_name, "value": value},
+            )
+            raise convert_sqlalchemy_error(
+                error=e, 
+                operation="has_dependencies", 
+                entity_type=self.model_class.__name__, 
+                context={"employee_id": employee_id}
             )

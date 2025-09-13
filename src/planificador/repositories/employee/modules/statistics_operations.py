@@ -16,12 +16,17 @@ from planificador.models.team_membership import TeamMembership
 from planificador.models.project_assignment import ProjectAssignment
 from planificador.models.vacation import Vacation, VacationStatus
 from planificador.utils.date_utils import get_current_time
-from planificador.exceptions.repository import convert_sqlalchemy_error
-from planificador.exceptions.repository.employee_repository_exceptions import create_employee_statistics_error
+from planificador.models.project import Project
+from planificador.models.team import Team
+from planificador.repositories.base_repository import BaseRepository
+from planificador.exceptions.repository.employee_repository_exceptions import (
+    create_employee_statistics_error,
+    create_employee_validation_repository_error
+)
 from ..interfaces.statistics_interface import IEmployeeStatisticsOperations
 
 
-class StatisticsOperations(IEmployeeStatisticsOperations):
+class StatisticsOperations(BaseRepository, IEmployeeStatisticsOperations):
     """Implementación de operaciones estadísticas para empleados.
     
     Esta clase proporciona métodos para generar estadísticas y métricas
@@ -30,14 +35,13 @@ class StatisticsOperations(IEmployeeStatisticsOperations):
     equipos y proyectos, vacaciones, habilidades y carga de trabajo.
     """
     
-    def __init__(self, session: AsyncSession):
+    def __init__(self, session: AsyncSession, logger: logger = logger):
         """Inicializa las operaciones estadísticas.
         
         Args:
             session: Sesión asíncrona de SQLAlchemy
         """
-        self.session = session
-        self._logger = logger.bind(component="StatisticsOperations")
+        super().__init__(session, Employee)
     
     # ============================================================================
     # ESTADÍSTICAS POR CATEGORÍAS
@@ -52,10 +56,10 @@ class StatisticsOperations(IEmployeeStatisticsOperations):
         try:
             query = (
                 select(
-                    Employee.status,
-                    func.count(Employee.id).label('count')
+                    self.model_class.status,
+                    func.count(self.model_class.id).label('count')
                 )
-                .group_by(Employee.status)
+                .group_by(self.model_class.status)
             )
             
             result = await self.session.execute(query)
@@ -74,16 +78,12 @@ class StatisticsOperations(IEmployeeStatisticsOperations):
         except SQLAlchemyError as e:
             self._logger.error(f"Error de base de datos obteniendo conteos por estado: {e}")
             raise convert_sqlalchemy_error(
-                error=e,
-                operation="get_employee_count_by_status",
-                entity_type="Employee"
+                e, "get_employee_count_by_status", self.model_class.__name__
             )
         except Exception as e:
             self._logger.error(f"Error inesperado obteniendo conteos por estado: {e}")
             raise create_employee_statistics_error(
-                message=f"Error inesperado obteniendo conteos por estado: {e}",
-                operation="get_employee_count_by_status",
-                original_error=e
+                "get_employee_count_by_status", e
             )
     
     async def get_employee_count_by_department(self) -> Dict[str, int]:
@@ -92,41 +92,60 @@ class StatisticsOperations(IEmployeeStatisticsOperations):
         Returns:
             Diccionario con conteos por departamento
         """
+        return await self._get_count_by_attribute(
+            attribute_name="department", 
+            none_label="Sin Departamento", 
+            log_unit="departamentos"
+        )
+
+    async def _get_count_by_attribute(
+        self, attribute_name: str, none_label: str, log_unit: str
+    ) -> Dict[str, int]:
+        """Método genérico para contar empleados activos por un atributo de cadena.
+
+        Args:
+            attribute_name: Nombre del atributo del modelo por el cual agrupar.
+            none_label: Etiqueta a usar para valores nulos.
+            log_unit: Unidad para el mensaje de log (e.g., 'departamentos').
+
+        Returns:
+            Diccionario con los conteos.
+        """
         try:
+            attribute = getattr(self.model_class, attribute_name)
+
             query = (
                 select(
-                    Employee.department,
-                    func.count(Employee.id).label('count')
+                    attribute,
+                    func.count(self.model_class.id).label('count')
                 )
-                .where(Employee.status == EmployeeStatus.ACTIVE)
-                .group_by(Employee.department)
-                .order_by(func.count(Employee.id).desc())
+                .where(self.model_class.status == EmployeeStatus.ACTIVE)
+                .group_by(attribute)
+                .order_by(func.count(self.model_class.id).desc())
             )
-            
+
             result = await self.session.execute(query)
             rows = result.all()
-            
+
             counts = {}
             for row in rows:
-                department = row.department or 'Sin Departamento'
-                counts[department] = row.count
-            
-            self._logger.debug(f"Conteos por departamento obtenidos: {len(counts)} departamentos")
+                key = getattr(row, attribute_name) or none_label
+                counts[key] = row.count
+
+            self._logger.debug(f"Conteos por {attribute_name} obtenidos: {len(counts)} {log_unit}")
             return counts
-            
+
         except SQLAlchemyError as e:
-            self._logger.error(f"Error de base de datos obteniendo conteos por departamento: {e}")
+            self._logger.error(f"Error de base de datos obteniendo conteos por {attribute_name}: {e}")
             raise convert_sqlalchemy_error(
-                error=e,
-                operation="get_employee_count_by_department",
-                entity_type="Employee"
+                e,
+                f"get_employee_count_by_{attribute_name}",
+                self.model_class.__name__,
             )
         except Exception as e:
-            self._logger.error(f"Error inesperado obteniendo conteos por departamento: {e}")
+            self._logger.error(f"Error inesperado obteniendo conteos por {attribute_name}: {e}")
             raise create_employee_statistics_error(
-                message=f"Error inesperado obteniendo conteos por departamento: {e}",
-                operation="get_employee_count_by_department",
-                original_error=e
+                f"get_employee_count_by_{attribute_name}", e
             )
     
     async def get_employee_count_by_position(self) -> Dict[str, int]:
@@ -135,42 +154,14 @@ class StatisticsOperations(IEmployeeStatisticsOperations):
         Returns:
             Diccionario con conteos por posición
         """
-        try:
-            query = (
-                select(
-                    Employee.position,
-                    func.count(Employee.id).label('count')
-                )
-                .where(Employee.status == EmployeeStatus.ACTIVE)
-                .group_by(Employee.position)
-                .order_by(func.count(Employee.id).desc())
-            )
-            
-            result = await self.session.execute(query)
-            rows = result.all()
-            
-            counts = {}
-            for row in rows:
-                position = row.position or 'Sin Posición'
-                counts[position] = row.count
-            
-            self._logger.debug(f"Conteos por posición obtenidos: {len(counts)} posiciones")
-            return counts
-            
-        except SQLAlchemyError as e:
-            self._logger.error(f"Error de base de datos obteniendo conteos por posición: {e}")
-            raise convert_sqlalchemy_error(
-                error=e,
-                operation="get_employee_count_by_position",
-                entity_type="Employee"
-            )
-        except Exception as e:
-            self._logger.error(f"Error inesperado obteniendo conteos por posición: {e}")
-            raise create_employee_statistics_error(
-                message=f"Error inesperado obteniendo conteos por posición: {e}",
-                operation="get_employee_count_by_position",
-                original_error=e
-            )
+        return await self._get_count_by_attribute(
+            attribute_name="position", 
+            none_label="Sin Posición", 
+            log_unit="posiciones"
+        )
+
+    async def get_by_unique_field(self, field_name: str, value: Any) -> Optional[Any]:
+        return await self._get_by_unique_field(field_name, value)
     
     # ============================================================================
     # ESTADÍSTICAS FINANCIERAS
@@ -185,16 +176,16 @@ class StatisticsOperations(IEmployeeStatisticsOperations):
         try:
             query = (
                 select(
-                    func.count(Employee.id).label('count'),
-                    func.avg(Employee.salary).label('average'),
-                    func.min(Employee.salary).label('minimum'),
-                    func.max(Employee.salary).label('maximum'),
-                    func.sum(Employee.salary).label('total')
+                    func.count(self.model_class.id).label('count'),
+                    func.avg(self.model_class.salary).label('average'),
+                    func.min(self.model_class.salary).label('minimum'),
+                    func.max(self.model_class.salary).label('maximum'),
+                    func.sum(self.model_class.salary).label('total')
                 )
                 .where(
                     and_(
-                        Employee.status == EmployeeStatus.ACTIVE,
-                        Employee.salary.is_not(None)
+                        self.model_class.status == EmployeeStatus.ACTIVE,
+                        self.model_class.salary.is_not(None)
                     )
                 )
             )
@@ -227,7 +218,7 @@ class StatisticsOperations(IEmployeeStatisticsOperations):
             raise convert_sqlalchemy_error(
                 error=e,
                 operation="get_salary_statistics",
-                entity_type="Employee"
+                entity_type=self.model_class.__name__
             )
         except Exception as e:
             self._logger.error(f"Error inesperado obteniendo estadísticas salariales: {e}")
@@ -256,17 +247,17 @@ class StatisticsOperations(IEmployeeStatisticsOperations):
             
             query = (
                 select(
-                    func.extract('year', Employee.hire_date).label('year'),
-                    func.count(Employee.id).label('count')
+                    func.extract('year', self.model_class.hire_date).label('year'),
+                    func.count(self.model_class.id).label('count')
                 )
                 .where(
                     and_(
-                        Employee.hire_date >= start_date,
-                        Employee.hire_date <= current_date
+                        self.model_class.hire_date >= start_date,
+                        self.model_class.hire_date <= current_date
                     )
                 )
-                .group_by(func.extract('year', Employee.hire_date))
-                .order_by(func.extract('year', Employee.hire_date))
+                .group_by(func.extract('year', self.model_class.hire_date))
+                .order_by(func.extract('year', self.model_class.hire_date))
             )
             
             result = await self.session.execute(query)
@@ -285,7 +276,7 @@ class StatisticsOperations(IEmployeeStatisticsOperations):
             raise convert_sqlalchemy_error(
                 error=e,
                 operation="get_hire_date_distribution",
-                entity_type="Employee"
+                entity_type=self.model_class.__name__
             )
         except Exception as e:
             self._logger.error(f"Error inesperado obteniendo distribución de fechas de contratación: {e}")
@@ -312,8 +303,8 @@ class StatisticsOperations(IEmployeeStatisticsOperations):
                     func.count(TeamMembership.team_id).label('team_count'),
                     func.count(TeamMembership.employee_id).label('employee_count')
                 )
-                .join(Employee)
-                .where(Employee.status == EmployeeStatus.ACTIVE)
+                .join(self.model_class)
+                .where(self.model_class.status == EmployeeStatus.ACTIVE)
                 .group_by(TeamMembership.employee_id)
             )
             
@@ -330,11 +321,11 @@ class StatisticsOperations(IEmployeeStatisticsOperations):
             
             # Empleados sin equipos
             no_team_query = (
-                select(func.count(Employee.id))
+                select(func.count(self.model_class.id))
                 .outerjoin(TeamMembership)
                 .where(
                     and_(
-                        Employee.status == EmployeeStatus.ACTIVE,
+                        self.model_class.status == EmployeeStatus.ACTIVE,
                         TeamMembership.employee_id.is_(None)
                     )
                 )
@@ -360,7 +351,7 @@ class StatisticsOperations(IEmployeeStatisticsOperations):
             raise convert_sqlalchemy_error(
                 error=e,
                 operation="get_team_participation_stats",
-                entity_type="Employee"
+                entity_type=self.model_class.__name__
             )
         except Exception as e:
             self._logger.error(f"Error inesperado obteniendo estadísticas de equipos: {e}")
@@ -383,8 +374,8 @@ class StatisticsOperations(IEmployeeStatisticsOperations):
                     func.count(ProjectAssignment.project_id).label('project_count'),
                     func.count(ProjectAssignment.employee_id).label('employee_count')
                 )
-                .join(Employee)
-                .where(Employee.status == EmployeeStatus.ACTIVE)
+                .join(self.model_class)
+                .where(self.model_class.status == EmployeeStatus.ACTIVE)
                 .group_by(ProjectAssignment.employee_id)
             )
             
@@ -401,11 +392,11 @@ class StatisticsOperations(IEmployeeStatisticsOperations):
             
             # Empleados sin proyectos
             no_project_query = (
-                select(func.count(Employee.id))
+                select(func.count(self.model_class.id))
                 .outerjoin(ProjectAssignment)
                 .where(
                     and_(
-                        Employee.status == EmployeeStatus.ACTIVE,
+                        self.model_class.status == EmployeeStatus.ACTIVE,
                         ProjectAssignment.employee_id.is_(None)
                     )
                 )
@@ -431,7 +422,7 @@ class StatisticsOperations(IEmployeeStatisticsOperations):
             raise convert_sqlalchemy_error(
                 error=e,
                 operation="get_project_participation_stats",
-                entity_type="Employee"
+                entity_type=self.model_class.__name__
             )
         except Exception as e:
             self._logger.error(f"Error inesperado obteniendo estadísticas de proyectos: {e}")
@@ -484,10 +475,10 @@ class StatisticsOperations(IEmployeeStatisticsOperations):
                         )
                     ).label('rejected_requests')
                 )
-                .join(Employee)
+                .join(self.model_class)
                 .where(
                     and_(
-                        Employee.status == EmployeeStatus.ACTIVE,
+                        self.model_class.status == EmployeeStatus.ACTIVE,
                         or_(
                             and_(Vacation.start_date >= start_date, Vacation.start_date <= end_date),
                             and_(Vacation.end_date >= start_date, Vacation.end_date <= end_date),
@@ -524,7 +515,7 @@ class StatisticsOperations(IEmployeeStatisticsOperations):
             raise convert_sqlalchemy_error(
                 error=e,
                 operation="get_vacation_statistics",
-                entity_type="Vacation"
+                entity_type=Vacation.__name__
             )
         except Exception as e:
             self._logger.error(f"Error inesperado obteniendo estadísticas de vacaciones: {e}")
@@ -550,13 +541,13 @@ class StatisticsOperations(IEmployeeStatisticsOperations):
         try:
             # Obtener todos los empleados activos con habilidades
             query = (
-                select(Employee.skills)
+                select(self.model_class.skills)
                 .where(
                     and_(
-                        Employee.status == EmployeeStatus.ACTIVE,
-                        Employee.skills.is_not(None),
-                        Employee.skills != '[]',
-                        Employee.skills != ''
+                        self.model_class.status == EmployeeStatus.ACTIVE,
+                        self.model_class.skills.is_not(None),
+                        self.model_class.skills != '[]',
+                        self.model_class.skills != ''
                     )
                 )
             )
@@ -590,7 +581,7 @@ class StatisticsOperations(IEmployeeStatisticsOperations):
             raise convert_sqlalchemy_error(
                 error=e,
                 operation="get_skills_distribution",
-                entity_type="Employee"
+                entity_type=self.model_class.__name__
             )
         except Exception as e:
             self._logger.error(f"Error inesperado obteniendo distribución de habilidades: {e}")
@@ -616,10 +607,10 @@ class StatisticsOperations(IEmployeeStatisticsOperations):
             Diccionario con estadísticas de carga de trabajo
         """
         try:
-            from .....models.workload import Workload
+            from planificador.models.workload import Workload
             
             # Verificar que el empleado existe
-            employee_query = select(Employee).where(Employee.id == employee_id)
+            employee_query = select(self.model_class).where(self.model_class.id == employee_id)
             employee_result = await self.session.execute(employee_query)
             employee = employee_result.scalar_one_or_none()
             
@@ -703,7 +694,7 @@ class StatisticsOperations(IEmployeeStatisticsOperations):
             raise convert_sqlalchemy_error(
                 error=e,
                 operation="get_employee_workload_stats",
-                entity_type="Employee",
+                entity_type=self.model_class.__name__,
                 entity_id=employee_id
             )
         except Exception as e:
@@ -748,7 +739,7 @@ class StatisticsOperations(IEmployeeStatisticsOperations):
             raise convert_sqlalchemy_error(
                 error=e,
                 operation="get_comprehensive_summary",
-                entity_type="Employee"
+                entity_type=self.model_class.__name__
             )
         except Exception as e:
             self._logger.error(f"Error inesperado generando resumen completo: {e}")

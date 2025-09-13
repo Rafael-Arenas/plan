@@ -23,28 +23,64 @@ class StatisticsOperations(BaseRepository):
         """
         Calcula un resumen del número de proyectos por estado.
         """
-        query = select(Project.status, func.count(Project.id)).group_by(Project.status)
-        result = await self.session.execute(query)
-        return {status: count for status, count in result.all()}
+        try:
+            query = select(Project.status, func.count(Project.id)).group_by(
+                Project.status
+            )
+            result = await self.session.execute(query)
+            return {status: count for status, count in result.all()}
+        except SQLAlchemyError as e:
+            self._logger.error(f"Error al obtener el resumen de estados: {e}")
+            raise convert_sqlalchemy_error(
+                error=e,
+                operation="get_status_summary",
+                entity_type="Project",
+            )
+        except Exception as e:
+            self._logger.error(f"Error inesperado al obtener el resumen de estados: {e}")
+            raise ProjectRepositoryError(
+                message=f"Error inesperado al obtener el resumen de estados: {e}",
+                operation="get_status_summary",
+                entity_type="Project",
+                original_error=e,
+            )
 
     async def get_overdue_projects_summary(self) -> List[Dict[str, Any]]:
         """
         Obtiene un resumen de proyectos vencidos.
         """
-        today = pendulum.now().start_of("day")
-        query = (
-            self.query_builder._base_query()
-            .where(Project.end_date < today)
-            .where(Project.status.notin_(["Completed", "Archived"]))
-        )
-        result = await self.session.execute(query)
-        projects = result.scalars().all()
-        return [
-            {
-                "id": p.id,
-                "name": p.name,
-                "end_date": p.end_date,
-                "days_overdue": (today - p.end_date).in_days(),
-            }
-            for p in projects
-        ]
+        try:
+            today = pendulum.now().start_of("day")
+            query = (
+                self.query_builder._base_query()
+                .where(Project.end_date < today)
+                .where(Project.status.notin_(["Completed", "Archived"]))
+            )
+            result = await self.session.execute(query)
+            projects = result.scalars().all()
+            return [
+                {
+                    "id": p.id,
+                    "name": p.name,
+                    "end_date": p.end_date,
+                    "days_overdue": (today - p.end_date).in_days(),
+                }
+                for p in projects
+            ]
+        except SQLAlchemyError as e:
+            self._logger.error(f"Error al obtener el resumen de proyectos vencidos: {e}")
+            raise convert_sqlalchemy_error(
+                error=e,
+                operation="get_overdue_projects_summary",
+                entity_type="Project",
+            )
+        except Exception as e:
+            self._logger.error(
+                f"Error inesperado al obtener el resumen de proyectos vencidos: {e}"
+            )
+            raise ProjectRepositoryError(
+                message=f"Error inesperado al obtener el resumen de proyectos vencidos: {e}",
+                operation="get_overdue_projects_summary",
+                entity_type="Project",
+                original_error=e,
+            )

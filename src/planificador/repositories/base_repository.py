@@ -540,6 +540,10 @@ class BaseRepository(Generic[ModelType], ABC):
                         
                         if operator == 'like':
                             conditions.append(field_attr.like(f"%{val}%"))
+                        elif operator == 'ilike':
+                            conditions.append(field_attr.ilike(f"%{val}%"))
+                        elif operator == 'iexact':
+                            conditions.append(field_attr.ilike(val))
                         elif operator == 'gt':
                             conditions.append(field_attr > val)
                         elif operator == 'gte':

@@ -55,6 +55,9 @@ class EmployeeRepositoryFacade(
         """Elimina un empleado."""
         return await self._crud.delete_employee(employee_id)
     
+    async def get_by_unique_field(self, field_name: str, value: Any) -> Optional[Employee]:
+        return await self._crud.get_by_unique_field(field_name, value)
+    
     # ============================================================================
     # OPERACIONES DE FECHAS - Delegación a _dates
     # ============================================================================

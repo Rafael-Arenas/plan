@@ -11,21 +11,19 @@ from planificador.models.employee import Employee, EmployeeStatus
 from planificador.utils.date_utils import (
     get_current_time,
     format_datetime,
-    is_business_day,
-    add_business_days,
-    get_business_days
+    add_business_days
 )
+from planificador.utils.date_utils import get_business_days, is_business_day
 from planificador.exceptions.repository import (
-    convert_sqlalchemy_error,
-    EmployeeRepositoryError,
     EmployeeQueryError,
+    EmployeeRepositoryError,
     EmployeeValidationRepositoryError,
     EmployeeDateRangeError,
-    create_employee_query_error,
+    convert_sqlalchemy_error,
     create_employee_validation_repository_error,
     create_employee_date_range_error
 )
-from ..interfaces.date_interface import IEmployeeDateOperations
+from planificador.repositories.employee.interfaces.date_interface import IEmployeeDateOperations
 
 
 class DateOperations(BaseRepository[Employee], IEmployeeDateOperations):
@@ -43,6 +41,36 @@ class DateOperations(BaseRepository[Employee], IEmployeeDateOperations):
     
     async def get_by_unique_field(self, field_name: str, value: Any) -> Optional[Employee]:
         return await super().get_by_unique_field(field_name, value)
+
+    async def get_employees_hired_on_date(self, date: date, **kwargs) -> List[Employee]:
+        """
+        Obtiene empleados contratados en una fecha específica.
+
+        Args:
+            date: Fecha de contratación
+
+        Returns:
+            Lista de empleados contratados en esa fecha
+        """
+        try:
+            return await self.find_all_by_criteria(
+                {"hire_date": date},
+                order_by="full_name_asc",
+                **kwargs
+            )
+        except SQLAlchemyError as e:
+            raise convert_sqlalchemy_error(
+                error=e,
+                operation="get_employees_hired_on_date",
+                entity_type=self.model_class.__name__
+            )
+        except Exception as e:
+            raise EmployeeQueryError(
+                message=f"Error inesperado al obtener empleados por fecha de contratación: {e}",
+                operation="get_employees_hired_on_date",
+                entity_type=self.model_class.__name__,
+                original_error=e
+            )
     
     # ============================================================================
     # CONSULTAS TEMPORALES
@@ -59,17 +87,25 @@ class DateOperations(BaseRepository[Employee], IEmployeeDateOperations):
             current_time = get_current_time()
             start_of_week = current_time.start_of('week')
             end_of_week = current_time.end_of('week')
-            
-            return await self.get_employees_hired_business_days_only(
-                start_date=start_of_week.date(),
-                end_date=end_of_week.date(),
+
+            return await self.find_all_by_criteria(
+                {"hire_date": {"operator": "between", "value": (start_of_week.date(), end_of_week.date())}},
+                order_by="hire_date_desc",
                 **kwargs
             )
+        except SQLAlchemyError as e:
+            raise convert_sqlalchemy_error(
+                error=e,
+                operation="get_employees_hired_current_week",
+                entity_type=self.model_class.__name__
+            )
         except Exception as e:
-            raise create_employee_date_range_error(
-                start_date=None,
-                end_date=None,
-                reason=f"Error obteniendo empleados contratados esta semana: {str(e)}",
+            start_date = locals().get('start_of_week')
+            end_date = locals().get('end_of_week')
+            raise EmployeeQueryError(
+                message=f"Error obteniendo empleados contratados esta semana: {str(e)}",
+                operation="get_employees_hired_current_week",
+                entity_type=self.model_class.__name__,
                 original_error=e
             )
     
@@ -90,11 +126,50 @@ class DateOperations(BaseRepository[Employee], IEmployeeDateOperations):
                 end_date=end_of_month.date(),
                 **kwargs
             )
+        except SQLAlchemyError as e:
+            raise convert_sqlalchemy_error(
+                error=e,
+                operation="get_employees_hired_current_month",
+                entity_type=self.model_class.__name__
+            )
         except Exception as e:
-            raise create_employee_date_range_error(
-                start_date=None,
-                end_date=None,
-                reason=f"Error obteniendo empleados contratados este mes: {str(e)}",
+            raise EmployeeQueryError(
+                message=f"Error inesperado al obtener empleados contratados en el mes actual: {e}",
+                operation="get_employees_hired_current_month",
+                entity_type=self.model_class.__name__,
+                original_error=e
+            )
+
+    async def get_employees_hired_last_n_days(self, days: int, **kwargs) -> List[Employee]:
+        """
+        Obtiene empleados contratados en los últimos N días.
+        
+        Args:
+            days: Número de días a revisar hacia atrás.
+        
+        Returns:
+            Lista de empleados contratados en los últimos N días.
+        """
+        try:
+            end_date = get_current_time().date()
+            start_date = end_date.subtract(days=days)
+            
+            return await self.find_all_by_criteria(
+                {"hire_date": {"operator": "between", "value": (start_date, end_date)}},
+                order_by="hire_date_desc",
+                **kwargs
+            )
+        except SQLAlchemyError as e:
+            raise convert_sqlalchemy_error(
+                error=e,
+                operation="get_employees_hired_last_n_days",
+                entity_type=self.model_class.__name__
+            )
+        except Exception as e:
+            raise EmployeeQueryError(
+                message=f"Error inesperado al obtener empleados contratados en los últimos {days} días: {e}",
+                operation="get_employees_hired_last_n_days",
+                entity_type=self.model_class.__name__,
                 original_error=e
             )
     
@@ -127,34 +202,30 @@ class DateOperations(BaseRepository[Employee], IEmployeeDateOperations):
             if end_date is None:
                 end_date = get_current_time().date()
             
-            # Obtener empleados en el rango de fechas
-            # Nota: Necesitamos acceso al query_builder desde el repository principal
-            # Por ahora, implementamos la consulta directamente
-            from sqlalchemy import select, and_
+            # Obtener solo los días laborables en el rango
+            business_days_in_range = get_business_days(start_date, end_date)
+
+            if not business_days_in_range:
+                return []
+
+            # Filtrar por días laborables usando el repositorio
+            return await self.find_all_by_criteria(
+                {"hire_date": {"operator": "in", "value": business_days_in_range}},
+                order_by="hire_date_asc",
+                **kwargs
+            )
             
-            query = select(Employee).where(
-                and_(
-                    Employee.hire_date >= start_date,
-                    Employee.hire_date <= end_date
-                )
-            ).order_by(Employee.hire_date.desc())
-            
-            result = await self.session.execute(query)
-            employees = result.scalars().all()
-            
-            # Filtrar solo los contratados en días laborables
-            business_day_employees = [
-                emp for emp in employees 
-                if emp.hire_date and is_business_day(emp.hire_date)
-            ]
-            
-            return business_day_employees
-            
+        except SQLAlchemyError as e:
+            raise convert_sqlalchemy_error(
+                error=e,
+                operation="get_employees_hired_business_days_only",
+                entity_type=self.model_class.__name__
+            )
         except Exception as e:
-            raise create_employee_date_range_error(
-                start_date=start_date,
-                end_date=end_date,
-                reason=f"Error obteniendo empleados contratados en días laborables: {str(e)}",
+            raise EmployeeQueryError(
+                message=f"Error inesperado al obtener empleados contratados en días laborables: {e}",
+                operation="get_employees_hired_business_days_only",
+                entity_type=self.model_class.__name__,
                 original_error=e
             )
     
@@ -171,34 +242,22 @@ class DateOperations(BaseRepository[Employee], IEmployeeDateOperations):
             Lista de empleados contratados en el rango de fechas
         """
         try:
-            from sqlalchemy import select, and_
-            
-            query = select(Employee).where(
-                and_(
-                    Employee.hire_date >= start_date,
-                    Employee.hire_date <= end_date
-                )
-            ).order_by(Employee.hire_date.desc())
-            
-            result = await self.session.execute(query)
-            employees = result.scalars().all()
-            
-            self._logger.debug(f"Obtenidos {len(employees)} empleados contratados entre {start_date} y {end_date}")
-            return list(employees)
-            
+            return await self.find_all_by_criteria(
+                {"hire_date": {"operator": "between", "value": (start_date, end_date)}},
+                order_by="hire_date_desc"
+            )
         except SQLAlchemyError as e:
-            self._logger.error(f"Error de base de datos obteniendo empleados por rango de fechas {start_date}-{end_date}: {e}")
             raise convert_sqlalchemy_error(
                 error=e,
                 operation="get_by_hire_date_range",
-                entity_type="Employee"
+                entity_type=self.model_class.__name__
             )
         except Exception as e:
-            self._logger.error(f"Error inesperado obteniendo empleados por rango de fechas {start_date}-{end_date}: {e}")
-            raise create_employee_query_error(
-                query_type="get_by_hire_date_range",
-                parameters={"start_date": str(start_date), "end_date": str(end_date)},
-                reason=f"Error inesperado: {str(e)}"
+            raise EmployeeQueryError(
+                message=f"Error inesperado al obtener empleados por rango de fecha: {e}",
+                operation="get_by_hire_date_range",
+                entity_type=self.model_class.__name__,
+                original_error=e
             )
     
     # ============================================================================
@@ -218,10 +277,11 @@ class DateOperations(BaseRepository[Employee], IEmployeeDateOperations):
         try:
             employee = await self.get_by_id(employee_id)
             if not employee:
-                raise create_employee_query_error(
-                    query_type="get_employee_tenure_stats",
-                    parameters={"employee_id": employee_id},
-                    reason="Empleado no encontrado"
+                raise EmployeeRepositoryError(
+                    message="Empleado no encontrado",
+                    operation="get_employee_tenure_stats",
+                    entity_type=self.model_class.__name__,
+                    entity_id=employee_id
                 )
             
             if not employee.hire_date:
@@ -272,11 +332,27 @@ class DateOperations(BaseRepository[Employee], IEmployeeDateOperations):
                 "tenure_category": category
             }
             
+        except SQLAlchemyError as e:
+            raise convert_sqlalchemy_error(
+                error=e,
+                operation="get_employee_tenure_stats",
+                entity_type=self.model_class.__name__,
+                entity_id=employee_id
+            )
+        except EmployeeRepositoryError as e:
+            raise EmployeeQueryError(
+                message=f"Error al buscar empleado: {e.message}",
+                operation="get_employee_tenure_stats",
+                entity_type=self.model_class.__name__,
+                entity_id=employee_id,
+                original_error=e
+            )
         except Exception as e:
-            raise create_employee_query_error(
-                query_type="get_employee_tenure_stats",
-                parameters={"employee_id": employee_id},
-                reason=f"Error calculando estadísticas de antigüedad: {str(e)}",
+            raise EmployeeQueryError(
+                message=f"Error inesperado al calcular estadísticas de antigüedad: {e}",
+                operation="get_employee_tenure_stats",
+                entity_type=self.model_class.__name__,
+                entity_id=employee_id,
                 original_error=e
             )
     
@@ -302,9 +378,9 @@ class DateOperations(BaseRepository[Employee], IEmployeeDateOperations):
             
             # Obtener empleados según estado
             if status:
-                query = select(Employee).where(Employee.status == status)
+                query = select(self.model_class).where(self.model_class.status == status)
             else:
-                query = select(Employee).where(Employee.status == EmployeeStatus.ACTIVE)
+                query = select(self.model_class).where(self.model_class.status == EmployeeStatus.ACTIVE)
             
             result = await self.session.execute(query)
             employees = result.scalars().all()
@@ -340,15 +416,17 @@ class DateOperations(BaseRepository[Employee], IEmployeeDateOperations):
             
             return result_list
             
+        except SQLAlchemyError as e:
+            raise convert_sqlalchemy_error(
+                error=e,
+                operation="get_employees_by_tenure_range",
+                entity_type=self.model_class.__name__
+            )
         except Exception as e:
-            raise create_employee_query_error(
-                query_type="get_employees_by_tenure_range",
-                parameters={
-                    "min_years": min_years,
-                    "max_years": max_years,
-                    "status": status.value if status else None
-                },
-                reason=f"Error obteniendo empleados por rango de antigüedad: {str(e)}",
+            raise EmployeeQueryError(
+                message=f"Error inesperado al obtener empleados por rango de antigüedad: {e}",
+                operation="get_employees_by_tenure_range",
+                entity_type=self.model_class.__name__,
                 original_error=e
             )
     
@@ -381,25 +459,31 @@ class DateOperations(BaseRepository[Employee], IEmployeeDateOperations):
                     hire_date = hire_date.date()
                 
                 if not is_business_day(hire_date):
-                    raise create_employee_validation_repository_error(
+                    raise RepositoryValidationError(
+                        message="La fecha de contratación debe ser un día laborable",
+                        operation="create_employee_with_date_validation",
+                        entity_type=self.model_class.__name__,
                         field="hire_date",
-                        value=hire_date,
-                        reason="La fecha de contratación debe ser un día laborable",
-                        operation="create_employee_with_date_validation"
+                        invalid_value=str(hire_date)
                     )
             
             # Crear empleado usando el método estándar del BaseRepository
             return await self.create(employee_data)
             
-        except Exception as e:
-            if isinstance(e, (EmployeeValidationRepositoryError, EmployeeRepositoryError)):
-                raise
-            
-            raise create_employee_validation_repository_error(
-                field="employee_data",
-                value=str(employee_data),
-                reason=f"Error en validación de fecha: {str(e)}",
+        except SQLAlchemyError as e:
+            raise convert_sqlalchemy_error(
+                error=e,
                 operation="create_employee_with_date_validation",
+                entity_type=self.model_class.__name__
+            )
+        except EmployeeValidationRepositoryError as e:
+            # Re-raise validation errors to be handled by the caller
+            raise e
+        except Exception as e:
+            raise EmployeeQueryError(
+                message=f"Error inesperado al crear empleado con validación de fecha: {e}",
+                operation="create_employee_with_date_validation",
+                entity_type=self.model_class.__name__,
                 original_error=e
             )
     

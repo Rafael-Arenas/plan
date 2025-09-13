@@ -1,31 +1,14 @@
 from typing import List, Optional, Dict, Any
 from datetime import date
-from sqlalchemy import select, and_, or_, func
-from sqlalchemy.orm import selectinload
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.exc import SQLAlchemyError
+
 from loguru import logger
 
+from planificador.repositories.base_repository import BaseRepository
 from planificador.models.employee import Employee, EmployeeStatus
-from planificador.models.team_membership import TeamMembership
-from planificador.models.project_assignment import ProjectAssignment
-from planificador.models.vacation import Vacation, VacationStatus
-from planificador.utils.date_utils import get_current_time
-from planificador.exceptions.repository.base_repository_exceptions import (
-    RepositoryError,
-    RepositoryConnectionError,
-    RepositoryTimeoutError,
-    RepositoryTransactionError,
-    convert_sqlalchemy_error
-)
-from planificador.exceptions.repository.employee_repository_exceptions import (
-    EmployeeRepositoryError,
-    create_employee_query_error
-)
 from ..interfaces.query_interface import IEmployeeQueryOperations
 
 
-class QueryOperations(IEmployeeQueryOperations):
+class QueryOperations(BaseRepository[Employee], IEmployeeQueryOperations):
     """
     Implementación de operaciones de consulta para empleados.
     
@@ -33,9 +16,9 @@ class QueryOperations(IEmployeeQueryOperations):
     con diferentes criterios de búsqueda y filtrado.
     """
     
-    def __init__(self, session: AsyncSession):
-        self.session = session
-        self._logger = logger
+    def __init__(self, session: Any):
+        super().__init__(session, Employee)
+        self._logger = logger.bind(component="EmployeeQueryOperations")
     
     # ============================================================================
     # MÉTODOS DE CONSULTA PRINCIPALES
@@ -52,7 +35,7 @@ class QueryOperations(IEmployeeQueryOperations):
             Empleado encontrado o None
         """
         try:
-            query = select(Employee).where(Employee.id == employee_id)
+            query = select(self.model_class).where(self.model_class.id == employee_id)
             result = await self.session.execute(query)
             employee = result.scalar_one_or_none()
             
@@ -68,15 +51,15 @@ class QueryOperations(IEmployeeQueryOperations):
             raise convert_sqlalchemy_error(
                 error=e,
                 operation="get_by_id",
-                entity_type="Employee",
+                entity_type=self.model_class.__name__,
                 entity_id=employee_id
             )
         except Exception as e:
             self._logger.error(f"Error inesperado obteniendo empleado por ID {employee_id}: {e}")
-            raise create_employee_query_error(
-                query_type="get_by_id",
-                parameters={"employee_id": employee_id},
-                reason=f"Error inesperado: {str(e)}"
+            raise EmployeeRepositoryError(
+                message=f"Error inesperado al obtener el empleado con ID {employee_id}",
+                operation="get_by_id",
+                entity_type=self.model_class.__name__,
             )
 
     async def get_all(self, skip: int = 0, limit: int = 100) -> List[Employee]:
@@ -91,7 +74,7 @@ class QueryOperations(IEmployeeQueryOperations):
             Lista de empleados
         """
         try:
-            query = select(Employee).offset(skip).limit(limit).order_by(Employee.full_name)
+            query = select(self.model_class).offset(skip).limit(limit).order_by(self.model_class.full_name)
             result = await self.session.execute(query)
             employees = result.scalars().all()
             
@@ -103,14 +86,14 @@ class QueryOperations(IEmployeeQueryOperations):
             raise convert_sqlalchemy_error(
                 error=e,
                 operation="get_all",
-                entity_type="Employee"
+                entity_type=self.model_class.__name__
             )
         except Exception as e:
             self._logger.error(f"Error inesperado obteniendo todos los empleados: {e}")
-            raise create_employee_query_error(
-                query_type="get_all",
-                parameters={"skip": skip, "limit": limit},
-                reason=f"Error inesperado: {str(e)}"
+            raise EmployeeRepositoryError(
+                message="Error inesperado al obtener todos los empleados",
+                operation="get_all",
+                entity_type=self.model_class.__name__,
             )
 
     async def employee_exists(self, employee_id: int) -> bool:
@@ -134,15 +117,15 @@ class QueryOperations(IEmployeeQueryOperations):
             raise convert_sqlalchemy_error(
                 error=e,
                 operation="employee_exists",
-                entity_type="Employee",
+                entity_type=self.model_class.__name__,
                 entity_id=employee_id
             )
         except Exception as e:
             self._logger.error(f"Error inesperado verificando existencia de empleado {employee_id}: {e}")
-            raise create_employee_query_error(
-                query_type="employee_exists",
-                parameters={"employee_id": employee_id},
-                reason=f"Error inesperado: {str(e)}"
+            raise EmployeeRepositoryError(
+                message=f"Error inesperado al verificar la existencia del empleado con ID {employee_id}",
+                operation="employee_exists",
+                entity_type=self.model_class.__name__,
             )
     
     async def count(self) -> int:
@@ -153,7 +136,7 @@ class QueryOperations(IEmployeeQueryOperations):
             Número total de empleados
         """
         try:
-            query = select(func.count(Employee.id))
+            query = select(func.count(self.model_class.id))
             result = await self.session.execute(query)
             total_employees = result.scalar()
             
@@ -165,14 +148,14 @@ class QueryOperations(IEmployeeQueryOperations):
             raise convert_sqlalchemy_error(
                 error=e,
                 operation="count",
-                entity_type="Employee"
+                entity_type=self.model_class.__name__
             )
         except Exception as e:
             self._logger.error(f"Error inesperado contando empleados: {e}")
-            raise create_employee_query_error(
-                query_type="count",
-                parameters={},
-                reason=f"Error inesperado: {str(e)}"
+            raise EmployeeRepositoryError(
+                message="Error inesperado al contar los empleados",
+                operation="count",
+                entity_type=self.model_class.__name__,
             )
 
     async def search_by_name(self, name: str, **kwargs) -> List[Employee]:
@@ -215,10 +198,10 @@ class QueryOperations(IEmployeeQueryOperations):
             )
         except Exception as e:
             self._logger.error(f"Error inesperado buscando empleados con término '{name}': {e}")
-            raise create_employee_query_error(
-                query_type="search_by_name",
-                parameters={"name": name},
-                reason=f"Error inesperado: {str(e)}"
+            raise EmployeeRepositoryError(
+                message=f"Error inesperado al buscar empleados con el término '{name}'",
+                operation="search_by_name",
+                entity_type=self.model_class.__name__,
             )
     
     async def get_by_email(self, email: str) -> Optional[Employee]:
@@ -232,35 +215,25 @@ class QueryOperations(IEmployeeQueryOperations):
             Empleado encontrado o None
         """
         try:
-            query = select(Employee).where(
-                func.lower(Employee.email) == func.lower(email)
+            return await self.find_by_criteria(
+                {"func.lower(email)": func.lower(email)}
             )
-            result = await self.session.execute(query)
-            employee = result.scalar_one_or_none()
-            
-            if employee:
-                self._logger.debug(f"Empleado encontrado por email: {email}")
-            else:
-                self._logger.debug(f"Empleado no encontrado por email: {email}")
-            
-            return employee
-            
         except SQLAlchemyError as e:
-            self._logger.error(f"Error de base de datos buscando empleado por email '{email}': {e}")
             raise convert_sqlalchemy_error(
                 error=e,
                 operation="get_by_email",
-                entity_type="Employee"
+                entity_type=self.model_class.__name__,
             )
         except Exception as e:
-            self._logger.error(f"Error inesperado buscando empleado por email '{email}': {e}")
-            raise create_employee_query_error(
-                query_type="get_by_email",
-                parameters={"email": email},
-                reason=f"Error inesperado: {str(e)}"
+            raise EmployeeRepositoryError(
+                message=f"Error inesperado al obtener el empleado con email {email}",
+                operation="get_by_email",
+                entity_type=self.model_class.__name__,
             )
-    
-    async def get_by_status(self, status: EmployeeStatus, **kwargs) -> List[Employee]:
+
+    async def get_by_status(
+        self, status: EmployeeStatus, **kwargs
+    ) -> List[Employee]:
         """
         Obtiene empleados por su estado.
         
@@ -272,29 +245,20 @@ class QueryOperations(IEmployeeQueryOperations):
             Lista de empleados con el estado especificado
         """
         try:
-            query = select(Employee).where(
-                Employee.status == status
-            ).order_by(Employee.full_name)
-            
-            result = await self.session.execute(query)
-            employees = result.scalars().all()
-            
-            self._logger.debug(f"Obtenidos {len(employees)} empleados con estado: {status.value}")
-            return list(employees)
-            
+            return await self.find_all_by_criteria(
+                {"status": status}, order_by="full_name"
+            )
         except SQLAlchemyError as e:
-            self._logger.error(f"Error de base de datos obteniendo empleados por estado '{status.value}': {e}")
             raise convert_sqlalchemy_error(
                 error=e,
                 operation="get_by_status",
-                entity_type="Employee"
+                entity_type=self.model_class.__name__,
             )
         except Exception as e:
-            self._logger.error(f"Error inesperado obteniendo empleados por estado '{status.value}': {e}")
-            raise create_employee_query_error(
-                query_type="get_by_status",
-                parameters={"status": status.value},
-                reason=f"Error inesperado: {str(e)}"
+            raise EmployeeRepositoryError(
+                message=f"Error inesperado al obtener empleados con estado {status}",
+                operation="get_by_status",
+                entity_type=self.model_class.__name__,
             )
     
     async def get_available_employees(self, **kwargs) -> List[Employee]:
@@ -314,52 +278,36 @@ class QueryOperations(IEmployeeQueryOperations):
             target_date = kwargs.get('target_date')
             if target_date is None:
                 target_date = get_current_time().date()
-            
-            # Subconsulta para empleados en vacaciones en la fecha objetivo
-            vacation_subquery = (
-                select(Vacation.employee_id)
-                .where(
-                    and_(
-                        Vacation.start_date <= target_date,
-                        Vacation.end_date >= target_date,
-                        Vacation.status == VacationStatus.APPROVED
-                    )
-                )
-            )
-            
-            # Consulta principal: empleados activos que NO están en vacaciones
-            query = (
-                select(Employee)
-                .where(
-                    and_(
-                        Employee.status == EmployeeStatus.ACTIVE,
-                        ~Employee.id.in_(vacation_subquery)
-                    )
-                )
-                .order_by(Employee.full_name)
-            )
 
-            result = await self.session.execute(query)
-            employees = result.scalars().all()
-
-            self._logger.debug(
-                f"Encontrados {len(employees)} empleados disponibles para la fecha {target_date}."
+            return await self.find_all_by_criteria(
+                {
+                    "status": EmployeeStatus.ACTIVE,
+                    "id": {
+                        "operator": "not_in",
+                        "value": select(Vacation.employee_id).where(
+                            and_(
+                                Vacation.start_date <= target_date,
+                                Vacation.end_date >= target_date,
+                                Vacation.status == VacationStatus.APPROVED
+                            )
+                        )
+                    }
+                },
+                order_by="full_name"
             )
-            return list(employees)
-
         except SQLAlchemyError as e:
             self._logger.error(f"Error de base de datos obteniendo empleados disponibles: {e}")
             raise convert_sqlalchemy_error(
                 error=e,
                 operation="get_available_employees",
-                entity_type="Employee"
+                entity_type=self.model_class.__name__,
             )
         except Exception as e:
             self._logger.error(f"Error inesperado obteniendo empleados disponibles: {e}")
-            raise create_employee_query_error(
-                query_type="get_available_employees",
-                parameters={"target_date": str(kwargs.get('target_date'))},
-                reason=f"Error inesperado: {str(e)}"
+            raise EmployeeRepositoryError(
+                message="Error inesperado al obtener empleados disponibles",
+                operation="get_available_employees",
+                entity_type=self.model_class.__name__,
             )
     
     async def search_by_skills(self, skills: List[str], **kwargs) -> List[Employee]:
@@ -377,62 +325,27 @@ class QueryOperations(IEmployeeQueryOperations):
         try:
             if not skills:
                 return []
-            
-            # Crear condiciones OR para cada skill
-            conditions = []
-            for skill in skills:
-                # Escapar caracteres especiales para LIKE
-                skill_escaped = skill.replace('\\', '\\\\').replace('%', '\\%').replace('_', '\\_')
-                
-                # Estrategia simplificada basada en los resultados de prueba:
-                # 1. Coincidencia exacta: "Java" encuentra "Java"
-                # 2. Coincidencia como prefijo con espacio: "Machine" encuentra "Machine Learning"
-                # 3. Coincidencia parcial para casos específicos como "Tensor" -> "TensorFlow"
-                
-                patterns = [
-                    # Coincidencia exacta como elemento del array
-                    f'%\"{skill_escaped}\"%',
-                    # Coincidencia como prefijo seguido de espacio
-                    f'%\"{skill_escaped} %'
+
+            conditions = {
+                "operator": "or",
+                "conditions": [
+                    {"skills": {"operator": "ilike", "value": f'%{skill}%'}}
+                    for skill in skills
                 ]
-                
-                # Para casos especiales como "Tensor" -> "TensorFlow", usar búsqueda simple
-                # pero solo si no es una palabra que puede causar falsos positivos
-                if skill.lower() not in ['java', 'script', 'python', 'node']:
-                    patterns.append(f'%{skill_escaped}%')
-                
-                skill_conditions = or_(*[Employee.skills.ilike(pattern) for pattern in patterns])
-                conditions.append(skill_conditions)
+            }
             
-            # Combinar todas las condiciones con OR
-            final_condition = or_(*conditions)
-            
-            query = select(Employee).where(
-                and_(
-                    Employee.skills.is_not(None),
-                    final_condition
-                )
-            ).order_by(Employee.full_name)
-            
-            result = await self.session.execute(query)
-            employees = result.scalars().all()
-            
-            self._logger.debug(f"Encontrados {len(employees)} empleados con habilidades: {skills}")
-            return list(employees)
-            
+            return await self.find_all_by_criteria(conditions, order_by="full_name")
         except SQLAlchemyError as e:
-            self._logger.error(f"Error de base de datos obteniendo empleados por habilidades {skills}: {e}")
             raise convert_sqlalchemy_error(
                 error=e,
                 operation="search_by_skills",
-                entity_type="Employee"
+                entity_type=self.model_class.__name__,
             )
         except Exception as e:
-            self._logger.error(f"Error inesperado obteniendo empleados por habilidades {skills}: {e}")
-            raise create_employee_query_error(
-                query_type="search_by_skills",
-                parameters={"skills": skills},
-                reason=f"Error inesperado: {str(e)}"
+            raise EmployeeRepositoryError(
+                message=f"Error inesperado al buscar empleados por habilidades",
+                operation="search_by_skills",
+                entity_type=self.model_class.__name__,
             )
     
     async def get_by_department(self, department: str, **kwargs) -> List[Employee]:
@@ -447,29 +360,20 @@ class QueryOperations(IEmployeeQueryOperations):
             Lista de empleados del departamento
         """
         try:
-            query = select(Employee).where(
-                Employee.department == department
-            ).order_by(Employee.full_name)
-            
-            result = await self.session.execute(query)
-            employees = result.scalars().all()
-            
-            self._logger.debug(f"Obtenidos {len(employees)} empleados del departamento: {department}")
-            return list(employees)
-            
+            return await self.find_all_by_criteria(
+                {"department": department}, order_by="full_name"
+            )
         except SQLAlchemyError as e:
-            self._logger.error(f"Error de base de datos obteniendo empleados del departamento '{department}': {e}")
             raise convert_sqlalchemy_error(
                 error=e,
                 operation="get_by_department",
-                entity_type="Employee"
+                entity_type=self.model_class.__name__,
             )
         except Exception as e:
-            self._logger.error(f"Error inesperado obteniendo empleados del departamento '{department}': {e}")
-            raise create_employee_query_error(
-                query_type="get_by_department",
-                parameters={"department": department},
-                reason=f"Error inesperado: {str(e)}"
+            raise EmployeeRepositoryError(
+                message=f"Error inesperado al obtener empleados del departamento {department}",
+                operation="get_by_department",
+                entity_type=self.model_class.__name__,
             )
     
     async def get_by_position(self, position: str, **kwargs) -> List[Employee]:
@@ -484,29 +388,20 @@ class QueryOperations(IEmployeeQueryOperations):
             Lista de empleados con la posición especificada
         """
         try:
-            query = select(Employee).where(
-                Employee.position == position
-            ).order_by(Employee.full_name)
-            
-            result = await self.session.execute(query)
-            employees = result.scalars().all()
-            
-            self._logger.debug(f"Obtenidos {len(employees)} empleados con posición: {position}")
-            return list(employees)
-            
+            return await self.find_all_by_criteria(
+                {"position": position}, order_by="full_name"
+            )
         except SQLAlchemyError as e:
-            self._logger.error(f"Error de base de datos obteniendo empleados por posición '{position}': {e}")
             raise convert_sqlalchemy_error(
                 error=e,
                 operation="get_by_position",
-                entity_type="Employee"
+                entity_type=self.model_class.__name__,
             )
         except Exception as e:
-            self._logger.error(f"Error inesperado obteniendo empleados por posición '{position}': {e}")
-            raise create_employee_query_error(
-                query_type="get_by_position",
-                parameters={"position": position},
-                reason=f"Error inesperado: {str(e)}"
+            raise EmployeeRepositoryError(
+                message=f"Error inesperado al obtener empleados con la posición {position}",
+                operation="get_by_position",
+                entity_type=self.model_class.__name__,
             )
     
     async def get_by_salary_range(self, min_salary: float, max_salary: float, **kwargs) -> List[Employee]:
@@ -522,32 +417,21 @@ class QueryOperations(IEmployeeQueryOperations):
             Lista de empleados en el rango salarial
         """
         try:
-            query = select(Employee).where(
-                and_(
-                    Employee.salary >= min_salary,
-                    Employee.salary <= max_salary
-                )
-            ).order_by(Employee.salary.desc())
-            
-            result = await self.session.execute(query)
-            employees = result.scalars().all()
-            
-            self._logger.debug(f"Obtenidos {len(employees)} empleados en rango salarial: {min_salary}-{max_salary}")
-            return list(employees)
-            
+            return await self.find_all_by_criteria(
+                {"salary": {"operator": "between", "value": (min_salary, max_salary)}},
+                order_by="salary_desc"
+            )
         except SQLAlchemyError as e:
-            self._logger.error(f"Error de base de datos obteniendo empleados por rango salarial {min_salary}-{max_salary}: {e}")
             raise convert_sqlalchemy_error(
                 error=e,
                 operation="get_by_salary_range",
-                entity_type="Employee"
+                entity_type=self.model_class.__name__,
             )
         except Exception as e:
-            self._logger.error(f"Error inesperado obteniendo empleados por rango salarial {min_salary}-{max_salary}: {e}")
-            raise create_employee_query_error(
-                query_type="get_by_salary_range",
-                parameters={"min_salary": min_salary, "max_salary": max_salary},
-                reason=f"Error inesperado: {str(e)}"
+            raise EmployeeRepositoryError(
+                message=f"Error inesperado al obtener empleados por rango salarial",
+                operation="get_by_salary_range",
+                entity_type=self.model_class.__name__,
             )
     
     async def get_by_hire_date_range(self, start_date: date, end_date: date, **kwargs) -> List[Employee]:
@@ -563,32 +447,21 @@ class QueryOperations(IEmployeeQueryOperations):
             Lista de empleados contratados en el rango de fechas
         """
         try:
-            query = select(Employee).where(
-                and_(
-                    Employee.hire_date >= start_date,
-                    Employee.hire_date <= end_date
-                )
-            ).order_by(Employee.hire_date.desc())
-            
-            result = await self.session.execute(query)
-            employees = result.scalars().all()
-            
-            self._logger.debug(f"Obtenidos {len(employees)} empleados contratados entre {start_date} y {end_date}")
-            return list(employees)
-            
+            return await self.find_all_by_criteria(
+                {"hire_date": {"operator": "between", "value": (start_date, end_date)}},
+                order_by="hire_date_desc"
+            )
         except SQLAlchemyError as e:
-            self._logger.error(f"Error de base de datos obteniendo empleados por rango de fechas {start_date}-{end_date}: {e}")
             raise convert_sqlalchemy_error(
                 error=e,
                 operation="get_by_hire_date_range",
-                entity_type="Employee"
+                entity_type=self.model_class.__name__,
             )
         except Exception as e:
-            self._logger.error(f"Error inesperado obteniendo empleados por rango de fechas {start_date}-{end_date}: {e}")
-            raise create_employee_query_error(
-                query_type="get_by_hire_date_range",
-                parameters={"start_date": str(start_date), "end_date": str(end_date)},
-                reason=f"Error inesperado: {str(e)}"
+            raise EmployeeRepositoryError(
+                message=f"Error inesperado al obtener empleados por rango de fecha de contratación",
+                operation="get_by_hire_date_range",
+                entity_type=self.model_class.__name__,
             )
     
     async def advanced_search(self, filters: Dict[str, Any], **kwargs) -> List[Employee]:
@@ -602,79 +475,23 @@ class QueryOperations(IEmployeeQueryOperations):
         Returns:
             Lista de empleados que cumplen los filtros
         """
+        order_by = kwargs.get('order_by') or filters.pop('order_by', 'full_name')
+        
         try:
-            query = select(Employee)
-            conditions = []
-            
-            # Aplicar filtros dinámicamente
-            if 'status' in filters and filters['status']:
-                conditions.append(Employee.status == filters['status'])
-            
-            if 'department' in filters and filters['department']:
-                conditions.append(Employee.department == filters['department'])
-            
-            if 'position' in filters and filters['position']:
-                conditions.append(Employee.position == filters['position'])
-            
-            if 'min_salary' in filters and filters['min_salary'] is not None:
-                conditions.append(Employee.salary >= filters['min_salary'])
-            
-            if 'max_salary' in filters and filters['max_salary'] is not None:
-                conditions.append(Employee.salary <= filters['max_salary'])
-            
-            if 'hire_date_start' in filters and filters['hire_date_start']:
-                conditions.append(Employee.hire_date >= filters['hire_date_start'])
-            
-            if 'hire_date_end' in filters and filters['hire_date_end']:
-                conditions.append(Employee.hire_date <= filters['hire_date_end'])
-            
-            if 'skills' in filters and filters['skills']:
-                skills = filters['skills'] if isinstance(filters['skills'], list) else [filters['skills']]
-                skill_conditions = []
-                for skill in skills:
-                    skill_conditions.append(Employee.skills.ilike(f'%{skill}%'))
-                conditions.append(or_(*skill_conditions))
-            
-            if 'name' in filters and filters['name']:
-                name = filters['name']
-                conditions.append(
-                    or_(
-                        Employee.full_name.ilike(f"%{name}%"),
-                        Employee.first_name.ilike(f"%{name}%"),
-                        Employee.last_name.ilike(f"%{name}%")
-                    )
-                )
-            
-            # Aplicar todas las condiciones
-            if conditions:
-                query = query.where(and_(*conditions))
-            
-            # Ordenamiento
-            order_by = kwargs.get('order_by', 'full_name')
-            if hasattr(Employee, order_by):
-                query = query.order_by(getattr(Employee, order_by))
-            else:
-                query = query.order_by(Employee.full_name)
-            
-            result = await self.session.execute(query)
-            employees = result.scalars().all()
-            
-            self._logger.debug(f"Búsqueda avanzada encontró {len(employees)} empleados con filtros: {filters}")
-            return list(employees)
-            
+            return await self.find_all_by_criteria(filters, order_by=order_by)
         except SQLAlchemyError as e:
             self._logger.error(f"Error de base de datos en búsqueda avanzada: {e}")
             raise convert_sqlalchemy_error(
                 error=e,
                 operation="advanced_search",
-                entity_type="Employee"
+                entity_type=self.model_class.__name__
             )
         except Exception as e:
             self._logger.error(f"Error inesperado en búsqueda avanzada: {e}")
-            raise create_employee_query_error(
-                query_type="advanced_search",
-                parameters={"filters": filters},
-                reason=f"Error inesperado: {str(e)}"
+            raise EmployeeRepositoryError(
+                message="Error inesperado durante la búsqueda avanzada de empleados",
+                operation="advanced_search",
+                entity_type=self.model_class.__name__,
             )
     
     # ============================================================================
@@ -692,32 +509,21 @@ class QueryOperations(IEmployeeQueryOperations):
             Empleado encontrado o None
         """
         try:
-            query = select(Employee).where(
-                func.lower(Employee.full_name) == func.lower(full_name)
+            return await self.find_all_by_criteria(
+                {"full_name": {"operator": "ilike", "value": f"%{full_name}%"}},
+                order_by="full_name"
             )
-            result = await self.session.execute(query)
-            employee = result.scalar_one_or_none()
-            
-            if employee:
-                self._logger.debug(f"Empleado encontrado por nombre: {full_name}")
-            else:
-                self._logger.debug(f"Empleado no encontrado por nombre: {full_name}")
-            
-            return employee
-            
         except SQLAlchemyError as e:
-            self._logger.error(f"Error de base de datos buscando empleado por nombre '{full_name}': {e}")
             raise convert_sqlalchemy_error(
                 error=e,
                 operation="get_by_full_name",
-                entity_type="Employee"
+                entity_type=self.model_class.__name__,
             )
         except Exception as e:
-            self._logger.error(f"Error inesperado buscando empleado por nombre '{full_name}': {e}")
-            raise create_employee_query_error(
-                query_type="get_by_full_name",
-                parameters={"full_name": full_name},
-                reason=f"Error inesperado: {str(e)}"
+            raise EmployeeRepositoryError(
+                message=f"Error inesperado al buscar empleados por nombre completo",
+                operation="get_by_full_name",
+                entity_type=self.model_class.__name__,
             )
     
     async def get_by_employee_code(self, employee_code: str) -> Optional[Employee]:
@@ -731,32 +537,18 @@ class QueryOperations(IEmployeeQueryOperations):
             Empleado encontrado o None
         """
         try:
-            query = select(Employee).where(
-                func.lower(Employee.employee_code) == func.lower(employee_code)
-            )
-            result = await self.session.execute(query)
-            employee = result.scalar_one_or_none()
-            
-            if employee:
-                self._logger.debug(f"Empleado encontrado por código: {employee_code}")
-            else:
-                self._logger.debug(f"Empleado no encontrado por código: {employee_code}")
-            
-            return employee
-            
+            return await self.find_by_criteria({"employee_code": employee_code})
         except SQLAlchemyError as e:
-            self._logger.error(f"Error de base de datos buscando empleado por código '{employee_code}': {e}")
             raise convert_sqlalchemy_error(
                 error=e,
                 operation="get_by_employee_code",
-                entity_type="Employee"
+                entity_type=self.model_class.__name__,
             )
         except Exception as e:
-            self._logger.error(f"Error inesperado buscando empleado por código '{employee_code}': {e}")
-            raise create_employee_query_error(
-                query_type="get_by_employee_code",
-                parameters={"employee_code": employee_code},
-                reason=f"Error inesperado: {str(e)}"
+            raise EmployeeRepositoryError(
+                message=f"Error inesperado al buscar empleado por código",
+                operation="get_by_employee_code",
+                entity_type=self.model_class.__name__,
             )
     
     async def get_active_employees(self) -> List[Employee]:
@@ -767,29 +559,20 @@ class QueryOperations(IEmployeeQueryOperations):
             Lista de empleados activos
         """
         try:
-            query = select(Employee).where(
-                Employee.status == EmployeeStatus.ACTIVE
-            ).order_by(Employee.full_name)
-            
-            result = await self.session.execute(query)
-            employees = result.scalars().all()
-            
-            self._logger.debug(f"Obtenidos {len(employees)} empleados activos")
-            return list(employees)
-            
+            return await self.find_all_by_criteria(
+                {"status": EmployeeStatus.ACTIVE}, order_by="full_name"
+            )
         except SQLAlchemyError as e:
-            self._logger.error(f"Error de base de datos obteniendo empleados activos: {e}")
             raise convert_sqlalchemy_error(
                 error=e,
                 operation="get_active_employees",
-                entity_type="Employee"
+                entity_type=self.model_class.__name__,
             )
         except Exception as e:
-            self._logger.error(f"Error inesperado obteniendo empleados activos: {e}")
-            raise create_employee_query_error(
-                query_type="get_active_employees",
-                parameters={},
-                reason=f"Error inesperado: {str(e)}"
+            raise EmployeeRepositoryError(
+                message=f"Error inesperado al obtener empleados activos",
+                operation="get_active_employees",
+                entity_type=self.model_class.__name__,
             )
     
     async def get_with_teams(self, employee_id: int) -> Optional[Employee]:
@@ -803,34 +586,21 @@ class QueryOperations(IEmployeeQueryOperations):
             Empleado con equipos cargados o None
         """
         try:
-            query = select(Employee).options(
-                selectinload(Employee.team_memberships).selectinload(TeamMembership.team)
-            ).where(Employee.id == employee_id)
-            
-            result = await self.session.execute(query)
-            employee = result.scalar_one_or_none()
-            
-            if employee:
-                self._logger.debug(f"Empleado con equipos cargado: {employee_id}")
-            else:
-                self._logger.debug(f"Empleado no encontrado: {employee_id}")
-            
-            return employee
-            
+            return await self.find_by_criteria(
+                {"id": employee_id},
+                options=[selectinload(Employee.team_memberships).selectinload(TeamMembership.team)]
+            )
         except SQLAlchemyError as e:
-            self._logger.error(f"Error de base de datos obteniendo empleado con equipos {employee_id}: {e}")
             raise convert_sqlalchemy_error(
                 error=e,
                 operation="get_with_teams",
-                entity_type="Employee",
-                entity_id=employee_id
+                entity_type=self.model_class.__name__,
             )
         except Exception as e:
-            self._logger.error(f"Error inesperado obteniendo empleado con equipos {employee_id}: {e}")
-            raise create_employee_query_error(
-                query_type="get_with_teams",
-                parameters={"employee_id": employee_id},
-                reason=f"Error inesperado: {str(e)}"
+            raise EmployeeRepositoryError(
+                message=f"Error inesperado al obtener empleado con equipos",
+                operation="get_with_teams",
+                entity_type=self.model_class.__name__,
             )
     
     async def get_with_projects(self, employee_id: int) -> Optional[Employee]:
@@ -844,34 +614,21 @@ class QueryOperations(IEmployeeQueryOperations):
             Empleado con proyectos cargados o None
         """
         try:
-            query = select(Employee).options(
-                selectinload(Employee.project_assignments).selectinload(ProjectAssignment.project)
-            ).where(Employee.id == employee_id)
-            
-            result = await self.session.execute(query)
-            employee = result.scalar_one_or_none()
-            
-            if employee:
-                self._logger.debug(f"Empleado con proyectos cargado: {employee_id}")
-            else:
-                self._logger.debug(f"Empleado no encontrado: {employee_id}")
-            
-            return employee
-            
+            return await self.find_by_criteria(
+                {"id": employee_id},
+                options=[selectinload(Employee.project_assignments).selectinload(ProjectAssignment.project)]
+            )
         except SQLAlchemyError as e:
-            self._logger.error(f"Error de base de datos obteniendo empleado con proyectos {employee_id}: {e}")
             raise convert_sqlalchemy_error(
                 error=e,
                 operation="get_with_projects",
-                entity_type="Employee",
-                entity_id=employee_id
+                entity_type=self.model_class.__name__,
             )
         except Exception as e:
-            self._logger.error(f"Error inesperado obteniendo empleado con proyectos {employee_id}: {e}")
-            raise create_employee_query_error(
-                query_type="get_with_projects",
-                parameters={"employee_id": employee_id},
-                reason=f"Error inesperado: {str(e)}"
+            raise EmployeeRepositoryError(
+                message=f"Error inesperado al obtener empleado con proyectos",
+                operation="get_with_projects",
+                entity_type=self.model_class.__name__,
             )
     
     # ============================================================================
@@ -890,12 +647,12 @@ class QueryOperations(IEmployeeQueryOperations):
             True si el nombre ya existe
         """
         try:
-            query = select(func.count(Employee.id)).where(
-                func.lower(Employee.full_name) == func.lower(full_name)
+            query = select(func.count(self.model_class.id)).where(
+                func.lower(self.model_class.full_name) == func.lower(full_name)
             )
             
             if exclude_id:
-                query = query.where(Employee.id != exclude_id)
+                query = query.where(self.model_class.id != exclude_id)
             
             result = await self.session.execute(query)
             count = result.scalar()
@@ -909,14 +666,20 @@ class QueryOperations(IEmployeeQueryOperations):
             raise convert_sqlalchemy_error(
                 error=e,
                 operation="full_name_exists",
-                entity_type="Employee"
+                entity_type=self.model_class.__name__,
+            )
+        except Exception as e:
+            raise EmployeeRepositoryError(
+                message=f"Error inesperado al verificar la existencia del nombre completo",
+                operation="full_name_exists",
+                entity_type=self.model_class.__name__,
             )
         except Exception as e:
             self._logger.error(f"Error inesperado verificando nombre '{full_name}': {e}")
-            raise create_employee_query_error(
-                query_type="full_name_exists",
-                parameters={"full_name": full_name, "exclude_id": exclude_id},
-                reason=f"Error inesperado: {str(e)}"
+            raise EmployeeRepositoryError(
+                message=f"Error inesperado al verificar la existencia del nombre completo",
+                operation="full_name_exists",
+                entity_type=self.model_class.__name__,
             )
     
     async def employee_code_exists(self, employee_code: str, exclude_id: Optional[int] = None) -> bool:
@@ -931,12 +694,12 @@ class QueryOperations(IEmployeeQueryOperations):
             True si el código ya existe
         """
         try:
-            query = select(func.count(Employee.id)).where(
-                Employee.employee_code == employee_code
+            query = select(func.count(self.model_class.id)).where(
+                self.model_class.employee_code == employee_code
             )
             
             if exclude_id:
-                query = query.where(Employee.id != exclude_id)
+                query = query.where(self.model_class.id != exclude_id)
             
             result = await self.session.execute(query)
             count = result.scalar()
@@ -950,14 +713,14 @@ class QueryOperations(IEmployeeQueryOperations):
             raise convert_sqlalchemy_error(
                 error=e,
                 operation="employee_code_exists",
-                entity_type="Employee"
+                entity_type=self.model_class.__name__,
             )
         except Exception as e:
             self._logger.error(f"Error inesperado verificando código '{employee_code}': {e}")
-            raise create_employee_query_error(
-                query_type="employee_code_exists",
-                parameters={"employee_code": employee_code, "exclude_id": exclude_id},
-                reason=f"Error inesperado: {str(e)}"
+            raise EmployeeRepositoryError(
+                message=f"Error inesperado al verificar la existencia del código de empleado",
+                operation="employee_code_exists",
+                entity_type=self.model_class.__name__,
             )
     
     async def email_exists(self, email: str, exclude_id: Optional[int] = None) -> bool:
@@ -972,12 +735,12 @@ class QueryOperations(IEmployeeQueryOperations):
             True si el email ya existe
         """
         try:
-            query = select(func.count(Employee.id)).where(
-                func.lower(Employee.email) == func.lower(email)
+            query = select(func.count(self.model_class.id)).where(
+                func.lower(self.model_class.email) == func.lower(email)
             )
             
             if exclude_id:
-                query = query.where(Employee.id != exclude_id)
+                query = query.where(self.model_class.id != exclude_id)
             
             result = await self.session.execute(query)
             count = result.scalar()
@@ -991,12 +754,40 @@ class QueryOperations(IEmployeeQueryOperations):
             raise convert_sqlalchemy_error(
                 error=e,
                 operation="email_exists",
-                entity_type="Employee"
+                entity_type=self.model_class.__name__,
             )
         except Exception as e:
             self._logger.error(f"Error inesperado verificando email '{email}': {e}")
-            raise create_employee_query_error(
-                query_type="email_exists",
-                parameters={"email": email, "exclude_id": exclude_id},
-                reason=f"Error inesperado: {str(e)}"
+            raise EmployeeRepositoryError(
+                message=f"Error inesperado al verificar la existencia del email",
+                operation="email_exists",
+                entity_type=self.model_class.__name__,
+            )
+
+    async def get_by_unique_field(self, field_name: str, value: Any) -> Optional[Employee]:
+        """
+        Obtiene una entidad por un campo único.
+        
+        Args:
+            field_name: Nombre del campo.
+            value: Valor del campo.
+            
+        Returns:
+            La entidad encontrada o None.
+        """
+        try:
+            return await self.find_by_criteria({field_name: value})
+        except SQLAlchemyError as e:
+            self._logger.error(f"Error de base de datos obteniendo por campo único '{field_name}': {e}")
+            raise convert_sqlalchemy_error(
+                error=e,
+                operation="get_by_unique_field",
+                entity_type=self.model_class.__name__
+            )
+        except Exception as e:
+            self._logger.error(f"Error inesperado obteniendo por campo único '{field_name}': {e}")
+            raise EmployeeRepositoryError(
+                message=f"Error inesperado al obtener por campo único '{field_name}'",
+                operation="get_by_unique_field",
+                entity_type=self.model_class.__name__,
             )
