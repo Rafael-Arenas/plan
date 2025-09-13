@@ -30,7 +30,7 @@ El facade integra los siguientes componentes especializados:
 
 ```python
 from sqlalchemy.ext.asyncio import AsyncSession
-from planificador.database.repositories.client.client_repository_facade import ClientRepositoryFacade
+from planificador.repositories.client.client_repository_facade import ClientRepositoryFacade
 ```
 
 ### Inicialización

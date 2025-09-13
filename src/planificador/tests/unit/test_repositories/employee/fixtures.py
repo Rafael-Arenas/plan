@@ -2,7 +2,7 @@
 import pytest
 from unittest.mock import AsyncMock
 from sqlalchemy.ext.asyncio import AsyncSession
-from planificador.database.repositories.employee.employee_repository_facade import EmployeeRepositoryFacade
+from planificador.repositories.employee.employee_repository_facade import EmployeeRepositoryFacade
 
 @pytest.fixture
 def mock_session() -> AsyncMock:

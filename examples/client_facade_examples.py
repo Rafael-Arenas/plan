@@ -15,7 +15,7 @@ from loguru import logger
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
 
-from planificador.database.repositories.client.client_repository_facade import (
+from planificador.repositories.client.client_repository_facade import (
     ClientRepositoryFacade,
 )
 from planificador.exceptions.repository.client_repository_exceptions import (

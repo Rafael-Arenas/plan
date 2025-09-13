@@ -230,7 +230,7 @@ Implementación específica para la gestión de empleados.
 
 ```python
 from planificador.database import DatabaseManager
-from planificador.database.repositories.client_repository import ClientRepository
+from planificador.repositories.client_repository import ClientRepository
 from planificador.services.domain.client_service import ClientService
 
 # Configurar dependencias

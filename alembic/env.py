@@ -2,7 +2,7 @@ from logging.config import fileConfig
 from sqlalchemy import engine_from_config
 from sqlalchemy import pool
 from alembic import context
-from src.planificador.config.config import settings
+from planificador.config.config import settings
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
@@ -15,9 +15,9 @@ if config.config_file_name is not None:
 
 # add your model's MetaData object here
 # for 'autogenerate' support
-from src.planificador.models.base import Base
+from planificador.models.base import Base
 # Import all models to ensure they are registered with SQLAlchemy
-from src.planificador.models import (
+from planificador.models import (
     client, employee, project, team, team_membership,
     workload, vacation, schedule, alert, project_assignment,
     change_log, status_code

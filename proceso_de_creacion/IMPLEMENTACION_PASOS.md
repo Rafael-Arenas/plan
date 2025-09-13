@@ -28,7 +28,7 @@ Este documento detalla los pasos a seguir para la implementación de la aplicaci
 
 ## Fase 3: Lógica de Negocio (Repositorios y Servicios)
 
-1.  **Implementar el Patrón Repository**: Crear una clase base `BaseRepository` y luego un repositorio para cada modelo en `src/planificador/database/repositories/`.
+1.  **Implementar el Patrón Repository**: Crear una clase base `BaseRepository` y luego un repositorio para cada modelo en `src/planificador/repositories/`.
 2.  **Desarrollar los Servicios**: Implementar la lógica de negocio en los archivos de servicio correspondientes en `src/planificador/services/`. Cada servicio utilizará los repositorios para interactuar con la base de datos.
 
 ## Fase 4: Desarrollo de la Interfaz de Usuario (Flet)

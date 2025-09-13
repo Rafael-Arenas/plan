@@ -30,8 +30,8 @@ Cada repositorio (p. ej., `project`, `employee`, `client`) se organizará de la 
 ### Fase 1: Creación de la Estructura de Directorios
 
 1.  Para cada repositorio a refactorizar (p. ej., `project`), crear los siguientes directorios:
-    *   `src/planificador/database/repositories/<entity>/interfaces/`
-    *   `src/planificador/database/repositories/<entity>/modules/`
+    *   `src/planificador/repositories/<entity>/interfaces/`
+*   `src/planificador/repositories/<entity>/modules/`
 
 ### Fase 2: Definición de Interfaces
 

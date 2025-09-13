@@ -1,7 +1,7 @@
 # c:\Users\raare\Documents\Personal\01Trabajo\AkGroup\Planificador2\src\planificador\tests\unit\test_repositories\employee\test_employee_repository_facade.py
 import pytest
 from unittest.mock import AsyncMock, MagicMock
-from planificador.database.repositories.employee.employee_repository_facade import EmployeeRepositoryFacade
+from planificador.repositories.employee.employee_repository_facade import EmployeeRepositoryFacade
 from planificador.models.employee import Employee
 from planificador.tests.unit.test_repositories.employee.fixtures import employee_repository, mock_session
 

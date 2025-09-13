@@ -2,7 +2,7 @@
 
 ## Resumen Ejecutivo
 
-Este documento presenta un análisis exhaustivo del directorio `src/planificador/database/repositories/client/` y proporciona recomendaciones específicas para optimizar la arquitectura, eliminar duplicaciones y mejorar la mantenibilidad del código.
+Este documento presenta un análisis exhaustivo del directorio `src/planificador/repositories/client/` y proporciona recomendaciones específicas para optimizar la arquitectura, eliminar duplicaciones y mejorar la mantenibilidad del código.
 
 ## 1. Problemas Críticos Identificados
 

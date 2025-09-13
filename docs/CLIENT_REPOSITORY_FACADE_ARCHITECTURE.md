@@ -248,7 +248,7 @@ health_status = await facade.health_check()
 
 ```python
 from sqlalchemy.ext.asyncio import AsyncSession
-from planificador.database.repositories.client import ClientRepositoryFacade
+from planificador.repositories.client import ClientRepositoryFacade
 
 # Crear facade con sesión
 facade = ClientRepositoryFacade(session=async_session)

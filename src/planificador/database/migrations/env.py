@@ -1,18 +1,14 @@
 from logging.config import fileConfig
 import os
-import sys
 from sqlalchemy import pool
 from sqlalchemy.ext.asyncio import create_async_engine
 from alembic import context
 
-# Añadir el directorio src al sys.path
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..', '..')))
-
 # Importar la Base de los modelos y la configuración
-from src.planificador.database.database import Base
-from src.planificador.config.config import settings
+from planificador.database.database import Base
+from planificador.config.config import settings
 # Importar todos los modelos para que Alembic los detecte
-from src.planificador.models import *
+from planificador.models import *
 
 
 # this is the Alembic Config object, which provides
