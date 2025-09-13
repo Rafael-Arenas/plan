@@ -140,39 +140,6 @@ class DateOperations(BaseRepository[Employee], IEmployeeDateOperations):
                 original_error=e
             )
 
-    async def get_employees_hired_last_n_days(self, days: int, **kwargs) -> List[Employee]:
-        """
-        Obtiene empleados contratados en los últimos N días.
-        
-        Args:
-            days: Número de días a revisar hacia atrás.
-        
-        Returns:
-            Lista de empleados contratados en los últimos N días.
-        """
-        try:
-            end_date = get_current_time().date()
-            start_date = end_date.subtract(days=days)
-            
-            return await self.find_all_by_criteria(
-                {"hire_date": {"operator": "between", "value": (start_date, end_date)}},
-                order_by="hire_date_desc",
-                **kwargs
-            )
-        except SQLAlchemyError as e:
-            raise convert_sqlalchemy_error(
-                error=e,
-                operation="get_employees_hired_last_n_days",
-                entity_type=self.model_class.__name__
-            )
-        except Exception as e:
-            raise EmployeeQueryError(
-                message=f"Error inesperado al obtener empleados contratados en los últimos {days} días: {e}",
-                operation="get_employees_hired_last_n_days",
-                entity_type=self.model_class.__name__,
-                original_error=e
-            )
-    
     async def get_employees_hired_business_days_only(
         self, 
         start_date: Union[date, str, None] = None,
