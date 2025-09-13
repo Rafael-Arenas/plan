@@ -138,29 +138,6 @@ class CrudOperations(BaseRepository[Employee], IEmployeeCrudOperations):
                 entity_id=employee_id,
                 original_error=e
             )
-    
-    async def get_by_unique_field(self, field_name: str, value: Any) -> Optional[Employee]:
-        """
-        Obtiene un empleado por un campo único (DNI o email).
-
-        Args:
-            field_name: Nombre del campo único ('dni' o 'email').
-            value: Valor a buscar.
-
-        Returns:
-            El empleado encontrado o None si no existe.
-        
-        Raises:
-            RepositoryError: Si el campo no es válido o si ocurre un error.
-        """
-        if field_name not in ["dni", "email"]:
-            raise RepositoryError(
-                message=f"Campo '{field_name}' no es un campo único válido para buscar.",
-                operation="get_by_unique_field",
-                entity_type=self.model_class.__name__
-            )
-        
-        return await super().get_by_unique_field(field_name, value)
 
     async def delete_employee(self, employee_id: UUID) -> bool:
         """
