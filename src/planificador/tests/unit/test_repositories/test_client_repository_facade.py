@@ -1,4 +1,5 @@
 import pytest
+from typing import Generator
 from unittest.mock import MagicMock, AsyncMock, patch
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -6,13 +7,17 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from planificador.schemas.client import ClientCreate, ClientUpdate
 from planificador.models.client import Client
 from planificador.repositories.client import ClientRepositoryFacade
-from planificador.repositories.client.modules.crud_operations import CrudOperations
-from planificador.repositories.client.modules.date_operations import DateOperations
+from planificador.repositories.client.modules.crud_operations import (
+    CrudOperations,
+)
+from planificador.repositories.client.modules.date_operations import (
+    DateOperations,
+)
+from planificador.repositories.client.modules.health_operations import (
+    HealthOperations,
+)
 from planificador.repositories.client.modules.query_operations import (
     QueryOperations,
-)
-from planificador.repositories.client.modules.validation_operations import (
-    ValidationOperations,
 )
 from planificador.repositories.client.modules.relationship_operations import (
     RelationshipOperations,
@@ -23,7 +28,9 @@ from planificador.repositories.client.modules.advanced_query_operations import (
 from planificador.repositories.client.modules.statistics_operations import (
     StatisticsOperations,
 )
-from datetime import datetime
+from planificador.repositories.client.modules.validation_operations import (
+    ValidationOperations,
+)
 
 
 @pytest.fixture
@@ -56,6 +63,11 @@ def mock_query_operations() -> AsyncMock:
     )
     mock_instance.get_all_clients = AsyncMock(return_value=[MagicMock(spec=Client)])
     mock_instance.get_by_unique_field = AsyncMock(return_value=None)
+    mock_instance.search_clients_by_text = AsyncMock(return_value=[])
+    mock_instance.get_clients_by_filters = AsyncMock(return_value=[])
+    mock_instance.get_clients_with_relationships = AsyncMock(return_value=[])
+    mock_instance.count_clients_by_filters = AsyncMock(return_value=0)
+    mock_instance.search_clients_fuzzy = AsyncMock(return_value=[])
     return mock_instance
 
 
@@ -85,6 +97,7 @@ def mock_statistics_operations() -> AsyncMock:
     """Fixture para simular StatisticsOperations."""
     mock = AsyncMock()
     mock.get_by_unique_field = AsyncMock(return_value=None)
+    mock.get_client_stats = AsyncMock(return_value={})
     return mock
 
 
@@ -111,6 +124,12 @@ def mock_date_operations() -> AsyncMock:
 
 
 @pytest.fixture
+def mock_health_operations() -> AsyncMock:
+    """Fixture para crear un mock de `HealthOperations`."""
+    return AsyncMock(spec=HealthOperations)
+
+
+@pytest.fixture
 def client_facade(
     mock_session: AsyncMock,
     mock_crud_operations: AsyncMock,
@@ -120,7 +139,8 @@ def client_facade(
     mock_statistics_operations: AsyncMock,
     mock_relationship_operations: AsyncMock,
     mock_date_operations: AsyncMock,
-) -> ClientRepositoryFacade:
+    mock_health_operations: AsyncMock,
+) -> Generator[ClientRepositoryFacade, None, None]:
     """
     Fixture que crea una instancia de `ClientRepositoryFacade` con módulos mock.
 
@@ -149,9 +169,12 @@ def client_facade(
     ), patch(
         "planificador.repositories.client.client_repository_facade.DateOperations",
         return_value=mock_date_operations,
+    ), patch(
+        "planificador.repositories.client.client_repository_facade.HealthOperations",
+        return_value=mock_health_operations,
     ):
         facade = ClientRepositoryFacade(session=mock_session)
-        return facade
+        yield facade
 
 
 @pytest.mark.asyncio
@@ -226,6 +249,9 @@ async def test_delete_client_success(client_facade: ClientRepositoryFacade):
 
     # Verificar que el resultado es el esperado
     assert result is True
+
+
+from datetime import datetime
 
 
 @pytest.mark.asyncio
@@ -481,3 +507,181 @@ async def test_get_comprehensive_dashboard_metrics_success(
     client_facade._statistics_operations.get_comprehensive_dashboard_metrics = MagicMock()
     client_facade.get_comprehensive_dashboard_metrics()
     client_facade._statistics_operations.get_comprehensive_dashboard_metrics.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_get_client_stats_by_id_delegation(
+    client_facade: ClientRepositoryFacade,
+) -> None:
+    """
+    Verifica que get_client_stats_by_id delega la llamada correctamente.
+    """
+    client_id = 1
+    await client_facade.get_client_stats_by_id(client_id)
+    client_facade._statistics_operations.get_client_stats_by_id.assert_awaited_once_with(
+        client_id
+    )
+
+
+@pytest.mark.asyncio
+async def test_search_clients_by_text_delegation(
+    client_facade: ClientRepositoryFacade,
+    mock_advanced_query_operations: AsyncMock,
+) -> None:
+    """
+    Verifica que search_clients_by_text delega la llamada correctamente.
+    """
+    await client_facade.search_clients_by_text("test")
+    mock_advanced_query_operations.search_clients_by_text.assert_awaited_once_with(
+        "test", None, 50, 0
+    )
+
+
+@pytest.mark.asyncio
+async def test_get_clients_by_filters_delegation(
+    client_facade: ClientRepositoryFacade,
+    mock_advanced_query_operations: AsyncMock,
+) -> None:
+    """
+    Verifica que get_clients_by_filters delega la llamada correctamente.
+    """
+    filters = {"country": "Spain"}
+    await client_facade.get_clients_by_filters(filters)
+    mock_advanced_query_operations.get_clients_by_filters.assert_awaited_once_with(
+        filters, 50, 0, None
+    )
+
+
+@pytest.mark.asyncio
+async def test_get_clients_with_relationships_delegation(
+    client_facade: ClientRepositoryFacade,
+    mock_advanced_query_operations: AsyncMock,
+) -> None:
+    """
+    Verifica que get_clients_with_relationships delega la llamada.
+    """
+    await client_facade.get_clients_with_relationships()
+    mock_advanced_query_operations.get_clients_with_relationships.assert_awaited_once_with(
+        False, False, 50, 0
+    )
+
+
+@pytest.mark.asyncio
+async def test_count_clients_by_filters_delegation(
+    client_facade: ClientRepositoryFacade,
+    mock_advanced_query_operations: AsyncMock,
+) -> None:
+    """
+    Verifica que count_clients_by_filters delega la llamada correctamente.
+    """
+    filters = {"country": "Spain"}
+    await client_facade.count_clients_by_filters(filters)
+    mock_advanced_query_operations.count_clients_by_filters.assert_awaited_once_with(
+        filters
+    )
+
+
+@pytest.mark.asyncio
+async def test_search_clients_fuzzy_delegation(
+    client_facade: ClientRepositoryFacade,
+    mock_advanced_query_operations: AsyncMock,
+) -> None:
+    """
+    Verifica que search_clients_fuzzy delega la llamada correctamente.
+    """
+    search_term = "test"
+    similarity = 0.5
+    await client_facade.search_clients_fuzzy(search_term, similarity)
+    mock_advanced_query_operations.search_clients_fuzzy.assert_awaited_once_with(
+        search_term, similarity
+    )
+
+
+# =========================================================================
+# LEGACY TESTS (Aseguran compatibilidad hacia atrás)
+# =========================================================================
+
+@pytest.mark.asyncio
+async def test_validate_client_data_delegation(
+    client_facade: ClientRepositoryFacade,
+    mock_validation_operations: AsyncMock,
+) -> None:
+    """Verifica que validate_client_data delega la llamada a _validation_operations."""
+    client_data = {"name": "Test"}
+    await client_facade.validate_client_data(client_data)
+    mock_validation_operations.validate_client_data.assert_awaited_once_with(
+        client_data, None, True
+    )
+
+
+@pytest.mark.asyncio
+async def test_validate_business_rules_delegation(
+    client_facade: ClientRepositoryFacade,
+    mock_validation_operations: AsyncMock,
+) -> None:
+    """Verifica que validate_business_rules delega la llamada a _validation_operations."""
+    client_data = {"name": "Test"}
+    await client_facade.validate_business_rules(client_data)
+    mock_validation_operations.validate_business_rules.assert_awaited_once_with(
+        client_data, None
+    )
+
+
+@pytest.mark.asyncio
+async def test_validate_client_name_unique_delegation(
+    client_facade: ClientRepositoryFacade,
+    mock_validation_operations: AsyncMock,
+) -> None:
+    """Verifica que validate_client_name_unique delega la llamada a _validation_operations."""
+    name = "Test Client"
+    await client_facade.validate_client_name_unique(name)
+    mock_validation_operations.validate_client_name_unique.assert_awaited_once_with(
+        name, None
+    )
+
+
+@pytest.mark.asyncio
+async def test_validate_client_code_unique_delegation(
+    client_facade: ClientRepositoryFacade,
+    mock_validation_operations: AsyncMock,
+) -> None:
+    """Verifica que validate_client_code_unique delega la llamada a _validation_operations."""
+    code = "TC-001"
+    await client_facade.validate_client_code_unique(code)
+    mock_validation_operations.validate_client_code_unique.assert_awaited_once_with(
+        code, None
+    )
+
+
+@pytest.mark.asyncio
+async def test_validate_client_deletion_success(
+    client_facade: ClientRepositoryFacade,
+    mock_validation_operations: AsyncMock,
+) -> None:
+    """Verifica que validate_client_deletion delega la llamada a _validation_operations."""
+    await client_facade.validate_client_deletion(1)
+    mock_validation_operations.validate_client_deletion.assert_awaited_once_with(1)
+
+
+@pytest.mark.asyncio
+async def test_health_check_delegation(
+    client_facade: ClientRepositoryFacade,
+    mock_health_operations: AsyncMock,
+) -> None:
+    """
+    Verifica que health_check delega la llamada correctamente.
+    """
+    await client_facade.health_check()
+    mock_health_operations.health_check.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_get_module_info_delegation(
+    client_facade: ClientRepositoryFacade,
+    mock_health_operations: AsyncMock,
+) -> None:
+    """
+    Verifica que get_module_info delega la llamada correctamente.
+    """
+    await client_facade.get_module_info()
+    mock_health_operations.get_module_info.assert_awaited_once()
