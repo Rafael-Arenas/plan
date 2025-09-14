@@ -43,7 +43,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from planificador.models import Client
 from planificador.schemas.client import ClientCreate, ClientUpdate
 
-# Nuevos módulos refactorizados
+# Módulos 
 from .modules.advanced_query_operations import AdvancedQueryOperations
 from .modules.crud_operations import CrudOperations 
 from .modules.date_operations import DateOperations
@@ -74,7 +74,7 @@ class ClientRepositoryFacade:
         self._session = session
         self._logger = logger
 
-        # Inicialización de los nuevos módulos optimizados
+        # Inicialización de los módulos
         self._crud_operations = CrudOperations(session)
         self._query_operations = QueryOperations(session)
         self._advanced_query_operations = AdvancedQueryOperations(session)
