@@ -115,14 +115,6 @@ class ProjectRepositoryFacade(IProjectRepository):
         """Filtra por rango de fechas."""
         return self._query_operations.filter_by_dates(start_date, end_date)
 
-    async def get_projects_by_status(self, status: str, limit: Optional[int] = None) -> List[Project]:
-        """Obtiene proyectos filtrados por estado."""
-        return await self._query_operations.get_projects_by_status(status, limit)
-
-    async def get_projects_by_client(self, client_id: int, limit: Optional[int] = None) -> List[Project]:
-        """Obtiene proyectos filtrados por cliente."""
-        return await self._query_operations.get_projects_by_client(client_id, limit)
-
     async def search_projects(self, search_term: str, limit: Optional[int] = None) -> List[Project]:
         """Busca proyectos por término de búsqueda en nombre, referencia y descripción."""
         return await self._query_operations.search_projects(search_term, limit)
@@ -167,10 +159,6 @@ class ProjectRepositoryFacade(IProjectRepository):
         """Obtiene proyectos por estado."""
         return await self._query_operations.get_by_status(status)
     
-    async def get_active_projects(self) -> List[Project]:
-        """Obtiene todos los proyectos activos."""
-        return await self._query_operations.get_active_projects()
-    
     async def get_by_priority(self, priority: ProjectPriority) -> List[Project]:
         """Obtiene proyectos por prioridad."""
         return await self._query_operations.get_by_priority(priority)
@@ -180,12 +168,6 @@ class ProjectRepositoryFacade(IProjectRepository):
     ) -> List[Project]:
         """Obtiene proyectos en un rango de fechas."""
         return await self._query_operations.get_by_date_range(start_date, end_date)
-    
-    async def get_overdue_projects(
-        self, reference_date: Optional[date] = None
-    ) -> List[Project]:
-        """Obtiene proyectos atrasados."""
-        return await self._query_operations.get_overdue_projects(reference_date)
     
     async def get_projects_starting_current_week(self, **kwargs) -> List[Project]:
         """Obtiene proyectos que inician en la semana actual."""
@@ -221,21 +203,6 @@ class ProjectRepositoryFacade(IProjectRepository):
     async def get_with_full_details(self, project_id: int) -> Optional[Project]:
         """Obtiene un proyecto con todos sus detalles."""
         return await self._query_operations.get_with_full_details(project_id)
-    # ============================================================================
-    # OPERACIONES DE RELACIONES - Delegación a _relationship_operations
-    # ============================================================================
-    def with_client_relationship(self, query):
-        """Añade la carga de la relación con el cliente usando relationship operations."""
-        return self._relationship_operations.with_client(query)
-
-    def with_assignments_relationship(self, query):
-        """Añade la carga de la relación con las asignaciones usando relationship operations."""
-        return self._relationship_operations.with_assignments(query)
-
-    def with_full_details_relationship(self, query):
-        """Añade la carga de todas las relaciones principales usando relationship operations."""
-        return self._relationship_operations.with_full_details(query)
-
     # ============================================================================
     # OPERACIONES DE ESTADÍSTICAS - Delegación a _statistics_operations
     # ============================================================================
@@ -275,42 +242,7 @@ class ProjectRepositoryFacade(IProjectRepository):
         """Obtiene estadísticas detalladas de proyectos vencidos."""
         return await self._statistics_operations.get_overdue_projects_stats()
 
-    async def get_project_performance_stats(self, project_id: int) -> Dict[str, Any]:
-        """Obtiene estadísticas de rendimiento de un proyecto."""
-        return await self._statistics_operations.get_project_performance_stats(project_id)
-    
-    async def get_projects_by_status_summary(self) -> Dict[str, int]:
-        """Obtiene un resumen de proyectos por estado."""
-        return await self._statistics_operations.get_projects_by_status_summary()
-    
-    async def get_project_workload_stats(
-        self,
-        project_id: int,
-        start_date: Optional[date] = None,
-        end_date: Optional[date] = None,
-    ) -> Dict[str, Any]:
-        """Obtiene estadísticas de carga de trabajo de un proyecto."""
-        return await self._statistics_operations.get_project_workload_stats(
-            project_id, start_date, end_date
-        )
-    
-    async def get_project_duration_stats(self, project_id: int) -> Dict[str, Any]:
-        """Obtiene estadísticas de duración de un proyecto."""
-        return await self._statistics_operations.get_project_duration_stats(project_id)
-    
-    async def get_monthly_project_stats(
-        self, year: int, month: int
-    ) -> Dict[str, Any]:
-        """Obtiene estadísticas mensuales de proyectos."""
-        return await self._statistics_operations.get_monthly_project_stats(year, month)
-    
-    async def get_client_project_stats(self, client_id: int) -> Dict[str, Any]:
-        """Obtiene estadísticas de proyectos de un cliente."""
-        return await self._statistics_operations.get_client_project_stats(client_id)
-    
-    async def get_overdue_projects_stats(self) -> Dict[str, Any]:
-        """Obtiene estadísticas de proyectos atrasados."""
-        return await self._statistics_operations.get_overdue_projects_stats()
+
 
     # ============================================================================
     # OPERACIONES DE VALIDACIÓN - Delegación a _validation_operations
@@ -328,18 +260,6 @@ class ProjectRepositoryFacade(IProjectRepository):
         return await self._validation_operations.reference_exists(reference, exclude_id)
 
     async def trigram_exists(self, trigram: str, exclude_id: Optional[int] = None) -> bool:
-        """Verifica si un trigrama de proyecto existe."""
-        return await self._validation_operations.trigram_exists(trigram, exclude_id)
-
-    async def reference_exists(
-        self, reference: str, exclude_id: Optional[int] = None
-    ) -> bool:
-        """Verifica si una referencia de proyecto existe."""
-        return await self._validation_operations.reference_exists(reference, exclude_id)
-    
-    async def trigram_exists(
-        self, trigram: str, exclude_id: Optional[int] = None
-    ) -> bool:
         """Verifica si un trigrama de proyecto existe."""
         return await self._validation_operations.trigram_exists(trigram, exclude_id)
 
