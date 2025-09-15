@@ -5,7 +5,7 @@ from datetime import date
 
 from sqlalchemy import and_, or_, select, func
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload, joinedload
+from sqlalchemy.orm import selectinload
 from sqlalchemy.exc import SQLAlchemyError
 from loguru import logger
 
@@ -13,13 +13,14 @@ from ....models.schedule import Schedule
 from ....models.employee import Employee
 from ....models.project import Project
 from ....models.team import Team
+from ...base_repository import BaseRepository
 from ....exceptions.repository_exceptions import RepositoryError
 from ....exceptions.database_exceptions import convert_sqlalchemy_error
 from ....exceptions.validation_exceptions import ValidationError
 from ..interfaces.relationship_interface import IScheduleRelationshipOperations
 
 
-class ScheduleRelationshipModule(IScheduleRelationshipOperations):
+class ScheduleRelationshipModule(BaseRepository[Schedule], IScheduleRelationshipOperations):
     """
     Módulo para operaciones de relaciones del repositorio Schedule.
     
@@ -35,8 +36,7 @@ class ScheduleRelationshipModule(IScheduleRelationshipOperations):
             session: Sesión de base de datos asíncrona
             model_class: Clase del modelo Schedule
         """
-        self.session = session
-        self.model_class = model_class
+        super().__init__(session, model_class)
         self._logger = logger.bind(module="ScheduleRelationshipModule")
     
     # ==========================================
@@ -536,11 +536,8 @@ class ScheduleRelationshipModule(IScheduleRelationshipOperations):
                     value={"schedule_id": schedule_id, "project_id": project_id}
                 )
             
-            # Obtener horario
-            query = select(self.model_class).where(self.model_class.id == schedule_id)
-            result = await self.session.execute(query)
-            schedule = result.scalar_one_or_none()
-            
+            # Usar BaseRepository para obtener y actualizar el horario
+            schedule = await self.get_by_id(schedule_id)
             if not schedule:
                 raise ValidationError(
                     message=f"Horario no encontrado: {schedule_id}",
@@ -548,33 +545,20 @@ class ScheduleRelationshipModule(IScheduleRelationshipOperations):
                     value=schedule_id
                 )
             
-            # Asignar proyecto
-            schedule.project_id = project_id
-            await self.session.flush()
+            # Actualizar usando BaseRepository
+            updated_schedule = await self.update(schedule_id, {"project_id": project_id})
             
             self._logger.info(
                 f"Horario {schedule_id} asignado a proyecto {project_id}"
             )
-            return schedule
+            return updated_schedule
             
-        except SQLAlchemyError as e:
-            self._logger.error(
-                f"Error BD asignando horario {schedule_id} a proyecto {project_id}: {e}"
-            )
-            await self.session.rollback()
-            raise convert_sqlalchemy_error(
-                error=e,
-                operation="assign_schedule_to_project",
-                entity_type=self.model_class.__name__,
-                entity_id=schedule_id
-            )
         except ValidationError:
             raise
         except Exception as e:
             self._logger.error(
                 f"Error inesperado asignando horario a proyecto: {e}"
             )
-            await self.session.rollback()
             raise RepositoryError(
                 message=f"Error inesperado: {e}",
                 operation="assign_schedule_to_project",
@@ -608,11 +592,8 @@ class ScheduleRelationshipModule(IScheduleRelationshipOperations):
                     value={"schedule_id": schedule_id, "team_id": team_id}
                 )
             
-            # Obtener horario
-            query = select(self.model_class).where(self.model_class.id == schedule_id)
-            result = await self.session.execute(query)
-            schedule = result.scalar_one_or_none()
-            
+            # Usar BaseRepository para obtener y actualizar el horario
+            schedule = await self.get_by_id(schedule_id)
             if not schedule:
                 raise ValidationError(
                     message=f"Horario no encontrado: {schedule_id}",
@@ -620,33 +601,20 @@ class ScheduleRelationshipModule(IScheduleRelationshipOperations):
                     value=schedule_id
                 )
             
-            # Asignar equipo
-            schedule.team_id = team_id
-            await self.session.flush()
+            # Actualizar usando BaseRepository
+            updated_schedule = await self.update(schedule_id, {"team_id": team_id})
             
             self._logger.info(
                 f"Horario {schedule_id} asignado a equipo {team_id}"
             )
-            return schedule
+            return updated_schedule
             
-        except SQLAlchemyError as e:
-            self._logger.error(
-                f"Error BD asignando horario {schedule_id} a equipo {team_id}: {e}"
-            )
-            await self.session.rollback()
-            raise convert_sqlalchemy_error(
-                error=e,
-                operation="assign_schedule_to_team",
-                entity_type=self.model_class.__name__,
-                entity_id=schedule_id
-            )
         except ValidationError:
             raise
         except Exception as e:
             self._logger.error(
                 f"Error inesperado asignando horario a equipo: {e}"
             )
-            await self.session.rollback()
             raise RepositoryError(
                 message=f"Error inesperado: {e}",
                 operation="assign_schedule_to_team",
@@ -669,11 +637,8 @@ class ScheduleRelationshipModule(IScheduleRelationshipOperations):
             Horario actualizado
         """
         try:
-            # Obtener horario
-            query = select(self.model_class).where(self.model_class.id == schedule_id)
-            result = await self.session.execute(query)
-            schedule = result.scalar_one_or_none()
-            
+            # Usar BaseRepository para obtener el horario
+            schedule = await self.get_by_id(schedule_id)
             if not schedule:
                 raise ValidationError(
                     message=f"Horario no encontrado: {schedule_id}",
@@ -681,34 +646,21 @@ class ScheduleRelationshipModule(IScheduleRelationshipOperations):
                     value=schedule_id
                 )
             
-            # Remover proyecto
+            # Remover proyecto usando BaseRepository
             old_project_id = schedule.project_id
-            schedule.project_id = None
-            await self.session.flush()
+            updated_schedule = await self.update(schedule_id, {"project_id": None})
             
             self._logger.info(
                 f"Horario {schedule_id} removido de proyecto {old_project_id}"
             )
-            return schedule
+            return updated_schedule
             
-        except SQLAlchemyError as e:
-            self._logger.error(
-                f"Error BD removiendo horario {schedule_id} de proyecto: {e}"
-            )
-            await self.session.rollback()
-            raise convert_sqlalchemy_error(
-                error=e,
-                operation="remove_schedule_from_project",
-                entity_type=self.model_class.__name__,
-                entity_id=schedule_id
-            )
         except ValidationError:
             raise
         except Exception as e:
             self._logger.error(
                 f"Error inesperado removiendo horario de proyecto: {e}"
             )
-            await self.session.rollback()
             raise RepositoryError(
                 message=f"Error inesperado: {e}",
                 operation="remove_schedule_from_project",
@@ -731,11 +683,8 @@ class ScheduleRelationshipModule(IScheduleRelationshipOperations):
             Horario actualizado
         """
         try:
-            # Obtener horario
-            query = select(self.model_class).where(self.model_class.id == schedule_id)
-            result = await self.session.execute(query)
-            schedule = result.scalar_one_or_none()
-            
+            # Usar BaseRepository para obtener el horario
+            schedule = await self.get_by_id(schedule_id)
             if not schedule:
                 raise ValidationError(
                     message=f"Horario no encontrado: {schedule_id}",
@@ -743,34 +692,21 @@ class ScheduleRelationshipModule(IScheduleRelationshipOperations):
                     value=schedule_id
                 )
             
-            # Remover equipo
+            # Remover equipo usando BaseRepository
             old_team_id = schedule.team_id
-            schedule.team_id = None
-            await self.session.flush()
+            updated_schedule = await self.update(schedule_id, {"team_id": None})
             
             self._logger.info(
                 f"Horario {schedule_id} removido de equipo {old_team_id}"
             )
-            return schedule
+            return updated_schedule
             
-        except SQLAlchemyError as e:
-            self._logger.error(
-                f"Error BD removiendo horario {schedule_id} de equipo: {e}"
-            )
-            await self.session.rollback()
-            raise convert_sqlalchemy_error(
-                error=e,
-                operation="remove_schedule_from_team",
-                entity_type=self.model_class.__name__,
-                entity_id=schedule_id
-            )
         except ValidationError:
             raise
         except Exception as e:
             self._logger.error(
                 f"Error inesperado removiendo horario de equipo: {e}"
             )
-            await self.session.rollback()
             raise RepositoryError(
                 message=f"Error inesperado: {e}",
                 operation="remove_schedule_from_team",
@@ -797,7 +733,17 @@ class ScheduleRelationshipModule(IScheduleRelationshipOperations):
             Dict con resumen de relaciones
         """
         try:
-            # Obtener horario con todas las relaciones
+            # Usar BaseRepository para obtener el horario
+            schedule = await self.get_by_id(schedule_id)
+            
+            if not schedule:
+                raise ValidationError(
+                    message=f"Horario no encontrado: {schedule_id}",
+                    field="schedule_id",
+                    value=schedule_id
+                )
+            
+            # Cargar relaciones manualmente si es necesario
             query = select(self.model_class).where(
                 self.model_class.id == schedule_id
             ).options(
@@ -808,36 +754,29 @@ class ScheduleRelationshipModule(IScheduleRelationshipOperations):
             )
             
             result = await self.session.execute(query)
-            schedule = result.scalar_one_or_none()
-            
-            if not schedule:
-                raise ValidationError(
-                    message=f"Horario no encontrado: {schedule_id}",
-                    field="schedule_id",
-                    value=schedule_id
-                )
+            schedule_with_relations = result.scalar_one_or_none()
             
             summary = {
                 'schedule_id': schedule_id,
-                'date': schedule.date.isoformat(),
-                'hours_worked': float(schedule.hours_worked),
+                'date': schedule_with_relations.date.isoformat(),
+                'hours_worked': float(schedule_with_relations.hours_worked),
                 'employee': {
-                    'id': schedule.employee.id if schedule.employee else None,
-                    'name': schedule.employee.name if schedule.employee else None
-                } if schedule.employee else None,
+                    'id': schedule_with_relations.employee.id if schedule_with_relations.employee else None,
+                    'name': schedule_with_relations.employee.name if schedule_with_relations.employee else None
+                } if schedule_with_relations.employee else None,
                 'project': {
-                    'id': schedule.project.id if schedule.project else None,
-                    'name': schedule.project.name if schedule.project else None
-                } if schedule.project else None,
+                    'id': schedule_with_relations.project.id if schedule_with_relations.project else None,
+                    'name': schedule_with_relations.project.name if schedule_with_relations.project else None
+                } if schedule_with_relations.project else None,
                 'team': {
-                    'id': schedule.team.id if schedule.team else None,
-                    'name': schedule.team.name if schedule.team else None
-                } if schedule.team else None,
+                    'id': schedule_with_relations.team.id if schedule_with_relations.team else None,
+                    'name': schedule_with_relations.team.name if schedule_with_relations.team else None
+                } if schedule_with_relations.team else None,
                 'status_code': {
-                    'id': schedule.status_code.id if schedule.status_code else None,
-                    'code': schedule.status_code.code if schedule.status_code else None,
-                    'description': schedule.status_code.description if schedule.status_code else None
-                } if schedule.status_code else None
+                    'id': schedule_with_relations.status_code.id if schedule_with_relations.status_code else None,
+                    'code': schedule_with_relations.status_code.code if schedule_with_relations.status_code else None,
+                    'description': schedule_with_relations.status_code.description if schedule_with_relations.status_code else None
+                } if schedule_with_relations.status_code else None
             }
             
             self._logger.debug(
