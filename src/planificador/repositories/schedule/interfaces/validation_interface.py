@@ -4,7 +4,7 @@ from abc import ABC, abstractmethod
 from typing import Dict, Any, List, Optional
 from datetime import date, time
 
-from planificador.exceptions.repository_exceptions import ScheduleRepositoryError
+from planificador.exceptions.repository import ScheduleRepositoryError
 
 
 class IScheduleValidationOperations(ABC):

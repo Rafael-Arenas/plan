@@ -5,7 +5,7 @@ from typing import List, Optional, Dict, Any
 from datetime import date
 
 from planificador.models.schedule import Schedule
-from planificador.exceptions.repository_exceptions import ScheduleRepositoryError
+from planificador.exceptions.repository import ScheduleRepositoryError
 
 
 class IScheduleQueryOperations(ABC):
