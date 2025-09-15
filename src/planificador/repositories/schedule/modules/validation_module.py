@@ -2,7 +2,7 @@
 
 from typing import Dict, Any, Optional
 from datetime import date, time
-from sqlalchemy import select, and_
+from sqlalchemy import select, and_, or_
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 from loguru import logger
@@ -11,14 +11,14 @@ from planificador.models.schedule import Schedule
 from planificador.models.employee import Employee
 from planificador.models.project import Project
 from planificador.models.team import Team
-from planificador.models.status_code import StatusCode
+from planificador.repositories.base_repository import BaseRepository
 from planificador.repositories.schedule.interfaces.validation_interface import IScheduleValidationOperations
 from planificador.exceptions.repository_exceptions import ScheduleRepositoryError
 from planificador.exceptions.database_exceptions import convert_sqlalchemy_error
 from planificador.exceptions.validation_exceptions import ValidationError
 
 
-class ScheduleValidationModule(IScheduleValidationOperations):
+class ScheduleValidationModule(BaseRepository[Schedule], IScheduleValidationOperations):
     """
     Módulo para operaciones de validación del repositorio Schedule.
     
@@ -33,8 +33,13 @@ class ScheduleValidationModule(IScheduleValidationOperations):
         Args:
             session: Sesión de base de datos asíncrona
         """
-        self.session = session
+        super().__init__(session, Schedule)
         self._logger = logger.bind(module="schedule_validation")
+        
+        # Repositorios auxiliares para validaciones
+        self._employee_repo = BaseRepository(session, Employee)
+        self._project_repo = BaseRepository(session, Project)
+        self._team_repo = BaseRepository(session, Team)
 
     async def validate_schedule_data(self, schedule_data: Dict[str, Any]) -> bool:
         """
@@ -215,10 +220,8 @@ class ScheduleValidationModule(IScheduleValidationOperations):
                     value=schedule_id
                 )
             
-            # Verificar que existe en la base de datos
-            stmt = select(Schedule.id).where(Schedule.id == schedule_id)
-            result = await self.session.execute(stmt)
-            exists = result.scalar_one_or_none() is not None
+            # Verificar que existe en la base de datos usando BaseRepository
+            exists = await self.exists(schedule_id)
             
             if not exists:
                 raise ValidationError(
@@ -401,7 +404,21 @@ class ScheduleValidationModule(IScheduleValidationOperations):
                 f"el {schedule_date} de {start_time} a {end_time}"
             )
             
-            # Construir consulta para buscar conflictos
+            # Construir filtros para buscar conflictos usando BaseRepository
+            filters = {
+                "employee_id": employee_id,
+                "date": schedule_date,
+                "_time_overlap": {
+                    "start_time": start_time,
+                    "end_time": end_time
+                }
+            }
+            
+            # Excluir el horario actual si se está actualizando
+            if exclude_schedule_id:
+                filters["id__ne"] = exclude_schedule_id
+            
+            # Usar consulta manual para solapamiento de horarios (lógica compleja)
             stmt = (
                 select(Schedule)
                 .where(
@@ -434,7 +451,7 @@ class ScheduleValidationModule(IScheduleValidationOperations):
             if exclude_schedule_id:
                 stmt = stmt.where(Schedule.id != exclude_schedule_id)
             
-            result = await self.session.execute(stmt)
+            result = await self.get_session().execute(stmt)
             conflicting_schedules = result.scalars().all()
             
             if conflicting_schedules:
@@ -499,10 +516,8 @@ class ScheduleValidationModule(IScheduleValidationOperations):
                 f"Validando asignación de empleado {employee_id} a proyecto {project_id}"
             )
             
-            # Verificar que el empleado existe
-            employee_stmt = select(Employee.id).where(Employee.id == employee_id)
-            employee_result = await self.session.execute(employee_stmt)
-            employee_exists = employee_result.scalar_one_or_none() is not None
+            # Verificar que el empleado existe usando BaseRepository
+            employee_exists = await self._employee_repo.exists(employee_id)
             
             if not employee_exists:
                 raise ValidationError(
@@ -511,10 +526,8 @@ class ScheduleValidationModule(IScheduleValidationOperations):
                     value=employee_id
                 )
             
-            # Verificar que el proyecto existe
-            project_stmt = select(Project.id).where(Project.id == project_id)
-            project_result = await self.session.execute(project_stmt)
-            project_exists = project_result.scalar_one_or_none() is not None
+            # Verificar que el proyecto existe usando BaseRepository
+            project_exists = await self._project_repo.exists(project_id)
             
             if not project_exists:
                 raise ValidationError(
@@ -574,10 +587,8 @@ class ScheduleValidationModule(IScheduleValidationOperations):
                 f"Validando membresía de empleado {employee_id} en equipo {team_id}"
             )
             
-            # Verificar que el empleado existe
-            employee_stmt = select(Employee.id).where(Employee.id == employee_id)
-            employee_result = await self.session.execute(employee_stmt)
-            employee_exists = employee_result.scalar_one_or_none() is not None
+            # Verificar que el empleado existe usando BaseRepository
+            employee_exists = await self._employee_repo.exists(employee_id)
             
             if not employee_exists:
                 raise ValidationError(
@@ -586,10 +597,8 @@ class ScheduleValidationModule(IScheduleValidationOperations):
                     value=employee_id
                 )
             
-            # Verificar que el equipo existe
-            team_stmt = select(Team.id).where(Team.id == team_id)
-            team_result = await self.session.execute(team_stmt)
-            team_exists = team_result.scalar_one_or_none() is not None
+            # Verificar que el equipo existe usando BaseRepository
+            team_exists = await self._team_repo.exists(team_id)
             
             if not team_exists:
                 raise ValidationError(

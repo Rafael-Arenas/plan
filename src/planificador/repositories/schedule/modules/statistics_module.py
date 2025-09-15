@@ -1,26 +1,21 @@
 # src/planificador/repositories/schedule/modules/statistics_module.py
 
 from typing import Dict, Any, List, Optional, Tuple
-from datetime import date, datetime, time
+from datetime import date, datetime
 from decimal import Decimal
 
-from sqlalchemy import func, and_, or_, case, extract
+from sqlalchemy import func, and_
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload, joinedload
 from sqlalchemy.sql import select
 from loguru import logger
-import pendulum
 
 from ....models.schedule import Schedule
-from ....models.employee import Employee
-from ....models.project import Project
-from ....models.team import Team
 from ....exceptions.repository_exceptions import RepositoryError
-from ....exceptions.database_exceptions import convert_sqlalchemy_error
+from ....repositories.base_repository import BaseRepository
 from ..interfaces.statistics_interface import IScheduleStatisticsOperations
 
 
-class ScheduleStatisticsModule(IScheduleStatisticsOperations):
+class ScheduleStatisticsModule(BaseRepository[Schedule], IScheduleStatisticsOperations):
     """
     Módulo para operaciones de estadísticas del repositorio Schedule.
     
@@ -36,8 +31,7 @@ class ScheduleStatisticsModule(IScheduleStatisticsOperations):
             session: Sesión de base de datos asíncrona
             model_class: Clase del modelo Schedule
         """
-        self.session = session
-        self.model_class = model_class
+        super().__init__(session, model_class)
         self._logger = logger.bind(module="ScheduleStatisticsModule")
     
     # ==========================================
@@ -62,14 +56,15 @@ class ScheduleStatisticsModule(IScheduleStatisticsOperations):
             Total de horas trabajadas
         """
         try:
-            query = select(func.sum(self.model_class.hours_worked)).where(
-                self.model_class.employee_id == employee_id
-            )
-            
+            filters = {"employee_id": employee_id}
             if start_date:
-                query = query.where(self.model_class.date >= start_date)
+                filters["date__gte"] = start_date
             if end_date:
-                query = query.where(self.model_class.date <= end_date)
+                filters["date__lte"] = end_date
+            
+            query = select(func.sum(self.model_class.hours_worked)).where(
+                self._build_filter_conditions(filters)
+            )
             
             result = await self.session.execute(query)
             total_hours = result.scalar() or Decimal('0')
@@ -109,14 +104,15 @@ class ScheduleStatisticsModule(IScheduleStatisticsOperations):
             Total de horas trabajadas en el proyecto
         """
         try:
-            query = select(func.sum(self.model_class.hours_worked)).where(
-                self.model_class.project_id == project_id
-            )
-            
+            filters = {"project_id": project_id}
             if start_date:
-                query = query.where(self.model_class.date >= start_date)
+                filters["date__gte"] = start_date
             if end_date:
-                query = query.where(self.model_class.date <= end_date)
+                filters["date__lte"] = end_date
+            
+            query = select(func.sum(self.model_class.hours_worked)).where(
+                self._build_filter_conditions(filters)
+            )
             
             result = await self.session.execute(query)
             total_hours = result.scalar() or Decimal('0')
@@ -169,16 +165,18 @@ class ScheduleStatisticsModule(IScheduleStatisticsOperations):
             else:
                 raise ValueError(f"Tipo de agrupación no válido: {group_by}")
             
+            filters = {
+                "date__gte": start_date,
+                "date__lte": end_date
+            }
+            
             query = select(
                 date_part.label('period'),
                 func.sum(self.model_class.hours_worked).label('total_hours'),
                 func.count(self.model_class.id).label('total_schedules'),
                 func.count(func.distinct(self.model_class.employee_id)).label('unique_employees')
             ).where(
-                and_(
-                    self.model_class.date >= start_date,
-                    self.model_class.date <= end_date
-                )
+                self._build_filter_conditions(filters)
             ).group_by(date_part).order_by(date_part)
             
             result = await self.session.execute(query)
@@ -237,7 +235,13 @@ class ScheduleStatisticsModule(IScheduleStatisticsOperations):
             Dict con métricas de productividad
         """
         try:
-            # Consulta principal para métricas
+            # Consulta principal para métricas usando BaseRepository
+            filters = {
+                "employee_id": employee_id,
+                "date__gte": start_date,
+                "date__lte": end_date
+            }
+            
             query = select(
                 func.sum(self.model_class.hours_worked).label('total_hours'),
                 func.count(self.model_class.id).label('total_days'),
@@ -246,11 +250,7 @@ class ScheduleStatisticsModule(IScheduleStatisticsOperations):
                 func.max(self.model_class.hours_worked).label('max_hours'),
                 func.count(func.distinct(self.model_class.project_id)).label('unique_projects')
             ).where(
-                and_(
-                    self.model_class.employee_id == employee_id,
-                    self.model_class.date >= start_date,
-                    self.model_class.date <= end_date
-                )
+                self._build_filter_conditions(filters)
             )
             
             result = await self.session.execute(query)
@@ -332,7 +332,13 @@ class ScheduleStatisticsModule(IScheduleStatisticsOperations):
             team_metrics = []
             
             for team_id in team_ids:
-                # Consulta para métricas del equipo
+                # Consulta para métricas del equipo usando BaseRepository
+                filters = {
+                    "team_id": team_id,
+                    "date__gte": start_date,
+                    "date__lte": end_date
+                }
+                
                 query = select(
                     func.sum(self.model_class.hours_worked).label('total_hours'),
                     func.count(self.model_class.id).label('total_schedules'),
@@ -340,11 +346,7 @@ class ScheduleStatisticsModule(IScheduleStatisticsOperations):
                     func.count(func.distinct(self.model_class.employee_id)).label('unique_employees'),
                     func.count(func.distinct(self.model_class.project_id)).label('unique_projects')
                 ).where(
-                    and_(
-                        self.model_class.team_id == team_id,
-                        self.model_class.date >= start_date,
-                        self.model_class.date <= end_date
-                    )
+                    self._build_filter_conditions(filters)
                 )
                 
                 result = await self.session.execute(query)
@@ -422,17 +424,19 @@ class ScheduleStatisticsModule(IScheduleStatisticsOperations):
                 'projects': [] if include_projects else None
             }
             
-            # Resumen general
+            # Resumen general usando BaseRepository
+            filters = {
+                "date__gte": start_date,
+                "date__lte": end_date
+            }
+            
             summary_query = select(
                 func.sum(self.model_class.hours_worked).label('total_hours'),
                 func.count(self.model_class.id).label('total_schedules'),
                 func.count(func.distinct(self.model_class.employee_id)).label('active_employees'),
                 func.count(func.distinct(self.model_class.project_id)).label('active_projects')
             ).where(
-                and_(
-                    self.model_class.date >= start_date,
-                    self.model_class.date <= end_date
-                )
+                self._build_filter_conditions(filters)
             )
             
             result = await self.session.execute(summary_query)
@@ -447,7 +451,7 @@ class ScheduleStatisticsModule(IScheduleStatisticsOperations):
                     'avg_hours_per_schedule': float(summary_row.total_hours or 0) / max(summary_row.total_schedules, 1)
                 }
             
-            # Datos por empleado
+            # Datos por empleado usando BaseRepository
             if include_employees:
                 employee_query = select(
                     self.model_class.employee_id,
@@ -455,10 +459,7 @@ class ScheduleStatisticsModule(IScheduleStatisticsOperations):
                     func.count(self.model_class.id).label('total_schedules'),
                     func.avg(self.model_class.hours_worked).label('avg_hours')
                 ).where(
-                    and_(
-                        self.model_class.date >= start_date,
-                        self.model_class.date <= end_date
-                    )
+                    self._build_filter_conditions(filters)
                 ).group_by(self.model_class.employee_id).order_by(
                     func.sum(self.model_class.hours_worked).desc()
                 )
@@ -476,19 +477,21 @@ class ScheduleStatisticsModule(IScheduleStatisticsOperations):
                     for row in employee_rows
                 ]
             
-            # Datos por proyecto
+            # Datos por proyecto usando BaseRepository
             if include_projects:
+                project_filters = {
+                    "date__gte": start_date,
+                    "date__lte": end_date,
+                    "project_id__isnot": None
+                }
+                
                 project_query = select(
                     self.model_class.project_id,
                     func.sum(self.model_class.hours_worked).label('total_hours'),
                     func.count(self.model_class.id).label('total_schedules'),
                     func.count(func.distinct(self.model_class.employee_id)).label('unique_employees')
                 ).where(
-                    and_(
-                        self.model_class.date >= start_date,
-                        self.model_class.date <= end_date,
-                        self.model_class.project_id.isnot(None)
-                    )
+                    self._build_filter_conditions(project_filters)
                 ).group_by(self.model_class.project_id).order_by(
                     func.sum(self.model_class.hours_worked).desc()
                 )
@@ -518,6 +521,175 @@ class ScheduleStatisticsModule(IScheduleStatisticsOperations):
             raise RepositoryError(
                 message=f"Error generando reporte utilización: {e}",
                 operation="get_resource_utilization_report",
+                entity_type=self.model_class.__name__,
+                original_error=e
+            )
+    
+    async def get_employee_utilization_metrics(
+        self,
+        start_date: date,
+        end_date: date,
+        expected_hours_per_day: float = 8.0
+    ) -> List[Dict[str, Any]]:
+        """
+        Calcula métricas de utilización por empleado.
+        
+        Args:
+            start_date: Fecha de inicio del período
+            end_date: Fecha de fin del período
+            expected_hours_per_day: Horas esperadas por día
+            
+        Returns:
+            Lista de métricas de utilización por empleado
+        """
+        try:
+            # Consulta para obtener datos de utilización usando BaseRepository
+            filters = {
+                "date__gte": start_date,
+                "date__lte": end_date
+            }
+            
+            query = select(
+                self.model_class.employee_id,
+                func.sum(self.model_class.hours_worked).label('total_hours'),
+                func.count(func.distinct(self.model_class.date)).label('days_worked')
+            ).where(
+                self._build_filter_conditions(filters)
+            ).group_by(self.model_class.employee_id)
+            
+            result = await self.session.execute(query)
+            rows = result.fetchall()
+            
+            # Calcular días laborables en el período
+            total_days = (end_date - start_date).days + 1
+            expected_total_hours = total_days * expected_hours_per_day
+            
+            utilization_metrics = []
+            for row in rows:
+                utilization_rate = (float(row.total_hours) / expected_total_hours) * 100
+                avg_hours_per_day = float(row.total_hours) / max(row.days_worked, 1)
+                
+                utilization_metrics.append({
+                    'employee_id': row.employee_id,
+                    'total_hours': float(row.total_hours),
+                    'days_worked': row.days_worked,
+                    'avg_hours_per_day': round(avg_hours_per_day, 2),
+                    'utilization_rate': round(utilization_rate, 2),
+                    'expected_hours': expected_total_hours,
+                    'hours_variance': float(row.total_hours) - expected_total_hours
+                })
+            
+            # Ordenar por tasa de utilización descendente
+            utilization_metrics.sort(key=lambda x: x['utilization_rate'], reverse=True)
+            
+            self._logger.debug(
+                f"Métricas utilización calculadas para {len(utilization_metrics)} empleados"
+            )
+            return utilization_metrics
+            
+        except Exception as e:
+            self._logger.error(
+                f"Error calculando métricas utilización: {e}"
+            )
+            raise RepositoryError(
+                message=f"Error calculando métricas utilización: {e}",
+                operation="get_employee_utilization_metrics",
+                entity_type=self.model_class.__name__,
+                original_error=e
+            )
+    
+    async def get_top_performers(
+        self,
+        start_date: date,
+        end_date: date,
+        limit: int = 10,
+        metric: str = "total_hours"  # total_hours, avg_hours, consistency
+    ) -> List[Dict[str, Any]]:
+        """
+        Obtiene los empleados con mejor rendimiento.
+        
+        Args:
+            start_date: Fecha de inicio del período
+            end_date: Fecha de fin del período
+            limit: Número máximo de resultados
+            metric: Métrica para ordenar (total_hours, avg_hours, consistency)
+            
+        Returns:
+            Lista de top performers
+        """
+        try:
+            # Consulta para obtener top performers usando BaseRepository
+            filters = {
+                "date__gte": start_date,
+                "date__lte": end_date
+            }
+            
+            query = select(
+                self.model_class.employee_id,
+                func.sum(self.model_class.hours_worked).label('total_hours'),
+                func.count(self.model_class.id).label('total_days'),
+                func.avg(self.model_class.hours_worked).label('avg_hours_per_day'),
+                func.count(func.distinct(self.model_class.project_id)).label('projects_worked')
+            ).where(
+                self._build_filter_conditions(filters)
+            ).group_by(self.model_class.employee_id).order_by(
+                func.sum(self.model_class.hours_worked).desc()
+            ).limit(limit)
+            
+            result = await self.session.execute(query)
+            rows = result.fetchall()
+            
+            performers = []
+            for row in rows:
+                performer_data = {
+                    'employee_id': row.employee_id,
+                    'total_hours': float(row.total_hours),
+                    'total_days': row.total_days,
+                    'avg_hours_per_day': float(row.avg_hours_per_day or 0),
+                    'projects_worked': row.projects_worked
+                }
+                
+                # Calcular score de consistencia
+                if row.total_days > 1:
+                    # Obtener desviación estándar de horas por día
+                    std_query = select(
+                        func.stddev(self.model_class.hours_worked)
+                    ).where(
+                        and_(
+                            self.model_class.employee_id == row.employee_id,
+                            self._build_filter_conditions(filters)
+                        )
+                    )
+                    
+                    std_result = await self.session.execute(std_query)
+                    std_dev = std_result.scalar() or 0
+                    
+                    consistency_score = max(0, 100 - (float(std_dev) * 10))
+                else:
+                    consistency_score = 100
+                
+                performer_data['consistency_score'] = round(consistency_score, 2)
+                performers.append(performer_data)
+            
+            # Reordenar según la métrica solicitada
+            if metric == "avg_hours":
+                performers.sort(key=lambda x: x['avg_hours_per_day'], reverse=True)
+            elif metric == "consistency":
+                performers.sort(key=lambda x: x['consistency_score'], reverse=True)
+            # total_hours ya está ordenado por defecto
+            
+            self._logger.debug(
+                f"Top {len(performers)} performers obtenidos por {metric}"
+            )
+            return performers
+            
+        except Exception as e:
+            self._logger.error(
+                f"Error obteniendo top performers: {e}"
+            )
+            raise RepositoryError(
+                message=f"Error obteniendo top performers: {e}",
+                operation="get_top_performers",
                 entity_type=self.model_class.__name__,
                 original_error=e
             )
