@@ -28,6 +28,9 @@ La fachada delega las operaciones a módulos especializados, cada uno responsabl
 - `delete_employee(employee_id: int) -> bool`
   - Elimina un empleado de la base de datos.
 
+- `get_by_unique_field(field_name: str, value: Any) -> Optional[Employee]`
+  - Obtiene un empleado por un campo único específico.
+
 ### 2. Operaciones de Fechas (`_dates`)
 
 - `get_employees_hired_current_week(**kwargs) -> List[Employee]`
