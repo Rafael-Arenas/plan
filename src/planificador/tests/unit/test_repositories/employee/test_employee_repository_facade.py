@@ -676,3 +676,204 @@ async def test_get_comprehensive_summary_delegates_to_statistics_operations(
     await employee_repository.get_comprehensive_summary()
     
     employee_repository._statistics.get_comprehensive_summary.assert_awaited_once_with()
+
+
+# ============================================================================
+# TESTS PARA DATE OPERATIONS
+# ============================================================================
+
+@pytest.mark.asyncio
+async def test_get_employees_hired_current_week_delegates_to_date_operations(
+    employee_repository: EmployeeRepositoryFacade,
+):
+    """Verifica que el método get_employees_hired_current_week delega la llamada a DateOperations."""
+    employee_repository._dates.get_employees_hired_current_week = AsyncMock()
+    
+    kwargs = {"status": "active"}
+    
+    await employee_repository.get_employees_hired_current_week(**kwargs)
+    
+    employee_repository._dates.get_employees_hired_current_week.assert_awaited_once_with(**kwargs)
+
+
+@pytest.mark.asyncio
+async def test_get_employees_hired_current_month_delegates_to_date_operations(
+    employee_repository: EmployeeRepositoryFacade,
+):
+    """Verifica que el método get_employees_hired_current_month delega la llamada a DateOperations."""
+    employee_repository._dates.get_employees_hired_current_month = AsyncMock()
+    
+    kwargs = {"department": "IT"}
+    
+    await employee_repository.get_employees_hired_current_month(**kwargs)
+    
+    employee_repository._dates.get_employees_hired_current_month.assert_awaited_once_with(**kwargs)
+
+
+@pytest.mark.asyncio
+async def test_get_employees_hired_business_days_only_delegates_to_date_operations(
+    employee_repository: EmployeeRepositoryFacade,
+):
+    """Verifica que el método get_employees_hired_business_days_only delega la llamada a DateOperations."""
+    employee_repository._dates.get_employees_hired_business_days_only = AsyncMock()
+    
+    from datetime import date
+    start_date = date(2024, 1, 1)
+    end_date = date(2024, 1, 31)
+    kwargs = {"status": "active"}
+    
+    await employee_repository.get_employees_hired_business_days_only(
+        start_date=start_date, end_date=end_date, **kwargs
+    )
+    
+    employee_repository._dates.get_employees_hired_business_days_only.assert_awaited_once_with(
+        start_date=start_date, end_date=end_date, **kwargs
+    )
+
+
+@pytest.mark.asyncio
+async def test_get_employee_tenure_stats_delegates_to_date_operations(
+    employee_repository: EmployeeRepositoryFacade,
+):
+    """Verifica que el método get_employee_tenure_stats delega la llamada a DateOperations."""
+    employee_repository._dates.get_employee_tenure_stats = AsyncMock()
+    
+    employee_id = 1
+    
+    await employee_repository.get_employee_tenure_stats(employee_id)
+    
+    employee_repository._dates.get_employee_tenure_stats.assert_awaited_once_with(employee_id)
+
+
+@pytest.mark.asyncio
+async def test_get_employees_by_tenure_range_delegates_to_date_operations(
+    employee_repository: EmployeeRepositoryFacade,
+):
+    """Verifica que el método get_employees_by_tenure_range delega la llamada a DateOperations."""
+    employee_repository._dates.get_employees_by_tenure_range = AsyncMock()
+    
+    min_years = 2.0
+    max_years = 5.0
+    status = "active"
+    
+    await employee_repository.get_employees_by_tenure_range(
+        min_years=min_years, max_years=max_years, status=status
+    )
+    
+    employee_repository._dates.get_employees_by_tenure_range.assert_awaited_once_with(
+        min_years=min_years, max_years=max_years, status=status
+    )
+
+
+@pytest.mark.asyncio
+async def test_create_employee_with_date_validation_delegates_to_date_operations(
+    employee_repository: EmployeeRepositoryFacade,
+):
+    """Verifica que el método create_employee_with_date_validation delega la llamada a DateOperations."""
+    employee_repository._dates.create_employee_with_date_validation = AsyncMock()
+    
+    employee_data = {"name": "John Doe", "email": "john@example.com"}
+    validate_hire_date_business_day = True
+    
+    await employee_repository.create_employee_with_date_validation(
+        employee_data=employee_data,
+        validate_hire_date_business_day=validate_hire_date_business_day
+    )
+    
+    employee_repository._dates.create_employee_with_date_validation.assert_awaited_once_with(
+        employee_data=employee_data,
+        validate_hire_date_business_day=validate_hire_date_business_day
+    )
+
+
+def test_format_employee_hire_date_delegates_to_date_operations(
+    employee_repository: EmployeeRepositoryFacade,
+):
+    """Verifica que el método format_employee_hire_date delega la llamada a DateOperations."""
+    from unittest.mock import MagicMock
+    employee_repository._dates.format_employee_hire_date = MagicMock()
+    
+    employee = MagicMock()
+    format_type = "iso"
+    
+    employee_repository.format_employee_hire_date(
+        employee=employee, format_type=format_type
+    )
+    
+    employee_repository._dates.format_employee_hire_date.assert_called_once_with(
+        employee=employee, format_type=format_type
+    )
+
+
+# ============================================================================
+# TESTS PARA VALIDATION OPERATIONS
+# ============================================================================
+
+def test_validate_create_data_delegates_to_validation_operations(
+    employee_repository: EmployeeRepositoryFacade,
+):
+    """Verifica que el método validate_create_data delega la llamada a ValidationOperations."""
+    from unittest.mock import MagicMock
+    employee_repository._validation.validate_create_data = MagicMock()
+    
+    employee_data = {"name": "John", "email": "john@example.com"}
+    
+    employee_repository.validate_create_data(employee_data)
+    
+    employee_repository._validation.validate_create_data.assert_called_once_with(employee_data)
+
+
+def test_validate_update_data_delegates_to_validation_operations(
+    employee_repository: EmployeeRepositoryFacade,
+):
+    """Verifica que el método validate_update_data delega la llamada a ValidationOperations."""
+    from unittest.mock import MagicMock
+    employee_repository._validation.validate_update_data = MagicMock()
+    
+    employee_data = {"name": "John Updated", "position": "Senior Developer"}
+    
+    employee_repository.validate_update_data(employee_data)
+    
+    employee_repository._validation.validate_update_data.assert_called_once_with(employee_data)
+
+
+def test_validate_skills_json_delegates_to_validation_operations(
+    employee_repository: EmployeeRepositoryFacade,
+):
+    """Verifica que el método validate_skills_json delega la llamada a ValidationOperations."""
+    from unittest.mock import MagicMock
+    employee_repository._validation.validate_skills_json = MagicMock()
+    
+    skills_json = '["Python", "JavaScript", "SQL"]'
+    
+    employee_repository.validate_skills_json(skills_json)
+    
+    employee_repository._validation.validate_skills_json.assert_called_once_with(skills_json)
+
+
+def test_validate_search_term_delegates_to_validation_operations(
+    employee_repository: EmployeeRepositoryFacade,
+):
+    """Verifica que el método validate_search_term delega la llamada a ValidationOperations."""
+    from unittest.mock import MagicMock
+    employee_repository._validation.validate_search_term = MagicMock()
+    
+    search_term = "John Doe"
+    
+    employee_repository.validate_search_term(search_term)
+    
+    employee_repository._validation.validate_search_term.assert_called_once_with(search_term)
+
+
+def test_validate_employee_id_delegates_to_validation_operations(
+    employee_repository: EmployeeRepositoryFacade,
+):
+    """Verifica que el método validate_employee_id delega la llamada a ValidationOperations."""
+    from unittest.mock import MagicMock
+    employee_repository._validation.validate_employee_id = MagicMock()
+    
+    employee_id = 1
+    
+    employee_repository.validate_employee_id(employee_id)
+    
+    employee_repository._validation.validate_employee_id.assert_called_once_with(employee_id)
