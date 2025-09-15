@@ -13,9 +13,11 @@ from planificador.models.project import Project
 from planificador.models.team import Team
 from planificador.repositories.base_repository import BaseRepository
 from planificador.repositories.schedule.interfaces.validation_interface import IScheduleValidationOperations
-from planificador.exceptions.repository_exceptions import ScheduleRepositoryError
-from planificador.exceptions.database_exceptions import convert_sqlalchemy_error
-from planificador.exceptions.validation_exceptions import ValidationError
+from planificador.exceptions.repository import (
+    ScheduleRepositoryError,
+    convert_sqlalchemy_error
+)
+from planificador.exceptions.validation import ValidationError
 
 
 class ScheduleValidationModule(BaseRepository[Schedule], IScheduleValidationOperations):
@@ -36,10 +38,26 @@ class ScheduleValidationModule(BaseRepository[Schedule], IScheduleValidationOper
         super().__init__(session, Schedule)
         self._logger = logger.bind(module="schedule_validation")
         
-        # Repositorios auxiliares para validaciones
-        self._employee_repo = BaseRepository(session, Employee)
-        self._project_repo = BaseRepository(session, Project)
-        self._team_repo = BaseRepository(session, Team)
+        # Inicializar repositorios auxiliares para validaciones
+        from planificador.repositories.employee.employee_repository_facade import EmployeeRepositoryFacade
+        from planificador.repositories.project.project_repository_facade import ProjectRepositoryFacade
+        
+        self._employee_repo = EmployeeRepositoryFacade(session)
+        self._project_repo = ProjectRepositoryFacade(session)
+        # Para Team creamos una implementación concreta ya que no existe TeamRepositoryFacade
+        self._team_repo = self._create_team_repository(session)
+
+    def _create_team_repository(self, session: AsyncSession) -> 'TeamRepository':
+        """Crea una implementación concreta de repositorio para Team."""
+        class TeamRepository(BaseRepository[Team]):
+            def __init__(self, session: AsyncSession):
+                super().__init__(Team, session)
+            
+            async def get_by_unique_field(self, field: str, value: Any) -> Optional[Team]:
+                """Implementación del método abstracto get_by_unique_field para Team."""
+                return await self.get_by_field(field, value)
+        
+        return TeamRepository(session)
 
     async def validate_schedule_data(self, schedule_data: Dict[str, Any]) -> bool:
         """
@@ -250,6 +268,72 @@ class ScheduleValidationModule(BaseRepository[Schedule], IScheduleValidationOper
                 operation="validate_schedule_id",
                 entity_type="Schedule",
                 entity_id=schedule_id,
+                original_error=e
+            )
+
+    async def validate_employee_id(self, employee_id: int) -> bool:
+        """
+        Valida que un ID de empleado sea válido y exista.
+        
+        Args:
+            employee_id: ID del empleado a validar
+            
+        Returns:
+            bool: True si el ID es válido y existe
+            
+        Raises:
+            ValidationError: Si el ID no es válido o no existe
+            ScheduleRepositoryError: Si ocurre un error durante la validación
+        """
+        try:
+            self._logger.debug(f"Validando ID de empleado: {employee_id}")
+            
+            # Validar tipo de dato
+            if not isinstance(employee_id, int):
+                raise ValidationError(
+                    message="employee_id debe ser un entero",
+                    field="employee_id",
+                    value=employee_id
+                )
+            
+            # Validar que sea positivo
+            if employee_id <= 0:
+                raise ValidationError(
+                    message="employee_id debe ser un entero positivo",
+                    field="employee_id",
+                    value=employee_id
+                )
+            
+            # Verificar que existe en la base de datos usando BaseRepository
+            exists = await self._employee_repo.exists(employee_id)
+            
+            if not exists:
+                raise ValidationError(
+                    message=f"No existe un empleado con ID {employee_id}",
+                    field="employee_id",
+                    value=employee_id
+                )
+            
+            self._logger.debug(f"ID de empleado {employee_id} válido")
+            return True
+            
+        except ValidationError:
+            raise
+        except SQLAlchemyError as e:
+            self._logger.error(f"Error de base de datos en validación: {e}")
+            raise convert_sqlalchemy_error(
+                error=e,
+                operation="validate_employee_id",
+                entity_type="Employee",
+                entity_id=employee_id
+            )
+        except Exception as e:
+            self._logger.error(f"Error inesperado en validación: {e}")
+            raise ScheduleRepositoryError(
+                message=f"Error inesperado en validación: {e}",
+                operation="validate_employee_id",
+                entity_type="Employee",
+                entity_id=employee_id,
                 original_error=e
             )
 
@@ -723,3 +807,21 @@ class ScheduleValidationModule(BaseRepository[Schedule], IScheduleValidationOper
                 entity_id=None,
                 original_error=e
             )
+    
+    async def get_by_unique_field(self, field_name: str, value: Any) -> Optional[Schedule]:
+        """
+        Obtiene un horario por un campo único específico.
+        
+        Args:
+            field_name: Nombre del campo único
+            value: Valor a buscar
+            
+        Returns:
+            Schedule encontrado o None si no existe
+            
+        Raises:
+            ScheduleRepositoryError: Si ocurre un error durante la consulta
+        """
+        self._logger.debug(f"Obteniendo horario por campo {field_name}={value}")
+        
+        return await self.get_by_field(field_name, value)

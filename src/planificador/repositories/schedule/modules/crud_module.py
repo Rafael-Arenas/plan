@@ -1,13 +1,13 @@
 # src/planificador/repositories/schedule/modules/crud_module.py
 
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 from datetime import date
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from planificador.models.schedule import Schedule
 from planificador.repositories.base_repository import BaseRepository
 from planificador.repositories.schedule.interfaces.crud_interface import IScheduleCrudOperations
-from planificador.exceptions.repository_exceptions import ScheduleRepositoryError
+from planificador.exceptions.repository import ScheduleRepositoryError
 
 
 class ScheduleCrudModule(BaseRepository[Schedule], IScheduleCrudOperations):
@@ -109,3 +109,21 @@ class ScheduleCrudModule(BaseRepository[Schedule], IScheduleCrudOperations):
         self._logger.debug(f"Eliminando horario con ID {schedule_id}")
         
         return await self.delete(schedule_id)
+
+    async def get_by_unique_field(self, field_name: str, value: Any) -> Optional[Schedule]:
+        """
+        Obtiene un horario por un campo único específico.
+        
+        Args:
+            field_name: Nombre del campo único
+            value: Valor a buscar
+            
+        Returns:
+            Schedule encontrado o None si no existe
+            
+        Raises:
+            ScheduleRepositoryError: Si ocurre un error durante la consulta
+        """
+        self._logger.debug(f"Obteniendo horario por campo {field_name}={value}")
+        
+        return await self.get_by_field(field_name, value)

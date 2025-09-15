@@ -11,8 +11,10 @@ from sqlalchemy.exc import SQLAlchemyError
 from planificador.models.schedule import Schedule
 from planificador.repositories.schedule.interfaces.query_interface import IScheduleQueryOperations
 from planificador.repositories.base_repository import BaseRepository
-from planificador.exceptions.repository_exceptions import ScheduleRepositoryError
-from planificador.exceptions.database_exceptions import convert_sqlalchemy_error
+from planificador.exceptions.repository import (
+    ScheduleRepositoryError,
+    convert_sqlalchemy_error
+)
 
 
 class ScheduleQueryModule(BaseRepository[Schedule], IScheduleQueryOperations):
@@ -423,6 +425,24 @@ class ScheduleQueryModule(BaseRepository[Schedule], IScheduleQueryOperations):
         """
         self._logger.debug(f"Buscando horarios con filtros: {filters}")
         return await self.find_by_criteria(filters, limit=limit, offset=offset)
+
+    async def get_by_unique_field(self, field_name: str, value: Any) -> Optional[Schedule]:
+        """
+        Obtiene un horario por un campo único específico.
+        
+        Args:
+            field_name: Nombre del campo único
+            value: Valor a buscar
+            
+        Returns:
+            Schedule encontrado o None si no existe
+            
+        Raises:
+            ScheduleRepositoryError: Si ocurre un error durante la consulta
+        """
+        self._logger.debug(f"Obteniendo horario por campo {field_name}={value}")
+        
+        return await self.get_by_field(field_name, value)
 
     async def count_schedules(self, filters: Optional[Dict[str, Any]] = None) -> int:
         """

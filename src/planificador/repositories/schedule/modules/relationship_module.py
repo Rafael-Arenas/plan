@@ -14,9 +14,9 @@ from ....models.employee import Employee
 from ....models.project import Project
 from ....models.team import Team
 from ...base_repository import BaseRepository
-from ....exceptions.repository_exceptions import RepositoryError
-from ....exceptions.database_exceptions import convert_sqlalchemy_error
-from ....exceptions.validation_exceptions import ValidationError
+from ....exceptions.repository import RepositoryError
+from ....exceptions.repository import convert_sqlalchemy_error
+from ....exceptions.validation import ValidationError
 from ..interfaces.relationship_interface import IScheduleRelationshipOperations
 
 
@@ -714,6 +714,24 @@ class ScheduleRelationshipModule(BaseRepository[Schedule], IScheduleRelationship
                 entity_id=schedule_id,
                 original_error=e
             )
+    
+    async def get_by_unique_field(self, field_name: str, value: Any) -> Optional[Schedule]:
+        """
+        Obtiene un horario por un campo único específico.
+        
+        Args:
+            field_name: Nombre del campo único
+            value: Valor a buscar
+            
+        Returns:
+            Schedule encontrado o None si no existe
+            
+        Raises:
+            ScheduleRepositoryError: Si ocurre un error durante la consulta
+        """
+        self._logger.debug(f"Obteniendo horario por campo {field_name}={value}")
+        
+        return await self.get_by_field(field_name, value)
     
     # ==========================================
     # OPERACIONES DE CONSULTA AUXILIARES

@@ -4,14 +4,15 @@ from typing import Dict, Any, List, Optional, Tuple
 from datetime import date, datetime
 from decimal import Decimal
 
-from sqlalchemy import func, and_
+from sqlalchemy import func, and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.sql import select
+from sqlalchemy.exc import SQLAlchemyError
 from loguru import logger
 
 from ....models.schedule import Schedule
-from ....exceptions.repository_exceptions import RepositoryError
+from ....exceptions.repository import RepositoryError
 from ....repositories.base_repository import BaseRepository
+from planificador.exceptions.repository.base_repository_exceptions import convert_sqlalchemy_error
 from ..interfaces.statistics_interface import IScheduleStatisticsOperations
 
 
@@ -33,6 +34,360 @@ class ScheduleStatisticsModule(BaseRepository[Schedule], IScheduleStatisticsOper
         """
         super().__init__(session, model_class)
         self._logger = logger.bind(module="ScheduleStatisticsModule")
+    
+    async def get_by_unique_field(self, field_name: str, field_value: Any) -> Optional[Schedule]:
+        """
+        Obtiene un registro por un campo único.
+        
+        Args:
+            field_name: Nombre del campo único
+            field_value: Valor del campo único
+            
+        Returns:
+            Registro encontrado o None
+        """
+        try:
+            if not hasattr(self.model_class, field_name):
+                self._logger.warning(f"Campo '{field_name}' no existe en {self.model_class.__name__}")
+                return None
+            
+            field_attr = getattr(self.model_class, field_name)
+            query = select(self.model_class).where(field_attr == field_value)
+            result = await self.session.execute(query)
+            record = result.scalar_one_or_none()
+            
+            self._logger.debug(f"Búsqueda por {field_name}={field_value}: {'encontrado' if record else 'no encontrado'}")
+            return record
+            
+        except SQLAlchemyError as e:
+            self._logger.error(f"Error en búsqueda por {field_name}={field_value}: {e}")
+            raise convert_sqlalchemy_error(
+                error=e,
+                operation="get_by_unique_field",
+                entity_type=self.model_class.__name__,
+                entity_id=str(field_value)
+            )
+        except Exception as e:
+            self._logger.error(f"Error inesperado en búsqueda por {field_name}={field_value}: {e}")
+            raise RepositoryError(
+                message=f"Error inesperado en búsqueda: {e}",
+                operation="get_by_unique_field",
+                entity_type=self.model_class.__name__,
+                entity_id=str(field_value),
+                original_error=e
+            )
+    
+    # ==========================================
+    # MÉTODOS DE LA INTERFAZ IScheduleStatisticsOperations
+    # ==========================================
+    
+    async def get_employee_hours_summary(
+        self,
+        employee_id: int,
+        start_date: date,
+        end_date: date
+    ) -> Dict[str, Any]:
+        """
+        Obtiene resumen de horas trabajadas por empleado.
+        
+        Args:
+            employee_id: ID del empleado
+            start_date: Fecha de inicio del período
+            end_date: Fecha de fin del período
+            
+        Returns:
+            Dict con estadísticas de horas del empleado
+        """
+        try:
+            # Implementación básica - puede expandirse según necesidades
+            return {
+                "employee_id": employee_id,
+                "period_start": start_date.isoformat(),
+                "period_end": end_date.isoformat(),
+                "total_hours": 0,
+                "total_days": 0,
+                "average_hours_per_day": 0
+            }
+        except Exception as e:
+            self._logger.error(f"Error obteniendo resumen de horas empleado {employee_id}: {e}")
+            raise RepositoryError(
+                message=f"Error obteniendo resumen de horas: {e}",
+                operation="get_employee_hours_summary",
+                entity_type=self.model_class.__name__,
+                entity_id=employee_id,
+                original_error=e
+            )
+    
+    async def get_project_hours_summary(
+        self,
+        project_id: int,
+        start_date: date,
+        end_date: date
+    ) -> Dict[str, Any]:
+        """
+        Obtiene resumen de horas por proyecto.
+        
+        Args:
+            project_id: ID del proyecto
+            start_date: Fecha de inicio del período
+            end_date: Fecha de fin del período
+            
+        Returns:
+            Dict con estadísticas de horas del proyecto
+        """
+        try:
+            # Implementación básica - puede expandirse según necesidades
+            return {
+                "project_id": project_id,
+                "period_start": start_date.isoformat(),
+                "period_end": end_date.isoformat(),
+                "total_hours": 0,
+                "total_employees": 0,
+                "average_hours_per_employee": 0
+            }
+        except Exception as e:
+            self._logger.error(f"Error obteniendo resumen de horas proyecto {project_id}: {e}")
+            raise RepositoryError(
+                message=f"Error obteniendo resumen de horas: {e}",
+                operation="get_project_hours_summary",
+                entity_type=self.model_class.__name__,
+                entity_id=project_id,
+                original_error=e
+            )
+    
+    async def get_team_hours_summary(
+        self,
+        team_id: int,
+        start_date: date,
+        end_date: date
+    ) -> Dict[str, Any]:
+        """
+        Obtiene resumen de horas por equipo.
+        
+        Args:
+            team_id: ID del equipo
+            start_date: Fecha de inicio del período
+            end_date: Fecha de fin del período
+            
+        Returns:
+            Dict con estadísticas de horas del equipo
+        """
+        try:
+            # Implementación básica - puede expandirse según necesidades
+            return {
+                "team_id": team_id,
+                "period_start": start_date.isoformat(),
+                "period_end": end_date.isoformat(),
+                "total_hours": 0,
+                "total_members": 0,
+                "average_hours_per_member": 0
+            }
+        except Exception as e:
+            self._logger.error(f"Error obteniendo resumen de horas equipo {team_id}: {e}")
+            raise RepositoryError(
+                message=f"Error obteniendo resumen de horas: {e}",
+                operation="get_team_hours_summary",
+                entity_type=self.model_class.__name__,
+                entity_id=team_id,
+                original_error=e
+            )
+    
+    async def get_schedule_counts_by_status(
+        self,
+        start_date: date,
+        end_date: date,
+        employee_id: Optional[int] = None
+    ) -> Dict[str, int]:
+        """
+        Obtiene conteo de horarios por estado.
+        
+        Args:
+            start_date: Fecha de inicio del período
+            end_date: Fecha de fin del período
+            employee_id: ID del empleado (opcional)
+            
+        Returns:
+            Dict con conteos por estado
+        """
+        try:
+            # Implementación básica - puede expandirse según necesidades
+            return {
+                "confirmed": 0,
+                "pending": 0,
+                "cancelled": 0,
+                "total": 0
+            }
+        except Exception as e:
+            self._logger.error(f"Error obteniendo conteos por estado: {e}")
+            raise RepositoryError(
+                message=f"Error obteniendo conteos por estado: {e}",
+                operation="get_schedule_counts_by_status",
+                entity_type=self.model_class.__name__,
+                original_error=e
+            )
+    
+    async def get_productivity_metrics(
+        self,
+        start_date: date,
+        end_date: date,
+        employee_id: Optional[int] = None,
+        project_id: Optional[int] = None
+    ) -> Dict[str, Any]:
+        """
+        Obtiene métricas de productividad.
+        
+        Args:
+            start_date: Fecha de inicio del período
+            end_date: Fecha de fin del período
+            employee_id: ID del empleado (opcional)
+            project_id: ID del proyecto (opcional)
+            
+        Returns:
+            Dict con métricas de productividad
+        """
+        try:
+            # Implementación básica - puede expandirse según necesidades
+            return {
+                "period_start": start_date.isoformat(),
+                "period_end": end_date.isoformat(),
+                "efficiency_score": 0.0,
+                "completion_rate": 0.0,
+                "average_daily_hours": 0.0
+            }
+        except Exception as e:
+            self._logger.error(f"Error obteniendo métricas de productividad: {e}")
+            raise RepositoryError(
+                message=f"Error obteniendo métricas de productividad: {e}",
+                operation="get_productivity_metrics",
+                entity_type=self.model_class.__name__,
+                original_error=e
+            )
+    
+    async def get_utilization_report(
+        self,
+        start_date: date,
+        end_date: date,
+        group_by: str = "employee"
+    ) -> List[Dict[str, Any]]:
+        """
+        Obtiene reporte de utilización de tiempo.
+        
+        Args:
+            start_date: Fecha de inicio del período
+            end_date: Fecha de fin del período
+            group_by: Criterio de agrupación
+            
+        Returns:
+            Lista de diccionarios con datos de utilización
+        """
+        try:
+            # Implementación básica - puede expandirse según necesidades
+            return []
+        except Exception as e:
+            self._logger.error(f"Error obteniendo reporte de utilización: {e}")
+            raise RepositoryError(
+                message=f"Error obteniendo reporte de utilización: {e}",
+                operation="get_utilization_report",
+                entity_type=self.model_class.__name__,
+                original_error=e
+            )
+    
+    async def get_confirmation_statistics(
+        self,
+        start_date: date,
+        end_date: date
+    ) -> Dict[str, Any]:
+        """
+        Obtiene estadísticas de confirmación de horarios.
+        
+        Args:
+            start_date: Fecha de inicio del período
+            end_date: Fecha de fin del período
+            
+        Returns:
+            Dict con estadísticas de confirmación
+        """
+        try:
+            # Implementación básica - puede expandirse según necesidades
+            return {
+                "period_start": start_date.isoformat(),
+                "period_end": end_date.isoformat(),
+                "total_schedules": 0,
+                "confirmed_schedules": 0,
+                "confirmation_rate": 0.0
+            }
+        except Exception as e:
+            self._logger.error(f"Error obteniendo estadísticas de confirmación: {e}")
+            raise RepositoryError(
+                message=f"Error obteniendo estadísticas de confirmación: {e}",
+                operation="get_confirmation_statistics",
+                entity_type=self.model_class.__name__,
+                original_error=e
+            )
+    
+    async def get_overtime_analysis(
+        self,
+        start_date: date,
+        end_date: date,
+        employee_id: Optional[int] = None
+    ) -> Dict[str, Any]:
+        """
+        Obtiene análisis de horas extra.
+        
+        Args:
+            start_date: Fecha de inicio del período
+            end_date: Fecha de fin del período
+            employee_id: ID del empleado (opcional)
+            
+        Returns:
+            Dict con análisis de horas extra
+        """
+        try:
+            # Implementación básica - puede expandirse según necesidades
+            return {
+                "period_start": start_date.isoformat(),
+                "period_end": end_date.isoformat(),
+                "total_overtime_hours": 0,
+                "employees_with_overtime": 0,
+                "average_overtime_per_employee": 0.0
+            }
+        except Exception as e:
+            self._logger.error(f"Error obteniendo análisis de horas extra: {e}")
+            raise RepositoryError(
+                message=f"Error obteniendo análisis de horas extra: {e}",
+                operation="get_overtime_analysis",
+                entity_type=self.model_class.__name__,
+                original_error=e
+            )
+    
+    async def get_schedule_distribution(
+        self,
+        start_date: date,
+        end_date: date,
+        distribution_type: str = "daily"
+    ) -> List[Dict[str, Any]]:
+        """
+        Obtiene distribución de horarios en el tiempo.
+        
+        Args:
+            start_date: Fecha de inicio del período
+            end_date: Fecha de fin del período
+            distribution_type: Tipo de distribución temporal
+            
+        Returns:
+            Lista con distribución de horarios
+        """
+        try:
+            # Implementación básica - puede expandirse según necesidades
+            return []
+        except Exception as e:
+            self._logger.error(f"Error obteniendo distribución de horarios: {e}")
+            raise RepositoryError(
+                message=f"Error obteniendo distribución de horarios: {e}",
+                operation="get_schedule_distribution",
+                entity_type=self.model_class.__name__,
+                original_error=e
+            )
     
     # ==========================================
     # ESTADÍSTICAS DE HORAS TRABAJADAS
