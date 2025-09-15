@@ -1,4 +1,5 @@
 from typing import Any, Dict, List, Optional
+from datetime import date
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -18,24 +19,53 @@ from planificador.repositories.project.modules.statistics_operations import (
 from planificador.repositories.project.modules.validation_operations import (
     ValidationOperations,
 )
-from planificador.models.project import Project
+from planificador.models.project import Project, ProjectStatus, ProjectPriority
 
 
 class ProjectRepositoryFacade(IProjectRepository):
-    def __init__(self, session: AsyncSession):
+    def __init__(
+        self,
+        session: AsyncSession,
+        query_operations: Optional[QueryOperations] = None,
+        validation_operations: Optional[ValidationOperations] = None,
+        relationship_operations: Optional[RelationshipOperations] = None,
+        crud_operations: Optional[CrudOperations] = None,
+        statistics_operations: Optional[StatisticsOperations] = None,
+    ):
         self.session = session
-        self._query_operations = QueryOperations(session)
-        self._validation_operations = ValidationOperations(session)
-        self._relationship_operations = RelationshipOperations(self._query_operations)
-        self._crud_operations = CrudOperations(
-            session,
-            self._validation_operations,
-            self._query_operations,
-            self._relationship_operations,
-        )
-        self._statistics_operations = StatisticsOperations(
-            session, self._query_operations
-        )
+        
+        # Permitir inyección de dependencias para testing
+        if query_operations is not None:
+            self._query_operations = query_operations
+        else:
+            self._query_operations = QueryOperations(session)
+            
+        if validation_operations is not None:
+            self._validation_operations = validation_operations
+        else:
+            self._validation_operations = ValidationOperations(session)
+            
+        if relationship_operations is not None:
+            self._relationship_operations = relationship_operations
+        else:
+            self._relationship_operations = RelationshipOperations(self._query_operations)
+            
+        if crud_operations is not None:
+            self._crud_operations = crud_operations
+        else:
+            self._crud_operations = CrudOperations(
+                session,
+                self._validation_operations,
+                self._query_operations,
+                self._relationship_operations,
+            )
+            
+        if statistics_operations is not None:
+            self._statistics_operations = statistics_operations
+        else:
+            self._statistics_operations = StatisticsOperations(
+                session, self._query_operations
+            )
 
     # ============================================================================
     # OPERACIONES CRUD - Delegación a _crud
@@ -73,38 +103,124 @@ class ProjectRepositoryFacade(IProjectRepository):
         """Añade la carga de la relación con las asignaciones."""
         return self._query_operations.with_assignments(query)
 
-    def with_full_details(self, query):
-        """Añade la carga de todas las relaciones principales."""
-        return self._query_operations.with_full_details(query)
-
     def filter_by_reference(self, query, reference: str):
         """Filtra por número de referencia."""
         return self._query_operations.filter_by_reference(query, reference)
-
-    def filter_by_trigram(self, query, trigram: str):
-        """Filtra por trigrama."""
-        return self._query_operations.filter_by_trigram(query, trigram)
 
     def filter_by_name(self, query, name: str):
         """Filtra por nombre (búsqueda parcial)."""
         return self._query_operations.filter_by_name(query, name)
 
-    def filter_by_client(self, query, client_id: int):
-        """Filtra por ID de cliente."""
-        return self._query_operations.filter_by_client(query, client_id)
-
-    def filter_by_status(self, query, status: str):
-        """Filtra por estado."""
-        return self._query_operations.filter_by_status(query, status)
-
-    def filter_by_priority(self, query, priority: str):
-        """Filtra por prioridad."""
-        return self._query_operations.filter_by_priority(query, priority)
-
-    def filter_by_date_range(self, query, start_date, end_date):
+    def filter_by_dates(self, start_date: date, end_date: date):
         """Filtra por rango de fechas."""
-        return self._query_operations.filter_by_date_range(query, start_date, end_date)
+        return self._query_operations.filter_by_dates(start_date, end_date)
 
+    async def get_projects_by_status(self, status: str, limit: Optional[int] = None) -> List[Project]:
+        """Obtiene proyectos filtrados por estado."""
+        return await self._query_operations.get_projects_by_status(status, limit)
+
+    async def get_projects_by_client(self, client_id: int, limit: Optional[int] = None) -> List[Project]:
+        """Obtiene proyectos filtrados por cliente."""
+        return await self._query_operations.get_projects_by_client(client_id, limit)
+
+    async def search_projects(self, search_term: str, limit: Optional[int] = None) -> List[Project]:
+        """Busca proyectos por término de búsqueda en nombre, referencia y descripción."""
+        return await self._query_operations.search_projects(search_term, limit)
+
+    async def get_overdue_projects(self, limit: Optional[int] = None) -> List[Project]:
+        """Obtiene proyectos que están vencidos."""
+        return await self._query_operations.get_overdue_projects(limit)
+
+    async def get_active_projects(self, limit: Optional[int] = None) -> List[Project]:
+        """Obtiene proyectos activos."""
+        return await self._query_operations.get_active_projects(limit)
+
+    async def filter_by_date_range(self, start_date: date, end_date: date, limit: Optional[int] = None) -> List[Project]:
+        """Filtra proyectos por rango de fechas."""
+        return await self._query_operations.filter_by_date_range(start_date, end_date, limit)
+
+    async def get_by_id(self, project_id: int) -> Optional[Project]:
+        """Obtiene un proyecto por su ID."""
+        return await self._query_operations.get_by_id(project_id)
+    
+    def format_project_dates(self, project: Project) -> Dict[str, Optional[str]]:
+        """Formatea las fechas de un proyecto."""
+        return self._query_operations.format_project_dates(project)
+    
+    async def get_by_reference(self, reference: str) -> Optional[Project]:
+        """Obtiene un proyecto por su referencia."""
+        return await self._query_operations.get_by_reference(reference)
+    
+    async def get_by_trigram(self, trigram: str) -> Optional[Project]:
+        """Obtiene un proyecto por su trigrama."""
+        return await self._query_operations.get_by_trigram(trigram)
+    
+    async def search_by_name(self, search_term: str) -> List[Project]:
+        """Busca proyectos por nombre."""
+        return await self._query_operations.search_by_name(search_term)
+    
+    async def get_by_client(self, client_id: int) -> List[Project]:
+        """Obtiene proyectos por cliente."""
+        return await self._query_operations.get_by_client(client_id)
+    
+    async def get_by_status(self, status: ProjectStatus) -> List[Project]:
+        """Obtiene proyectos por estado."""
+        return await self._query_operations.get_by_status(status)
+    
+    async def get_active_projects(self) -> List[Project]:
+        """Obtiene todos los proyectos activos."""
+        return await self._query_operations.get_active_projects()
+    
+    async def get_by_priority(self, priority: ProjectPriority) -> List[Project]:
+        """Obtiene proyectos por prioridad."""
+        return await self._query_operations.get_by_priority(priority)
+    
+    async def get_by_date_range(
+        self, start_date: Optional[date] = None, end_date: Optional[date] = None
+    ) -> List[Project]:
+        """Obtiene proyectos en un rango de fechas."""
+        return await self._query_operations.get_by_date_range(start_date, end_date)
+    
+    async def get_overdue_projects(
+        self, reference_date: Optional[date] = None
+    ) -> List[Project]:
+        """Obtiene proyectos atrasados."""
+        return await self._query_operations.get_overdue_projects(reference_date)
+    
+    async def get_projects_starting_current_week(self, **kwargs) -> List[Project]:
+        """Obtiene proyectos que inician en la semana actual."""
+        return await self._query_operations.get_projects_starting_current_week(**kwargs)
+    
+    async def get_projects_ending_current_week(self, **kwargs) -> List[Project]:
+        """Obtiene proyectos que terminan en la semana actual."""
+        return await self._query_operations.get_projects_ending_current_week(**kwargs)
+    
+    async def get_projects_starting_current_month(self, **kwargs) -> List[Project]:
+        """Obtiene proyectos que inician en el mes actual."""
+        return await self._query_operations.get_projects_starting_current_month(**kwargs)
+    
+    async def get_projects_starting_business_days_only(
+        self,
+        start_date: Optional[date] = None,
+        end_date: Optional[date] = None,
+        **kwargs,
+    ) -> List[Project]:
+        """Obtiene proyectos que inician en días hábiles."""
+        return await self._query_operations.get_projects_starting_business_days_only(
+            start_date, end_date, **kwargs
+        )
+    
+    async def get_with_client(self, project_id: int) -> Optional[Project]:
+        """Obtiene un proyecto con su cliente."""
+        return await self._query_operations.get_with_client(project_id)
+    
+    async def get_with_assignments(self, project_id: int) -> Optional[Project]:
+        """Obtiene un proyecto con sus asignaciones."""
+        return await self._query_operations.get_with_assignments(project_id)
+    
+    async def get_with_full_details(self, project_id: int) -> Optional[Project]:
+        """Obtiene un proyecto con todos sus detalles."""
+        return await self._query_operations.get_with_full_details(project_id)
     # ============================================================================
     # OPERACIONES DE RELACIONES - Delegación a _relationship_operations
     # ============================================================================
@@ -131,6 +247,71 @@ class ProjectRepositoryFacade(IProjectRepository):
         """Obtiene un resumen de proyectos vencidos."""
         return await self._statistics_operations.get_overdue_projects_summary()
 
+    async def get_project_performance_stats(self) -> Dict[str, Any]:
+        """Obtiene estadísticas de rendimiento de proyectos."""
+        return await self._statistics_operations.get_project_performance_stats()
+
+    async def get_projects_by_status_summary(self, status: str) -> Dict[str, Any]:
+        """Obtiene un resumen de proyectos por estado específico."""
+        return await self._statistics_operations.get_projects_by_status_summary(status)
+
+    async def get_project_workload_stats(self) -> Dict[str, Any]:
+        """Obtiene estadísticas de carga de trabajo de proyectos."""
+        return await self._statistics_operations.get_project_workload_stats()
+
+    async def get_project_duration_stats(self) -> Dict[str, Any]:
+        """Obtiene estadísticas de duración de proyectos."""
+        return await self._statistics_operations.get_project_duration_stats()
+
+    async def get_monthly_project_stats(self, year: int, month: int) -> Dict[str, Any]:
+        """Obtiene estadísticas de proyectos por mes."""
+        return await self._statistics_operations.get_monthly_project_stats(year, month)
+
+    async def get_client_project_stats(self, client_id: int) -> Dict[str, Any]:
+        """Obtiene estadísticas de proyectos por cliente."""
+        return await self._statistics_operations.get_client_project_stats(client_id)
+
+    async def get_overdue_projects_stats(self) -> Dict[str, Any]:
+        """Obtiene estadísticas detalladas de proyectos vencidos."""
+        return await self._statistics_operations.get_overdue_projects_stats()
+
+    async def get_project_performance_stats(self, project_id: int) -> Dict[str, Any]:
+        """Obtiene estadísticas de rendimiento de un proyecto."""
+        return await self._statistics_operations.get_project_performance_stats(project_id)
+    
+    async def get_projects_by_status_summary(self) -> Dict[str, int]:
+        """Obtiene un resumen de proyectos por estado."""
+        return await self._statistics_operations.get_projects_by_status_summary()
+    
+    async def get_project_workload_stats(
+        self,
+        project_id: int,
+        start_date: Optional[date] = None,
+        end_date: Optional[date] = None,
+    ) -> Dict[str, Any]:
+        """Obtiene estadísticas de carga de trabajo de un proyecto."""
+        return await self._statistics_operations.get_project_workload_stats(
+            project_id, start_date, end_date
+        )
+    
+    async def get_project_duration_stats(self, project_id: int) -> Dict[str, Any]:
+        """Obtiene estadísticas de duración de un proyecto."""
+        return await self._statistics_operations.get_project_duration_stats(project_id)
+    
+    async def get_monthly_project_stats(
+        self, year: int, month: int
+    ) -> Dict[str, Any]:
+        """Obtiene estadísticas mensuales de proyectos."""
+        return await self._statistics_operations.get_monthly_project_stats(year, month)
+    
+    async def get_client_project_stats(self, client_id: int) -> Dict[str, Any]:
+        """Obtiene estadísticas de proyectos de un cliente."""
+        return await self._statistics_operations.get_client_project_stats(client_id)
+    
+    async def get_overdue_projects_stats(self) -> Dict[str, Any]:
+        """Obtiene estadísticas de proyectos atrasados."""
+        return await self._statistics_operations.get_overdue_projects_stats()
+
     # ============================================================================
     # OPERACIONES DE VALIDACIÓN - Delegación a _validation_operations
     # ============================================================================
@@ -141,4 +322,24 @@ class ProjectRepositoryFacade(IProjectRepository):
     async def validate_project_update(self, project_id: int, data: Dict[str, Any]) -> None:
         """Valida los datos para la actualización de un proyecto."""
         return await self._validation_operations.validate_project_update(project_id, data)
+
+    async def reference_exists(self, reference: str, exclude_id: Optional[int] = None) -> bool:
+        """Verifica si una referencia de proyecto existe."""
+        return await self._validation_operations.reference_exists(reference, exclude_id)
+
+    async def trigram_exists(self, trigram: str, exclude_id: Optional[int] = None) -> bool:
+        """Verifica si un trigrama de proyecto existe."""
+        return await self._validation_operations.trigram_exists(trigram, exclude_id)
+
+    async def reference_exists(
+        self, reference: str, exclude_id: Optional[int] = None
+    ) -> bool:
+        """Verifica si una referencia de proyecto existe."""
+        return await self._validation_operations.reference_exists(reference, exclude_id)
+    
+    async def trigram_exists(
+        self, trigram: str, exclude_id: Optional[int] = None
+    ) -> bool:
+        """Verifica si un trigrama de proyecto existe."""
+        return await self._validation_operations.trigram_exists(trigram, exclude_id)
 

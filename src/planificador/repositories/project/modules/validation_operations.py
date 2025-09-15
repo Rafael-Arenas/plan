@@ -94,3 +94,33 @@ class ValidationOperations(BaseRepository):
         """
         if await self._is_field_duplicate(field_name, value, project_id):
             raise ValidationError(f"El campo '{field_name}' con valor '{value}' ya está en uso.")
+
+    async def reference_exists(
+        self, reference: str, exclude_id: int = None
+    ) -> bool:
+        """
+        Verifica si una referencia de proyecto ya existe en la base de datos.
+        
+        Args:
+            reference: Referencia del proyecto a verificar
+            exclude_id: ID del proyecto a excluir de la búsqueda (para actualizaciones)
+            
+        Returns:
+            bool: True si la referencia existe, False en caso contrario
+        """
+        return await self._is_field_duplicate("reference", reference, exclude_id)
+
+    async def trigram_exists(
+        self, trigram: str, exclude_id: int = None
+    ) -> bool:
+        """
+        Verifica si un trigrama de proyecto ya existe en la base de datos.
+        
+        Args:
+            trigram: Trigrama del proyecto a verificar
+            exclude_id: ID del proyecto a excluir de la búsqueda (para actualizaciones)
+            
+        Returns:
+            bool: True si el trigrama existe, False en caso contrario
+        """
+        return await self._is_field_duplicate("trigram", trigram, exclude_id)
