@@ -1,4 +1,5 @@
 from typing import Any, Dict, List, Optional
+from datetime import date
 
 from loguru import logger
 from sqlalchemy import and_, or_, select
