@@ -203,9 +203,13 @@ class ProjectRepositoryFacade(IProjectRepository):
     async def get_with_full_details(self, project_id: int) -> Optional[Project]:
         """Obtiene un proyecto con todos sus detalles."""
         return await self._query_operations.get_with_full_details(project_id)
+
+
     # ============================================================================
     # OPERACIONES DE ESTADÍSTICAS - Delegación a _statistics_operations
     # ============================================================================
+
+    
     async def get_status_summary(self) -> Dict[str, int]:
         """Calcula un resumen del número de proyectos por estado."""
         return await self._statistics_operations.get_status_summary()
