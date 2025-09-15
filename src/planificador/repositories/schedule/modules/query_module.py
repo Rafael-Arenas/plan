@@ -2,19 +2,20 @@
 
 from typing import List, Optional, Dict, Any
 from datetime import date
-from sqlalchemy import select, and_, or_, func
-from sqlalchemy.exc import SQLAlchemyError
-from sqlalchemy.ext.asyncio import AsyncSession
+
+from sqlalchemy import select, and_
 from sqlalchemy.orm import selectinload
-from loguru import logger
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.exc import SQLAlchemyError
 
 from planificador.models.schedule import Schedule
 from planificador.repositories.schedule.interfaces.query_interface import IScheduleQueryOperations
+from planificador.repositories.base_repository import BaseRepository
 from planificador.exceptions.repository_exceptions import ScheduleRepositoryError
 from planificador.exceptions.database_exceptions import convert_sqlalchemy_error
 
 
-class ScheduleQueryModule(IScheduleQueryOperations):
+class ScheduleQueryModule(BaseRepository[Schedule], IScheduleQueryOperations):
     """
     Módulo para operaciones de consulta del repositorio Schedule.
     
@@ -29,12 +30,12 @@ class ScheduleQueryModule(IScheduleQueryOperations):
         Args:
             session: Sesión de base de datos asíncrona
         """
-        self.session = session
-        self._logger = logger.bind(module="schedule_query")
+        super().__init__(session, Schedule)
+        self._logger = self._logger.bind(module="schedule_query")
 
     async def get_schedule_by_id(self, schedule_id: int) -> Optional[Schedule]:
         """
-        Obtiene un horario por su ID.
+        Obtiene un horario por su ID usando BaseRepository.
         
         Args:
             schedule_id: ID del horario a buscar
@@ -45,47 +46,8 @@ class ScheduleQueryModule(IScheduleQueryOperations):
         Raises:
             ScheduleRepositoryError: Si ocurre un error durante la consulta
         """
-        try:
-            self._logger.debug(f"Buscando horario con ID {schedule_id}")
-            
-            stmt = (
-                select(Schedule)
-                .options(
-                    selectinload(Schedule.employee),
-                    selectinload(Schedule.project),
-                    selectinload(Schedule.team),
-                    selectinload(Schedule.status_code)
-                )
-                .where(Schedule.id == schedule_id)
-            )
-            
-            result = await self.session.execute(stmt)
-            schedule = result.scalar_one_or_none()
-            
-            if schedule:
-                self._logger.debug(f"Horario {schedule_id} encontrado")
-            else:
-                self._logger.debug(f"Horario {schedule_id} no encontrado")
-            
-            return schedule
-            
-        except SQLAlchemyError as e:
-            self._logger.error(f"Error de base de datos al buscar horario: {e}")
-            raise convert_sqlalchemy_error(
-                error=e,
-                operation="get_schedule_by_id",
-                entity_type="Schedule",
-                entity_id=schedule_id
-            )
-        except Exception as e:
-            self._logger.error(f"Error inesperado al buscar horario: {e}")
-            raise ScheduleRepositoryError(
-                message=f"Error inesperado al buscar horario: {e}",
-                operation="get_schedule_by_id",
-                entity_type="Schedule",
-                entity_id=schedule_id,
-                original_error=e
-            )
+        self._logger.debug(f"Obteniendo horario con ID: {schedule_id}")
+        return await self.get_by_id(schedule_id)
 
     async def get_schedules_by_employee(
         self,
@@ -446,7 +408,7 @@ class ScheduleQueryModule(IScheduleQueryOperations):
         offset: Optional[int] = None
     ) -> List[Schedule]:
         """
-        Busca horarios con filtros personalizados.
+        Busca horarios con filtros personalizados usando BaseRepository.
         
         Args:
             filters: Diccionario de filtros a aplicar
@@ -459,86 +421,12 @@ class ScheduleQueryModule(IScheduleQueryOperations):
         Raises:
             ScheduleRepositoryError: Si ocurre un error durante la búsqueda
         """
-        try:
-            self._logger.debug(f"Buscando horarios con filtros: {filters}")
-            
-            stmt = (
-                select(Schedule)
-                .options(
-                    selectinload(Schedule.employee),
-                    selectinload(Schedule.project),
-                    selectinload(Schedule.team),
-                    selectinload(Schedule.status_code)
-                )
-            )
-            
-            # Aplicar filtros dinámicamente
-            conditions = []
-            
-            if 'employee_id' in filters:
-                conditions.append(Schedule.employee_id == filters['employee_id'])
-            
-            if 'project_id' in filters:
-                conditions.append(Schedule.project_id == filters['project_id'])
-            
-            if 'team_id' in filters:
-                conditions.append(Schedule.team_id == filters['team_id'])
-            
-            if 'status_code_id' in filters:
-                conditions.append(Schedule.status_code_id == filters['status_code_id'])
-            
-            if 'date_from' in filters:
-                conditions.append(Schedule.date >= filters['date_from'])
-            
-            if 'date_to' in filters:
-                conditions.append(Schedule.date <= filters['date_to'])
-            
-            if 'is_confirmed' in filters:
-                conditions.append(Schedule.is_confirmed == filters['is_confirmed'])
-            
-            if 'location' in filters:
-                conditions.append(Schedule.location.ilike(f"%{filters['location']}%"))
-            
-            if conditions:
-                stmt = stmt.where(and_(*conditions))
-            
-            # Aplicar ordenamiento
-            stmt = stmt.order_by(Schedule.date.desc(), Schedule.start_time.asc())
-            
-            # Aplicar paginación
-            if offset:
-                stmt = stmt.offset(offset)
-            if limit:
-                stmt = stmt.limit(limit)
-            
-            result = await self.session.execute(stmt)
-            schedules = result.scalars().all()
-            
-            self._logger.debug(f"Encontrados {len(schedules)} horarios")
-            
-            return list(schedules)
-            
-        except SQLAlchemyError as e:
-            self._logger.error(f"Error de base de datos al buscar horarios: {e}")
-            raise convert_sqlalchemy_error(
-                error=e,
-                operation="search_schedules",
-                entity_type="Schedule",
-                entity_id=None
-            )
-        except Exception as e:
-            self._logger.error(f"Error inesperado al buscar horarios: {e}")
-            raise ScheduleRepositoryError(
-                message=f"Error inesperado al buscar horarios: {e}",
-                operation="search_schedules",
-                entity_type="Schedule",
-                entity_id=None,
-                original_error=e
-            )
+        self._logger.debug(f"Buscando horarios con filtros: {filters}")
+        return await self.find_by_criteria(filters, limit=limit, offset=offset)
 
     async def count_schedules(self, filters: Optional[Dict[str, Any]] = None) -> int:
         """
-        Cuenta el número de horarios que coinciden con los filtros.
+        Cuenta el número de horarios que coinciden con los filtros usando BaseRepository.
         
         Args:
             filters: Diccionario de filtros a aplicar (opcional)
@@ -549,57 +437,5 @@ class ScheduleQueryModule(IScheduleQueryOperations):
         Raises:
             ScheduleRepositoryError: Si ocurre un error durante el conteo
         """
-        try:
-            self._logger.debug(f"Contando horarios con filtros: {filters}")
-            
-            stmt = select(func.count(Schedule.id))
-            
-            # Aplicar filtros si se proporcionan
-            if filters:
-                conditions = []
-                
-                if 'employee_id' in filters:
-                    conditions.append(Schedule.employee_id == filters['employee_id'])
-                
-                if 'project_id' in filters:
-                    conditions.append(Schedule.project_id == filters['project_id'])
-                
-                if 'team_id' in filters:
-                    conditions.append(Schedule.team_id == filters['team_id'])
-                
-                if 'date_from' in filters:
-                    conditions.append(Schedule.date >= filters['date_from'])
-                
-                if 'date_to' in filters:
-                    conditions.append(Schedule.date <= filters['date_to'])
-                
-                if 'is_confirmed' in filters:
-                    conditions.append(Schedule.is_confirmed == filters['is_confirmed'])
-                
-                if conditions:
-                    stmt = stmt.where(and_(*conditions))
-            
-            result = await self.session.execute(stmt)
-            count = result.scalar()
-            
-            self._logger.debug(f"Contados {count} horarios")
-            
-            return count or 0
-            
-        except SQLAlchemyError as e:
-            self._logger.error(f"Error de base de datos al contar horarios: {e}")
-            raise convert_sqlalchemy_error(
-                error=e,
-                operation="count_schedules",
-                entity_type="Schedule",
-                entity_id=None
-            )
-        except Exception as e:
-            self._logger.error(f"Error inesperado al contar horarios: {e}")
-            raise ScheduleRepositoryError(
-                message=f"Error inesperado al contar horarios: {e}",
-                operation="count_schedules",
-                entity_type="Schedule",
-                entity_id=None,
-                original_error=e
-            )
+        self._logger.debug(f"Contando horarios con filtros: {filters}")
+        return await self.count(filters or {})
