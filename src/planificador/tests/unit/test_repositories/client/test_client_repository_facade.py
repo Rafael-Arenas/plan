@@ -505,7 +505,7 @@ async def test_get_comprehensive_dashboard_metrics_success(
 ):
     """Test that get_comprehensive_dashboard_metrics delegates to _statistics_operations."""
     client_facade._statistics_operations.get_comprehensive_dashboard_metrics = MagicMock()
-    client_facade.get_comprehensive_dashboard_metrics()
+    await client_facade.get_comprehensive_dashboard_metrics()
     client_facade._statistics_operations.get_comprehensive_dashboard_metrics.assert_called_once()
 
 
@@ -685,3 +685,25 @@ async def test_get_module_info_delegation(
     """
     await client_facade.get_module_info()
     mock_health_operations.get_module_info.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_validate_field_lengths_success(client_facade: ClientRepositoryFacade):
+    """Test that validate_field_lengths delegates to _validation_operations."""
+    client_data = {"name": "Test Client", "address": "123 Test Street"}
+    client_facade._validation_operations.validate_field_lengths = MagicMock()
+    client_facade.validate_field_lengths(client_data)
+    client_facade._validation_operations.validate_field_lengths.assert_called_once_with(
+        client_data
+    )
+
+
+@pytest.mark.asyncio
+async def test_validate_code_format_success(client_facade: ClientRepositoryFacade):
+    """Test that validate_code_format delegates to _validation_operations."""
+    code = "TC-001"
+    client_facade._validation_operations.validate_code_format = MagicMock()
+    client_facade.validate_code_format(code)
+    client_facade._validation_operations.validate_code_format.assert_called_once_with(
+        code
+    )
