@@ -242,7 +242,7 @@ class ClientRepositoryFacade:
     async def get_clients_by_project_count(self, limit: int = 10) -> list[dict[str, Any]]:
         return await self._statistics_operations.get_clients_by_project_count(limit)
 
-    def get_comprehensive_dashboard_metrics(self) -> dict[str, Any]:
+    async def get_comprehensive_dashboard_metrics(self) -> dict[str, Any]:
         return self._statistics_operations.get_comprehensive_dashboard_metrics()
 
     # --- Validation Operations ---
