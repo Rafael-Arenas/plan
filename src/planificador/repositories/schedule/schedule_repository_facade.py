@@ -28,12 +28,14 @@ Uso:
     ```
 """
 
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Tuple
 from datetime import date, time
 from sqlalchemy.ext.asyncio import AsyncSession
 from loguru import logger
 
 from planificador.models.schedule import Schedule
+from planificador.models.employee import Employee
+from planificador.models.project import Project
 from planificador.repositories.schedule.interfaces import (
     IScheduleCrudOperations,
     IScheduleQueryOperations,
@@ -48,7 +50,7 @@ from planificador.repositories.schedule.modules import (
     ScheduleRelationshipModule,
     ScheduleStatisticsModule
 )
-from planificador.exceptions.repository_exceptions import ScheduleRepositoryError
+from planificador.exceptions.repository import ScheduleRepositoryError
 
 
 class ScheduleRepositoryFacade(
@@ -461,6 +463,10 @@ class ScheduleRepositoryFacade(
     async def validate_schedule_id(self, schedule_id: int) -> bool:
         # Valida que un ID de horario sea válido y exista
         return await self.validation_module.validate_schedule_id(schedule_id)
+
+    async def validate_employee_id(self, employee_id: int) -> bool:
+        # Valida que un ID de empleado sea válido y exista
+        return await self.validation_module.validate_employee_id(employee_id)
 
     async def validate_date_range(
         self,
