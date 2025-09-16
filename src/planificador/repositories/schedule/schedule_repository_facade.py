@@ -497,15 +497,7 @@ class ScheduleRepositoryFacade(
             employee_id, schedule_date, start_time, end_time, exclude_schedule_id
         )
 
-    async def validate_project_assignment(
-        self,
-        employee_id: int,
-        project_id: int
-    ) -> bool:
-        # Valida que un empleado esté asignado a un proyecto
-        return await self.validation_module.validate_project_assignment(
-            employee_id, project_id
-        )
+
 
     async def validate_team_membership(
         self,
