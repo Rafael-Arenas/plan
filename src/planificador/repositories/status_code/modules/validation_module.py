@@ -360,3 +360,277 @@ class StatusCodeValidationModule(BaseRepository[StatusCode], IStatusCodeValidati
                 entity_type=self.model_class.__name__,
                 original_error=e
             )
+
+    # ==========================================
+    # IMPLEMENTACIÓN DE MÉTODOS ABSTRACTOS DE LA INTERFAZ
+    # ==========================================
+
+    async def validate_code_uniqueness(
+        self, 
+        code: str, 
+        exclude_id: Optional[int] = None
+    ) -> bool:
+        """
+        Valida que un código sea único en el sistema.
+        
+        Args:
+            code: Código a validar
+            exclude_id: ID a excluir de la validación (para actualizaciones)
+            
+        Returns:
+            bool: True si el código es único, False si ya existe
+            
+        Raises:
+            RepositoryError: Si ocurre un error en la base de datos
+        """
+        try:
+            query = select(StatusCode).where(StatusCode.code == code)
+            
+            if exclude_id is not None:
+                query = query.where(StatusCode.id != exclude_id)
+            
+            result = await self.session.execute(query)
+            existing_code = result.scalar_one_or_none()
+            
+            is_unique = existing_code is None
+            
+            self._logger.info(
+                f"Validación de unicidad de código: {code}, "
+                f"único: {is_unique}, excluir_id: {exclude_id}"
+            )
+            
+            return is_unique
+            
+        except SQLAlchemyError as e:
+            self._logger.error(f"Error validando unicidad de código {code}: {e}")
+            raise convert_sqlalchemy_error(
+                error=e,
+                operation="validate_code_uniqueness",
+                entity_type=self.model_class.__name__,
+                entity_id=exclude_id
+            )
+        except Exception as e:
+            self._logger.error(f"Error inesperado validando unicidad de código {code}: {e}")
+            raise StatusCodeRepositoryError(
+                message=f"Error inesperado validando unicidad de código: {e}",
+                operation="validate_code_uniqueness",
+                entity_type=self.model_class.__name__,
+                entity_id=exclude_id,
+                original_error=e
+            )
+
+    async def validate_sort_order_uniqueness(
+        self, 
+        sort_order: int, 
+        exclude_id: Optional[int] = None
+    ) -> bool:
+        """
+        Valida que un orden de clasificación sea único.
+        
+        Args:
+            sort_order: Orden de clasificación a validar
+            exclude_id: ID a excluir de la validación (para actualizaciones)
+            
+        Returns:
+            bool: True si el orden es único, False si ya existe
+            
+        Raises:
+            RepositoryError: Si ocurre un error en la base de datos
+        """
+        try:
+            query = select(StatusCode).where(StatusCode.sort_order == sort_order)
+            
+            if exclude_id is not None:
+                query = query.where(StatusCode.id != exclude_id)
+            
+            result = await self.session.execute(query)
+            existing_order = result.scalar_one_or_none()
+            
+            is_unique = existing_order is None
+            
+            self._logger.info(
+                f"Validación de unicidad de orden: {sort_order}, "
+                f"único: {is_unique}, excluir_id: {exclude_id}"
+            )
+            
+            return is_unique
+            
+        except SQLAlchemyError as e:
+            self._logger.error(f"Error validando unicidad de orden {sort_order}: {e}")
+            raise convert_sqlalchemy_error(
+                error=e,
+                operation="validate_sort_order_uniqueness",
+                entity_type=self.model_class.__name__,
+                entity_id=exclude_id
+            )
+        except Exception as e:
+            self._logger.error(f"Error inesperado validando unicidad de orden {sort_order}: {e}")
+            raise StatusCodeRepositoryError(
+                message=f"Error inesperado validando unicidad de orden: {e}",
+                operation="validate_sort_order_uniqueness",
+                entity_type=self.model_class.__name__,
+                entity_id=exclude_id,
+                original_error=e
+            )
+
+    async def validate_status_code_can_be_deactivated(self, entity_id: int) -> bool:
+        """
+        Valida si un código de estado puede ser desactivado.
+        
+        Verifica que la desactivación no afecte registros activos
+        o procesos en curso.
+        
+        Args:
+            entity_id: ID del código de estado
+            
+        Returns:
+            bool: True si puede ser desactivado, False en caso contrario
+            
+        Raises:
+            RepositoryError: Si ocurre un error en la base de datos
+        """
+        try:
+            # Verificar que el código de estado existe
+            status_code = await self.get_by_id(entity_id)
+            if not status_code:
+                self._logger.warning(f"Código de estado {entity_id} no encontrado para validación de desactivación")
+                return False
+            
+            # Si ya está inactivo, no se puede desactivar
+            if not status_code.is_active:
+                self._logger.info(f"Código de estado {entity_id} ya está inactivo")
+                return False
+            
+            # TODO: Implementar validaciones específicas de negocio
+            # Por ejemplo, verificar si está siendo usado en horarios activos,
+            # cargas de trabajo en curso, etc.
+            
+            can_be_deactivated = True
+            
+            self._logger.info(
+                f"Validación de desactivación para código {entity_id}: {can_be_deactivated}"
+            )
+            
+            return can_be_deactivated
+            
+        except SQLAlchemyError as e:
+            self._logger.error(f"Error validando desactivación de código {entity_id}: {e}")
+            raise convert_sqlalchemy_error(
+                error=e,
+                operation="validate_status_code_can_be_deactivated",
+                entity_type=self.model_class.__name__,
+                entity_id=entity_id
+            )
+        except Exception as e:
+            self._logger.error(f"Error inesperado validando desactivación de código {entity_id}: {e}")
+            raise StatusCodeRepositoryError(
+                message=f"Error inesperado validando desactivación: {e}",
+                operation="validate_status_code_can_be_deactivated",
+                entity_type=self.model_class.__name__,
+                entity_id=entity_id,
+                original_error=e
+            )
+
+    async def validate_status_code_can_be_deleted(self, entity_id: int) -> bool:
+        """
+        Valida si un código de estado puede ser eliminado.
+        
+        Verifica que el código no esté siendo utilizado en horarios,
+        cargas de trabajo u otras entidades relacionadas.
+        
+        Args:
+            entity_id: ID del código de estado
+            
+        Returns:
+            bool: True si puede ser eliminado, False en caso contrario
+            
+        Raises:
+            RepositoryError: Si ocurre un error en la base de datos
+        """
+        try:
+            # Verificar que el código de estado existe
+            status_code = await self.get_by_id(entity_id)
+            if not status_code:
+                self._logger.warning(f"Código de estado {entity_id} no encontrado para validación de eliminación")
+                return False
+            
+            # TODO: Implementar validaciones específicas de negocio
+            # Por ejemplo, verificar si está siendo usado en:
+            # - Horarios de trabajo
+            # - Cargas de trabajo
+            # - Registros históricos importantes
+            # - Configuraciones del sistema
+            
+            can_be_deleted = True
+            
+            self._logger.info(
+                f"Validación de eliminación para código {entity_id}: {can_be_deleted}"
+            )
+            
+            return can_be_deleted
+            
+        except SQLAlchemyError as e:
+            self._logger.error(f"Error validando eliminación de código {entity_id}: {e}")
+            raise convert_sqlalchemy_error(
+                error=e,
+                operation="validate_status_code_can_be_deleted",
+                entity_type=self.model_class.__name__,
+                entity_id=entity_id
+            )
+        except Exception as e:
+            self._logger.error(f"Error inesperado validando eliminación de código {entity_id}: {e}")
+            raise StatusCodeRepositoryError(
+                message=f"Error inesperado validando eliminación: {e}",
+                operation="validate_status_code_can_be_deleted",
+                entity_type=self.model_class.__name__,
+                entity_id=entity_id,
+                original_error=e
+            )
+
+    async def get_by_unique_field(self, field_name: str, value: Any) -> Optional[StatusCode]:
+        """
+        Obtiene una entidad por un campo único específico.
+        
+        Args:
+            field_name: Nombre del campo único
+            value: Valor a buscar
+            
+        Returns:
+            Optional[StatusCode]: La entidad encontrada o None
+            
+        Raises:
+            RepositoryError: Si ocurre un error en la base de datos
+        """
+        try:
+            # Validar que el campo existe en el modelo
+            if not hasattr(StatusCode, field_name):
+                raise ValueError(f"Campo '{field_name}' no existe en el modelo StatusCode")
+            
+            field = getattr(StatusCode, field_name)
+            query = select(StatusCode).where(field == value)
+            
+            result = await self.session.execute(query)
+            entity = result.scalar_one_or_none()
+            
+            self._logger.debug(
+                f"Búsqueda por campo único {field_name}={value}: "
+                f"{'encontrado' if entity else 'no encontrado'}"
+            )
+            
+            return entity
+            
+        except SQLAlchemyError as e:
+            self._logger.error(f"Error buscando por campo {field_name}={value}: {e}")
+            raise convert_sqlalchemy_error(
+                error=e,
+                operation="get_by_unique_field",
+                entity_type=self.model_class.__name__
+            )
+        except Exception as e:
+            self._logger.error(f"Error inesperado buscando por campo {field_name}={value}: {e}")
+            raise StatusCodeRepositoryError(
+                message=f"Error inesperado en búsqueda por campo único: {e}",
+                operation="get_by_unique_field",
+                entity_type=self.model_class.__name__,
+                original_error=e
+            )

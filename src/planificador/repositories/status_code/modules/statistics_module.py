@@ -489,3 +489,326 @@ class StatusCodeStatisticsModule(BaseRepository[StatusCode], IStatusCodeStatisti
         health_score = max(0.0, base_score - total_penalty)
         
         return round(health_score, 2)
+
+    async def get_by_unique_field(self, field_name: str, value: Any) -> Optional[StatusCode]:
+        """
+        Busca una entidad por un campo único específico.
+        
+        Args:
+            field_name: Nombre del campo único por el cual buscar
+            value: Valor a buscar en el campo especificado
+            
+        Returns:
+            Optional[StatusCode]: La entidad encontrada o None si no existe
+            
+        Raises:
+            StatusCodeRepositoryError: Si ocurre un error durante la consulta
+            ValueError: Si el campo especificado no es válido
+        """
+        try:
+            self._logger.debug(f"Buscando StatusCode por campo único: {field_name}={value}")
+            
+            # Validar que el campo existe en el modelo
+            if not hasattr(StatusCode, field_name):
+                raise ValueError(f"El campo '{field_name}' no existe en el modelo StatusCode")
+            
+            # Construir la consulta dinámicamente
+            field_attr = getattr(StatusCode, field_name)
+            stmt = select(StatusCode).where(field_attr == value)
+            
+            result = await self.session.execute(stmt)
+            entity = result.scalar_one_or_none()
+            
+            if entity:
+                self._logger.debug(f"StatusCode encontrado: {entity.id}")
+            else:
+                self._logger.debug(f"No se encontró StatusCode con {field_name}={value}")
+                
+            return entity
+            
+        except ValueError:
+            # Re-lanzar errores de validación sin modificar
+            raise
+        except SQLAlchemyError as e:
+            self._logger.error(f"Error SQLAlchemy al buscar por {field_name}: {e}")
+            raise convert_sqlalchemy_error(
+                error=e,
+                operation="get_by_unique_field",
+                entity_type=self.model_class.__name__
+            )
+        except Exception as e:
+            self._logger.error(f"Error inesperado al buscar por {field_name}: {e}")
+            raise StatusCodeRepositoryError(
+                message=f"Error inesperado al buscar por {field_name}: {e}",
+                operation="get_by_unique_field",
+                entity_type=self.model_class.__name__,
+                original_error=e
+            )
+
+    async def get_usage_statistics(self) -> Dict[str, Any]:
+        """
+        Obtiene estadísticas de uso de los códigos de estado.
+        
+        Incluye métricas como:
+        - Total de códigos de estado
+        - Distribución por características (activos, facturables, productivos)
+        - Códigos más utilizados
+        - Códigos menos utilizados
+        - Estadísticas de aprobación
+        
+        Returns:
+            Dict[str, Any]: Diccionario con estadísticas de uso
+            
+        Raises:
+            StatusCodeRepositoryError: Si ocurre un error en la base de datos
+        """
+        try:
+            self._logger.debug("Obteniendo estadísticas de uso de códigos de estado")
+            
+            # Estadísticas básicas
+            total_count = await self.get_total_count()
+            active_count = await self.get_active_count()
+            
+            # Conteos por características
+            stmt_billable = select(func.count(StatusCode.id)).where(
+                and_(StatusCode.is_active == True, StatusCode.is_billable == True)
+            )
+            billable_result = await self.session.execute(stmt_billable)
+            billable_count = billable_result.scalar() or 0
+            
+            stmt_productive = select(func.count(StatusCode.id)).where(
+                and_(StatusCode.is_active == True, StatusCode.is_productive == True)
+            )
+            productive_result = await self.session.execute(stmt_productive)
+            productive_count = productive_result.scalar() or 0
+            
+            stmt_approval = select(func.count(StatusCode.id)).where(
+                and_(StatusCode.is_active == True, StatusCode.requires_approval == True)
+            )
+            approval_result = await self.session.execute(stmt_approval)
+            approval_count = approval_result.scalar() or 0
+            
+            statistics = {
+                "total_codes": total_count,
+                "active_codes": active_count,
+                "inactive_codes": total_count - active_count,
+                "billable_codes": billable_count,
+                "productive_codes": productive_count,
+                "approval_required_codes": approval_count,
+                "usage_percentage": {
+                    "active": round((active_count / total_count * 100) if total_count > 0 else 0, 2),
+                    "billable": round((billable_count / active_count * 100) if active_count > 0 else 0, 2),
+                    "productive": round((productive_count / active_count * 100) if active_count > 0 else 0, 2),
+                    "approval_required": round((approval_count / active_count * 100) if active_count > 0 else 0, 2)
+                }
+            }
+            
+            self._logger.debug(f"Estadísticas de uso obtenidas: {statistics}")
+            return statistics
+            
+        except SQLAlchemyError as e:
+            self._logger.error(f"Error SQLAlchemy al obtener estadísticas de uso: {e}")
+            raise convert_sqlalchemy_error(
+                error=e,
+                operation="get_usage_statistics",
+                entity_type=self.model_class.__name__
+            )
+        except Exception as e:
+            self._logger.error(f"Error inesperado al obtener estadísticas de uso: {e}")
+            raise StatusCodeRepositoryError(
+                message=f"Error inesperado al obtener estadísticas de uso: {e}",
+                operation="get_usage_statistics",
+                entity_type=self.model_class.__name__,
+                original_error=e
+            )
+
+    async def get_distribution_by_characteristics(self) -> Dict[str, Any]:
+        """
+        Obtiene la distribución de códigos por características.
+        
+        Analiza la distribución de códigos según:
+        - Estado activo/inactivo
+        - Códigos facturables vs no facturables
+        - Códigos productivos vs no productivos
+        - Códigos que requieren aprobación
+        
+        Returns:
+            Dict[str, Any]: Diccionario con análisis de distribución
+            
+        Raises:
+            StatusCodeRepositoryError: Si ocurre un error en la base de datos
+        """
+        try:
+            self._logger.debug("Obteniendo distribución por características")
+            
+            # Distribución por estado activo
+            stmt_active = select(
+                StatusCode.is_active,
+                func.count(StatusCode.id).label('count')
+            ).group_by(StatusCode.is_active)
+            
+            active_result = await self.session.execute(stmt_active)
+            active_distribution = {
+                row.is_active: row.count for row in active_result.fetchall()
+            }
+            
+            # Distribución por facturación (solo activos)
+            stmt_billable = select(
+                StatusCode.is_billable,
+                func.count(StatusCode.id).label('count')
+            ).where(StatusCode.is_active == True).group_by(StatusCode.is_billable)
+            
+            billable_result = await self.session.execute(stmt_billable)
+            billable_distribution = {
+                row.is_billable: row.count for row in billable_result.fetchall()
+            }
+            
+            # Distribución por productividad (solo activos)
+            stmt_productive = select(
+                StatusCode.is_productive,
+                func.count(StatusCode.id).label('count')
+            ).where(StatusCode.is_active == True).group_by(StatusCode.is_productive)
+            
+            productive_result = await self.session.execute(stmt_productive)
+            productive_distribution = {
+                row.is_productive: row.count for row in productive_result.fetchall()
+            }
+            
+            # Distribución por aprobación (solo activos)
+            stmt_approval = select(
+                StatusCode.requires_approval,
+                func.count(StatusCode.id).label('count')
+            ).where(StatusCode.is_active == True).group_by(StatusCode.requires_approval)
+            
+            approval_result = await self.session.execute(stmt_approval)
+            approval_distribution = {
+                row.requires_approval: row.count for row in approval_result.fetchall()
+            }
+            
+            distribution = {
+                "by_active_status": {
+                    "active": active_distribution.get(True, 0),
+                    "inactive": active_distribution.get(False, 0)
+                },
+                "by_billing": {
+                    "billable": billable_distribution.get(True, 0),
+                    "non_billable": billable_distribution.get(False, 0)
+                },
+                "by_productivity": {
+                    "productive": productive_distribution.get(True, 0),
+                    "non_productive": productive_distribution.get(False, 0)
+                },
+                "by_approval": {
+                    "requires_approval": approval_distribution.get(True, 0),
+                    "no_approval_required": approval_distribution.get(False, 0)
+                }
+            }
+            
+            self._logger.debug(f"Distribución por características obtenida: {distribution}")
+            return distribution
+            
+        except SQLAlchemyError as e:
+            self._logger.error(f"Error SQLAlchemy al obtener distribución: {e}")
+            raise convert_sqlalchemy_error(
+                error=e,
+                operation="get_distribution_by_characteristics",
+                entity_type=self.model_class.__name__
+            )
+        except Exception as e:
+            self._logger.error(f"Error inesperado al obtener distribución: {e}")
+            raise StatusCodeRepositoryError(
+                message=f"Error inesperado al obtener distribución: {e}",
+                operation="get_distribution_by_characteristics",
+                entity_type=self.model_class.__name__,
+                original_error=e
+            )
+
+    async def get_sort_order_analysis(self) -> Dict[str, Any]:
+        """
+        Obtiene análisis del ordenamiento de códigos.
+        
+        Incluye:
+        - Rango de valores de sort_order
+        - Gaps en la secuencia de ordenamiento
+        - Códigos duplicados en sort_order
+        - Sugerencias de reorganización
+        
+        Returns:
+            Dict[str, Any]: Diccionario con análisis de ordenamiento
+            
+        Raises:
+            StatusCodeRepositoryError: Si ocurre un error en la base de datos
+        """
+        try:
+            self._logger.debug("Obteniendo análisis de ordenamiento")
+            
+            # Obtener estadísticas básicas de sort_order
+            stmt_stats = select(
+                func.min(StatusCode.sort_order).label('min_order'),
+                func.max(StatusCode.sort_order).label('max_order'),
+                func.count(StatusCode.id).label('total_count'),
+                func.count(func.distinct(StatusCode.sort_order)).label('unique_orders')
+            ).where(StatusCode.is_active == True)
+            
+            stats_result = await self.session.execute(stmt_stats)
+            stats = stats_result.fetchone()
+            
+            # Detectar duplicados en sort_order
+            stmt_duplicates = select(
+                StatusCode.sort_order,
+                func.count(StatusCode.id).label('count')
+            ).where(StatusCode.is_active == True).group_by(
+                StatusCode.sort_order
+            ).having(func.count(StatusCode.id) > 1)
+            
+            duplicates_result = await self.session.execute(stmt_duplicates)
+            duplicates = [
+                {"sort_order": row.sort_order, "count": row.count}
+                for row in duplicates_result.fetchall()
+            ]
+            
+            # Calcular gaps en la secuencia
+            if stats.min_order is not None and stats.max_order is not None:
+                expected_count = stats.max_order - stats.min_order + 1
+                gaps_count = expected_count - stats.unique_orders
+            else:
+                gaps_count = 0
+            
+            analysis = {
+                "range": {
+                    "min_order": stats.min_order,
+                    "max_order": stats.max_order,
+                    "range_size": (stats.max_order - stats.min_order + 1) if stats.min_order is not None else 0
+                },
+                "counts": {
+                    "total_codes": stats.total_count,
+                    "unique_orders": stats.unique_orders,
+                    "duplicates": len(duplicates),
+                    "gaps": gaps_count
+                },
+                "duplicated_orders": duplicates,
+                "health_score": {
+                    "has_duplicates": len(duplicates) > 0,
+                    "has_gaps": gaps_count > 0,
+                    "needs_reorganization": len(duplicates) > 0 or gaps_count > 0
+                }
+            }
+            
+            self._logger.debug(f"Análisis de ordenamiento obtenido: {analysis}")
+            return analysis
+            
+        except SQLAlchemyError as e:
+            self._logger.error(f"Error SQLAlchemy al obtener análisis de ordenamiento: {e}")
+            raise convert_sqlalchemy_error(
+                error=e,
+                operation="get_sort_order_analysis",
+                entity_type=self.model_class.__name__
+            )
+        except Exception as e:
+            self._logger.error(f"Error inesperado al obtener análisis de ordenamiento: {e}")
+            raise StatusCodeRepositoryError(
+                message=f"Error inesperado al obtener análisis de ordenamiento: {e}",
+                operation="get_sort_order_analysis",
+                entity_type=self.model_class.__name__,
+                original_error=e
+            )

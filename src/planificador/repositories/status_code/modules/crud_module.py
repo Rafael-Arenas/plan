@@ -283,3 +283,174 @@ class StatusCodeCrudModule(BaseRepository[StatusCode], IStatusCodeCrudOperations
                 entity_id=status_code_id,
                 original_error=e
             )
+
+    async def exists(self, entity_id: int) -> bool:
+        """
+        Verifica si existe un código de estado por ID.
+        
+        Args:
+            entity_id: ID del código de estado
+            
+        Returns:
+            bool: True si existe, False en caso contrario
+            
+        Raises:
+            StatusCodeRepositoryError: Si ocurre un error en la base de datos
+        """
+        try:
+            result = await self.session.execute(
+                select(StatusCode.id).where(StatusCode.id == entity_id)
+            )
+            return result.scalar() is not None
+            
+        except SQLAlchemyError as e:
+            self._logger.error(f"Error verificando existencia de StatusCode ID {entity_id}: {e}")
+            raise convert_sqlalchemy_error(
+                error=e,
+                operation="exists",
+                entity_type="StatusCode",
+                entity_id=entity_id
+            )
+        except Exception as e:
+            self._logger.error(f"Error inesperado verificando existencia: {e}")
+            raise StatusCodeRepositoryError(
+                message=f"Error inesperado verificando existencia: {e}",
+                operation="exists",
+                entity_type="StatusCode",
+                entity_id=entity_id,
+                original_error=e
+            )
+
+    async def get_by_unique_field(self, field_name: str, value: Any) -> Optional[StatusCode]:
+        """
+        Obtiene un código de estado por un campo único específico.
+        
+        Args:
+            field_name: Nombre del campo único (code, name, etc.)
+            value: Valor a buscar
+            
+        Returns:
+            Optional[StatusCode]: El código de estado encontrado o None
+            
+        Raises:
+            StatusCodeRepositoryError: Si ocurre un error en la base de datos
+        """
+        try:
+            # Validar que el campo existe en el modelo
+            if not hasattr(StatusCode, field_name):
+                raise ValueError(f"Campo '{field_name}' no existe en StatusCode")
+            
+            field = getattr(StatusCode, field_name)
+            result = await self.session.execute(
+                select(StatusCode).where(field == value)
+            )
+            return result.scalar_one_or_none()
+            
+        except ValueError as e:
+            self._logger.error(f"Campo inválido en get_by_unique_field: {e}")
+            raise StatusCodeRepositoryError(
+                message=f"Campo inválido: {e}",
+                operation="get_by_unique_field",
+                entity_type="StatusCode",
+                original_error=e
+            )
+        except SQLAlchemyError as e:
+            self._logger.error(f"Error obteniendo StatusCode por {field_name}={value}: {e}")
+            raise convert_sqlalchemy_error(
+                error=e,
+                operation="get_by_unique_field",
+                entity_type="StatusCode"
+            )
+        except Exception as e:
+            self._logger.error(f"Error inesperado en get_by_unique_field: {e}")
+            raise StatusCodeRepositoryError(
+                message=f"Error inesperado: {e}",
+                operation="get_by_unique_field",
+                entity_type="StatusCode",
+                original_error=e
+            )
+
+    # ==========================================
+    # IMPLEMENTACIÓN DE MÉTODOS DE INTERFAZ CRUD
+    # ==========================================
+
+    async def create(self, entity_data: Dict[str, Any]) -> StatusCode:
+        """
+        Crea un nuevo código de estado.
+        
+        Args:
+            entity_data: Diccionario con los datos del código de estado
+            
+        Returns:
+            StatusCode: El código de estado creado
+            
+        Raises:
+            StatusCodeRepositoryError: Si ocurre un error durante la creación
+        """
+        return await self.create_status_code(entity_data)
+
+    async def update(self, entity_id: int, **update_data) -> StatusCode:
+        """
+        Actualiza un código de estado existente.
+        
+        Args:
+            entity_id: ID del código de estado a actualizar
+            **update_data: Datos a actualizar
+            
+        Returns:
+            StatusCode: El código de estado actualizado
+            
+        Raises:
+            StatusCodeRepositoryError: Si ocurre un error durante la actualización
+        """
+        result = await self.update_status_code(entity_id, update_data)
+        if result is None:
+            raise StatusCodeRepositoryError(
+                message=f"No se encontró código de estado con ID: {entity_id}",
+                operation="update",
+                entity_type="StatusCode",
+                entity_id=entity_id
+            )
+        return result
+
+    async def get_by_id(self, entity_id: int) -> Optional[StatusCode]:
+        """
+        Obtiene un código de estado por su ID.
+        
+        Args:
+            entity_id: ID del código de estado
+            
+        Returns:
+            Optional[StatusCode]: El código de estado o None si no existe
+            
+        Raises:
+            StatusCodeRepositoryError: Si ocurre un error durante la consulta
+        """
+        return await self.get_status_code_by_id(entity_id)
+
+    async def delete(self, entity_id: int) -> bool:
+        """
+        Elimina un código de estado.
+        
+        Args:
+            entity_id: ID del código de estado a eliminar
+            
+        Returns:
+            bool: True si se eliminó correctamente, False si no existía
+            
+        Raises:
+            StatusCodeRepositoryError: Si ocurre un error durante la eliminación
+        """
+        return await self.delete_status_code(entity_id)
+
+    async def get_all(self) -> List[StatusCode]:
+        """
+        Obtiene todos los códigos de estado.
+        
+        Returns:
+            List[StatusCode]: Lista de todos los códigos de estado
+            
+        Raises:
+            StatusCodeRepositoryError: Si ocurre un error durante la consulta
+        """
+        return await self.get_all_status_codes()
