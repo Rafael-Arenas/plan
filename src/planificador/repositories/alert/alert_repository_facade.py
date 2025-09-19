@@ -12,9 +12,9 @@ from .modules.query_operations import QueryOperations
 from .modules.statistics_operations import StatisticsOperations
 from .modules.state_manager import StateManager
 from .modules.validation_operations import ValidationOperations
-from ...models.alert import Alert, AlertType, AlertStatus
-from ...schemas.alert.alert import AlertCreate, AlertUpdate, AlertSearchFilter
-from ...exceptions.repository_exceptions import RepositoryError
+from planificador.models.alert import Alert, AlertType, AlertStatus
+from planificador.schemas.alert.alert import AlertCreate, AlertUpdate, AlertSearchFilter
+from planificador.exceptions import RepositoryError
 
 
 class AlertRepositoryFacade(IAlertRepository):
@@ -48,9 +48,14 @@ class AlertRepositoryFacade(IAlertRepository):
     # OPERACIONES CRUD
     # ==========================================
 
-    async def create_alert(self, alert_data: AlertCreate) -> Alert:
-        """Crea una nueva alerta."""
-        return await self._crud_operations.create_alert(alert_data)
+    async def create_alert(self, alert_data: Dict[str, Any]) -> Alert:
+        """Crea una nueva alerta con validaciones completas."""
+        # Convertir dict a AlertCreate si es necesario
+        if isinstance(alert_data, dict):
+            alert_create = AlertCreate(**alert_data)
+        else:
+            alert_create = alert_data
+        return await self._crud_operations.create_alert(alert_create)
 
     async def get_by_id(self, alert_id: int) -> Optional[Alert]:
         """Obtiene una alerta por su ID."""
@@ -60,64 +65,76 @@ class AlertRepositoryFacade(IAlertRepository):
         """Obtiene una alerta por un campo único."""
         return await self._crud_operations.get_by_unique_field(field_name, field_value)
 
-    async def update_alert(self, alert_id: int, alert_data: AlertUpdate) -> Alert:
-        """Actualiza una alerta existente."""
-        return await self._crud_operations.update_alert(alert_id, alert_data)
+    async def update_alert(self, alert_id: int, update_data: Dict[str, Any]) -> Alert:
+        """Actualiza una alerta existente con validaciones."""
+        # Convertir dict a AlertUpdate si es necesario
+        if isinstance(update_data, dict):
+            alert_update = AlertUpdate(**update_data)
+        else:
+            alert_update = update_data
+        return await self._crud_operations.update_alert(alert_id, alert_update)
 
     async def delete_alert(self, alert_id: int) -> bool:
-        """Elimina una alerta."""
+        """Elimina una alerta del sistema."""
         return await self._crud_operations.delete_alert(alert_id)
 
-    async def bulk_create_alerts(self, alerts_data: List[AlertCreate]) -> List[Alert]:
-        """Crea múltiples alertas en lote."""
-        return await self._crud_operations.bulk_create_alerts(alerts_data)
+    async def bulk_create_alerts(self, alerts_data: List[Dict[str, Any]]) -> List[Alert]:
+        """Crea múltiples alertas en lote con validaciones."""
+        # Convertir dicts a AlertCreate
+        alert_creates = []
+        for alert_data in alerts_data:
+            if isinstance(alert_data, dict):
+                alert_creates.append(AlertCreate(**alert_data))
+            else:
+                alert_creates.append(alert_data)
+        return await self._crud_operations.bulk_create_alerts(alert_creates)
 
     # ==========================================
     # OPERACIONES DE CONSULTA
     # ==========================================
 
     async def find_by_type(self, alert_type: AlertType) -> List[Alert]:
-        """Busca alertas por tipo."""
+        """Obtiene alertas por tipo específico."""
         return await self._query_operations.find_by_type(alert_type)
 
     async def find_by_status(self, status: AlertStatus) -> List[Alert]:
-        """Busca alertas por estado."""
+        """Obtiene alertas por estado específico."""
         return await self._query_operations.find_by_status(status)
 
     async def get_active_alerts(self) -> List[Alert]:
-        """Obtiene todas las alertas activas."""
+        """Obtiene todas las alertas activas (NEW y READ)."""
         return await self._query_operations.get_active_alerts()
 
     async def get_critical_alerts(self) -> List[Alert]:
-        """Obtiene todas las alertas críticas."""
+        """Obtiene alertas críticas activas."""
         return await self._query_operations.get_critical_alerts()
 
     async def get_unread_alerts(self) -> List[Alert]:
-        """Obtiene todas las alertas no leídas."""
+        """Obtiene alertas no leídas (estado NEW)."""
         return await self._query_operations.get_unread_alerts()
 
     async def get_alerts_with_relations(self) -> List[Alert]:
-        """Obtiene alertas con sus relaciones cargadas."""
+        """Obtiene todas las alertas con sus relaciones cargadas."""
         return await self._query_operations.get_alerts_with_relations()
 
     async def get_with_relations(self, alert_id: int) -> Optional[Alert]:
-        """Obtiene una alerta con sus relaciones cargadas."""
+        """Obtiene alerta específica con todas sus relaciones cargadas."""
         return await self._query_operations.get_with_relations(alert_id)
 
     async def find_by_employee(self, employee_id: int) -> List[Alert]:
-        """Busca alertas por empleado."""
+        """Obtiene alertas asociadas a un empleado específico."""
         return await self._query_operations.find_by_employee(employee_id)
 
     async def find_by_project(self, project_id: int) -> List[Alert]:
-        """Busca alertas por proyecto."""
+        """Obtiene alertas asociadas a un proyecto específico."""
         return await self._query_operations.find_by_project(project_id)
 
     async def find_by_date_range(self, start_date: datetime, end_date: datetime) -> List[Alert]:
-        """Busca alertas en un rango de fechas."""
+        """Obtiene alertas en un rango de fechas."""
         return await self._query_operations.find_by_date_range(start_date, end_date)
 
     async def get_old_resolved_alerts(self, days_old: int = 30) -> List[Alert]:
-        """Obtiene alertas resueltas antiguas."""
+        """Obtiene alertas resueltas antiguas para limpieza."""
         return await self._query_operations.get_old_resolved_alerts(days_old)
 
     async def get_current_week_alerts(self) -> List[Alert]:
@@ -128,16 +145,159 @@ class AlertRepositoryFacade(IAlertRepository):
         """Obtiene alertas del mes actual."""
         return await self._query_operations.get_current_month_alerts()
 
-    async def get_all_with_filters(self, filters: AlertSearchFilter) -> List[Alert]:
-        """Obtiene alertas aplicando filtros."""
-        return await self._query_operations.get_all_with_filters(filters)
+    async def get_all_with_filters(self, filters: Dict[str, Any]) -> List[Alert]:
+        """Obtiene alertas con filtros dinámicos."""
+        # Convertir dict a AlertSearchFilter si es necesario
+        if isinstance(filters, dict):
+            search_filter = AlertSearchFilter(**filters)
+        else:
+            search_filter = filters
+        return await self._query_operations.get_all_with_filters(search_filter)
 
     async def count_alerts_by_date_range(self, start_date: datetime, end_date: datetime) -> int:
         """Cuenta alertas en un rango de fechas."""
         return await self._query_operations.count_alerts_by_date_range(start_date, end_date)
 
     # ==========================================
-    # OPERACIONES ESTADÍSTICAS
+    # GESTIÓN DE ESTADOS DE ALERTAS
+    # ==========================================
+
+    async def acknowledge_alert(self, alert_id: int, acknowledged_by: str) -> Alert:
+        """Marca una alerta como reconocida (READ)."""
+        return await self._state_manager.acknowledge_alert(alert_id, acknowledged_by)
+
+    async def resolve_alert(
+        self, 
+        alert_id: int, 
+        resolved_by: str, 
+        resolution_notes: Optional[str] = None
+    ) -> Alert:
+        """Marca una alerta como resuelta."""
+        return await self._state_manager.resolve_alert(alert_id, resolved_by, resolution_notes)
+
+    async def dismiss_alert(
+        self, 
+        alert_id: int, 
+        dismissed_by: str, 
+        dismissal_reason: Optional[str] = None
+    ) -> Alert:
+        """Descarta una alerta (IGNORED)."""
+        return await self._state_manager.dismiss_alert(alert_id, dismissed_by, dismissal_reason)
+
+    async def bulk_acknowledge_alerts(
+        self, 
+        alert_ids: List[int], 
+        acknowledged_by: str
+    ) -> List[Alert]:
+        """Reconoce múltiples alertas en lote."""
+        return await self._state_manager.bulk_acknowledge_alerts(alert_ids, acknowledged_by)
+
+    async def bulk_resolve_alerts(
+        self, 
+        alert_ids: List[int], 
+        resolved_by: str, 
+        resolution_notes: Optional[str] = None
+    ) -> List[Alert]:
+        """Resuelve múltiples alertas en lote."""
+        return await self._state_manager.bulk_resolve_alerts(alert_ids, resolved_by, resolution_notes)
+
+    async def cleanup_old_alerts(self, days_old: int = 90) -> int:
+        """Limpia alertas antiguas resueltas o descartadas."""
+        return await self._state_manager.cleanup_old_alerts(days_old)
+
+    async def get_valid_state_transitions(self, current_status: AlertStatus) -> List[AlertStatus]:
+        """Obtiene transiciones de estado válidas."""
+        return await self._state_manager.get_valid_state_transitions(current_status)
+
+    async def can_transition_to_state(
+        self, 
+        current_status: AlertStatus, 
+        target_status: AlertStatus
+    ) -> bool:
+        """Verifica si se puede transicionar a un estado."""
+        return await self._state_manager.can_transition_to_state(current_status, target_status)
+
+    async def format_alert_created_at(
+        self, 
+        alert: Alert, 
+        format_str: str = 'YYYY-MM-DD HH:mm:ss'
+    ) -> str:
+        """Formatea la fecha de creación de una alerta."""
+        if alert.created_at:
+            # Convertir datetime a Pendulum si es necesario
+            if isinstance(alert.created_at, datetime):
+                dt = pendulum.instance(alert.created_at)
+            else:
+                dt = alert.created_at
+            return dt.format(format_str)
+        return ""
+
+    # ==========================================
+    # ESTADÍSTICAS Y MÉTRICAS
+    # ==========================================
+
+    async def get_alert_statistics(
+        self, 
+        start_date: Optional[datetime] = None, 
+        end_date: Optional[datetime] = None
+    ) -> Dict[str, Any]:
+        """Obtiene estadísticas generales de alertas."""
+        return await self._statistics_operations.get_alert_statistics(start_date, end_date)
+
+    async def get_alert_counts_by_status(self) -> Dict[str, int]:
+        """Obtiene conteo de alertas por estado."""
+        return await self._statistics_operations.get_alert_counts_by_status()
+
+    async def get_alert_counts_by_type(self) -> Dict[str, int]:
+        """Obtiene conteo de alertas por tipo."""
+        return await self._statistics_operations.get_alert_counts_by_type()
+
+    async def get_alert_trends(
+        self, 
+        days: int = 30, 
+        group_by: str = 'day'
+    ) -> List[Dict[str, Any]]:
+        """Obtiene tendencias de alertas en período específico."""
+        return await self._statistics_operations.get_alert_trends(days, group_by)
+
+    async def get_alert_response_time_stats(self) -> Dict[str, float]:
+        """Calcula estadísticas de tiempo de respuesta."""
+        return await self._statistics_operations.get_alert_response_time_stats()
+
+    async def get_alerts_by_employee_stats(self, limit: int = 10) -> List[Dict[str, Any]]:
+        """Obtiene estadísticas de alertas por empleado."""
+        return await self._statistics_operations.get_alerts_by_employee_stats(limit)
+
+    async def get_alerts_by_project_stats(self, limit: int = 10) -> List[Dict[str, Any]]:
+        """Obtiene estadísticas de alertas por proyecto."""
+        return await self._statistics_operations.get_alerts_by_project_stats(limit)
+
+    async def get_critical_alerts_summary(self) -> Dict[str, Any]:
+        """Obtiene resumen de alertas críticas."""
+        return await self._statistics_operations.get_critical_alerts_summary()
+
+    async def get_performance_metrics(self) -> Dict[str, Any]:
+        """Obtiene métricas de rendimiento del sistema de alertas."""
+        return await self._statistics_operations.get_performance_metrics()
+
+    # ==========================================
+    # VALIDACIONES
+    # ==========================================
+
+    async def validate_alert_data(self, alert_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Valida y normaliza datos de alerta."""
+        return await self._validation_operations.validate_alert_data(alert_data)
+
+    async def validate_bulk_data(self, alerts_data: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Valida datos de múltiples alertas."""
+        return await self._validation_operations.validate_bulk_data(alerts_data)
+
+    async def validate_update_data(self, update_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Valida datos para actualización de alerta."""
+        return await self._validation_operations.validate_update_data(update_data)
+
+    # ==========================================
+    # OPERACIONES ESTADÍSTICAS ADICIONALES
     # ==========================================
 
     async def count_total_alerts(self) -> int:
@@ -180,16 +340,12 @@ class AlertRepositoryFacade(IAlertRepository):
         """Obtiene estadísticas mensuales."""
         return await self._statistics_operations.get_monthly_statistics()
 
-    async def get_alert_trends(self, days: int = 30) -> Dict[str, Any]:
-        """Obtiene tendencias de alertas."""
-        return await self._statistics_operations.get_alert_trends(days)
-
     async def get_comprehensive_statistics(self) -> Dict[str, Any]:
         """Obtiene estadísticas comprehensivas."""
         return await self._statistics_operations.get_comprehensive_statistics()
 
     # ==========================================
-    # GESTIÓN DE ESTADOS
+    # GESTIÓN DE ESTADOS ADICIONALES
     # ==========================================
 
     async def mark_as_read(self, alert_id: int) -> Alert:
@@ -229,7 +385,7 @@ class AlertRepositoryFacade(IAlertRepository):
         return await self._state_manager.get_state_transition_summary()
 
     # ==========================================
-    # OPERACIONES DE VALIDACIÓN
+    # OPERACIONES DE VALIDACIÓN ADICIONALES
     # ==========================================
 
     async def validate_alert_exists(self, alert_id: int) -> bool:
@@ -243,10 +399,6 @@ class AlertRepositoryFacade(IAlertRepository):
     async def validate_project_exists(self, project_id: int) -> bool:
         """Valida que un proyecto existe."""
         return await self._validation_operations.validate_project_exists(project_id)
-
-    async def validate_alert_data(self, alert_data: Union[AlertCreate, AlertUpdate]) -> List[str]:
-        """Valida los datos de una alerta."""
-        return await self._validation_operations.validate_alert_data(alert_data)
 
     async def validate_alert_consistency(self, alert_id: int) -> List[str]:
         """Valida la consistencia de una alerta."""

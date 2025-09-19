@@ -8,12 +8,12 @@ from sqlalchemy.exc import SQLAlchemyError
 from loguru import logger
 import pendulum
 
-from ...models.alert import Alert, AlertType, AlertStatus
-from ...models.employee import Employee
-from ...models.project import Project
-from ..base_repository import BaseRepository
-from ...schemas.alert.alert import AlertCreate, AlertUpdate
-from ...exceptions.repository_exceptions import (
+from planificador.models.alert import Alert, AlertType, AlertStatus
+from planificador.models.employee import Employee
+from planificador.models.project import Project
+from planificador.repositories.base_repository import BaseRepository
+from planificador.schemas.alert.alert import AlertCreate, AlertUpdate
+from planificador.exceptions import (
     RepositoryError,
     ValidationError,
     convert_sqlalchemy_error
@@ -32,6 +32,48 @@ class ValidationOperations(BaseRepository[Alert]):
         """
         super().__init__(session, Alert)
         self._logger = logger.bind(component="AlertValidationOperations")
+
+    async def get_by_unique_field(self, field_name: str, field_value: Any) -> Optional[Alert]:
+        """
+        Obtiene una alerta por un campo único específico.
+        
+        Args:
+            field_name: Nombre del campo único
+            field_value: Valor del campo
+            
+        Returns:
+            Optional[Alert]: La alerta encontrada o None
+            
+        Raises:
+            RepositoryError: Si ocurre un error en la base de datos
+        """
+        try:
+            self._logger.debug(f"Buscando alerta por {field_name}={field_value}")
+            
+            result = await self.get_by_field(field_name, field_value)
+            
+            if result:
+                self._logger.debug(f"Alerta encontrada con {field_name}={field_value}")
+            else:
+                self._logger.debug(f"No se encontró alerta con {field_name}={field_value}")
+                
+            return result
+            
+        except SQLAlchemyError as e:
+            self._logger.error(f"Error de base de datos buscando por {field_name}: {e}")
+            raise convert_sqlalchemy_error(
+                error=e,
+                operation="get_by_unique_field",
+                entity_type="Alert"
+            )
+        except Exception as e:
+            self._logger.error(f"Error inesperado buscando por {field_name}: {e}")
+            raise RepositoryError(
+                message=f"Error inesperado buscando alerta: {e}",
+                operation="get_by_unique_field",
+                entity_type="Alert",
+                original_error=e
+            )
 
     # ==========================================
     # VALIDACIONES DE EXISTENCIA

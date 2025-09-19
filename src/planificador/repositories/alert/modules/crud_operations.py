@@ -5,12 +5,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import SQLAlchemyError
 from loguru import logger
 
-from ...models.alert import Alert, AlertType, AlertStatus
-from ...schemas.alert.alert import AlertCreate, AlertUpdate
-from ..base_repository import BaseRepository
-from ...exceptions.repository_exceptions import (
+from planificador.models.alert import Alert, AlertType, AlertStatus
+from planificador.schemas.alert.alert import AlertCreate, AlertUpdate
+from planificador.repositories.base_repository import BaseRepository
+from planificador.exceptions import (
     RepositoryError,
-    EntityNotFoundError,
+    NotFoundError,
     ValidationError,
     convert_sqlalchemy_error
 )
@@ -95,7 +95,7 @@ class CrudOperations(BaseRepository[Alert]):
             Alert: La alerta actualizada
             
         Raises:
-            EntityNotFoundError: Si la alerta no existe
+            NotFoundError: Si la alerta no existe
             ValidationError: Si los datos no son válidos
             RepositoryError: Si ocurre un error en la base de datos
         """
@@ -105,10 +105,10 @@ class CrudOperations(BaseRepository[Alert]):
             # Verificar que la alerta existe
             existing_alert = await self.get_by_id(alert_id)
             if not existing_alert:
-                raise EntityNotFoundError(
+                raise NotFoundError(
                     message=f"Alerta con ID {alert_id} no encontrada",
-                    entity_type="Alert",
-                    entity_id=alert_id
+                    resource_type="Alert",
+                    resource_id=alert_id
                 )
             
             # Validar datos de actualización usando el esquema Pydantic
@@ -121,7 +121,7 @@ class CrudOperations(BaseRepository[Alert]):
             self._logger.info(f"Alerta {alert_id} actualizada exitosamente")
             return result
             
-        except EntityNotFoundError:
+        except NotFoundError:
             raise
         except ValueError as e:
             self._logger.error(f"Error de validación al actualizar alerta {alert_id}: {e}")
@@ -163,7 +163,7 @@ class CrudOperations(BaseRepository[Alert]):
             bool: True si se eliminó exitosamente
             
         Raises:
-            EntityNotFoundError: Si la alerta no existe
+            NotFoundError: Si la alerta no existe
             RepositoryError: Si ocurre un error en la base de datos
         """
         try:
@@ -172,10 +172,10 @@ class CrudOperations(BaseRepository[Alert]):
             # Verificar que la alerta existe
             existing_alert = await self.get_by_id(alert_id)
             if not existing_alert:
-                raise EntityNotFoundError(
+                raise NotFoundError(
                     message=f"Alerta con ID {alert_id} no encontrada",
-                    entity_type="Alert",
-                    entity_id=alert_id
+                    resource_type="Alert",
+                    resource_id=alert_id
                 )
             
             # Eliminar la alerta
@@ -184,7 +184,7 @@ class CrudOperations(BaseRepository[Alert]):
             self._logger.info(f"Alerta {alert_id} eliminada exitosamente")
             return result
             
-        except EntityNotFoundError:
+        except NotFoundError:
             raise
         except SQLAlchemyError as e:
             self._logger.error(f"Error de base de datos al eliminar alerta {alert_id}: {e}")

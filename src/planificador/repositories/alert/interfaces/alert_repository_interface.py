@@ -4,7 +4,7 @@ from abc import ABC, abstractmethod
 from typing import List, Optional, Dict, Any
 from datetime import datetime
 
-from ...models.alert import Alert, AlertType, AlertStatus
+from planificador.models.alert import Alert, AlertType, AlertStatus
 
 
 class IAlertRepository(ABC):
