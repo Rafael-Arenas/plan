@@ -36,6 +36,9 @@ python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
 addopts = "-v --tb=long"
+markers = [
+    "vacation_repository: marks tests as vacation repository tests"
+]
 
 [tool.ruff]
 # Configuración de Ruff para linting y formateo

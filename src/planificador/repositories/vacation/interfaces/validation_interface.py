@@ -24,7 +24,7 @@ from abc import ABC, abstractmethod
 from typing import Dict, Any, Optional
 from datetime import date
 
-from planificador.enums.vacation_type import VacationType
+from planificador.models.vacation import VacationType
 from planificador.exceptions.repository import VacationRepositoryError
 
 
