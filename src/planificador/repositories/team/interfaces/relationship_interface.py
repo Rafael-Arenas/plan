@@ -26,8 +26,7 @@ from datetime import date
 
 from planificador.models.team import Team
 from planificador.models.employee import Employee
-from planificador.models.team_membership import TeamMembership
-from planificador.enums.membership_role import MembershipRole
+from planificador.models.team_membership import TeamMembership, MembershipRole
 from planificador.exceptions.repository import TeamRepositoryError
 
 
