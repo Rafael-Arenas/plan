@@ -34,7 +34,7 @@ from datetime import date
 from sqlalchemy.ext.asyncio import AsyncSession
 from loguru import logger
 
-from planificador.models.vacation import Vacation, VacationStatus, VacationType
+from planificador.models.vacation import Vacation
 from planificador.repositories.vacation.interfaces import (
     IVacationCrudOperations,
     IVacationQueryOperations,
@@ -80,11 +80,11 @@ class VacationRepositoryFacade(
         self._logger = logger.bind(module="vacation_repository_facade")
         
         # Inicializar módulos especializados
-        self._crud_operations = VacationCrudModule(session)
-        self._query_operations = VacationQueryModule(session)
-        self._validation_operations = VacationValidationModule(session)
-        self._relationship_operations = VacationRelationshipModule(session)
-        self._statistics_operations = VacationStatisticsModule(session)
+        self.crud_module = VacationCrudModule(session)
+        self.query_module = VacationQueryModule(session)
+        self.validation_module = VacationValidationModule(session)
+        self.relationship_module = VacationRelationshipModule(session)
+        self.statistics_module = VacationStatisticsModule(session)
         
         self._logger.debug("VacationRepositoryFacade inicializada")
 
@@ -94,7 +94,7 @@ class VacationRepositoryFacade(
 
     async def create_vacation(self, vacation_data: Dict[str, Any]) -> Vacation:
         """Crea una nueva vacación."""
-        return await self._crud_operations.create_vacation(vacation_data)
+        return await self.crud_module.create_vacation(vacation_data)
 
     async def update_vacation(
         self,
@@ -102,15 +102,15 @@ class VacationRepositoryFacade(
         vacation_data: Dict[str, Any]
     ) -> Vacation:
         """Actualiza una vacación existente."""
-        return await self._crud_operations.update_vacation(vacation_id, vacation_data)
+        return await self.crud_module.update_vacation(vacation_id, vacation_data)
 
     async def delete_vacation(self, vacation_id: int) -> bool:
         """Elimina una vacación."""
-        return await self._crud_operations.delete_vacation(vacation_id)
+        return await self.crud_module.delete_vacation(vacation_id)
 
     async def get_vacation_by_id(self, vacation_id: int) -> Optional[Vacation]:
         """Obtiene una vacación por su ID."""
-        return await self._crud_operations.get_vacation_by_id(vacation_id)
+        return await self.crud_module.get_vacation_by_id(vacation_id)
 
     async def get_by_unique_field(
         self,
@@ -118,7 +118,7 @@ class VacationRepositoryFacade(
         field_value: Any
     ) -> Optional[Vacation]:
         """Obtiene una vacación por un campo único."""
-        return await self._crud_operations.get_by_unique_field(field_name, field_value)
+        return await self.crud_module.get_by_unique_field(field_name, field_value)
 
     # =============================================================================
     # OPERACIONES DE CONSULTA
@@ -130,7 +130,7 @@ class VacationRepositoryFacade(
         active_only: bool = True
     ) -> List[Vacation]:
         """Obtiene vacaciones por empleado."""
-        return await self._query_operations.get_vacations_by_employee(employee_id, active_only)
+        return await self.query_module.get_vacations_by_employee(employee_id, active_only)
 
     async def get_vacations_by_date_range(
         self,
@@ -139,7 +139,7 @@ class VacationRepositoryFacade(
         employee_id: Optional[int] = None
     ) -> List[Vacation]:
         """Obtiene vacaciones por rango de fechas."""
-        return await self._query_operations.get_vacations_by_date_range(
+        return await self.query_module.get_vacations_by_date_range(
             start_date, end_date, employee_id
         )
 
@@ -149,7 +149,7 @@ class VacationRepositoryFacade(
         employee_id: Optional[int] = None
     ) -> List[Vacation]:
         """Obtiene vacaciones por estado."""
-        return await self._query_operations.get_vacations_by_status(status, employee_id)
+        return await self.query_module.get_vacations_by_status(status, employee_id)
 
     async def get_vacations_by_type(
         self,
@@ -157,7 +157,7 @@ class VacationRepositoryFacade(
         employee_id: Optional[int] = None
     ) -> List[Vacation]:
         """Obtiene vacaciones por tipo."""
-        return await self._query_operations.get_vacations_by_type(vacation_type, employee_id)
+        return await self.query_module.get_vacations_by_type(vacation_type, employee_id)
 
     async def search_vacations_by_criteria(
         self,
@@ -166,7 +166,7 @@ class VacationRepositoryFacade(
         offset: Optional[int] = None
     ) -> List[Vacation]:
         """Busca vacaciones por criterios específicos."""
-        return await self._query_operations.search_vacations_by_criteria(criteria, limit, offset)
+        return await self.query_module.search_vacations_by_criteria(criteria, limit, offset)
 
     async def get_vacations_with_pagination(
         self,
@@ -175,11 +175,11 @@ class VacationRepositoryFacade(
         filters: Optional[Dict[str, Any]] = None
     ) -> Tuple[List[Vacation], int]:
         """Obtiene vacaciones con paginación."""
-        return await self._query_operations.get_vacations_with_pagination(page, page_size, filters)
+        return await self.query_module.get_vacations_with_pagination(page, page_size, filters)
 
     async def count_vacations(self, filters: Optional[Dict[str, Any]] = None) -> int:
         """Cuenta vacaciones con filtros opcionales."""
-        return await self._query_operations.count_vacations(filters)
+        return await self.query_module.count_vacations(filters)
 
     # =============================================================================
     # OPERACIONES DE VALIDACIÓN
@@ -187,24 +187,23 @@ class VacationRepositoryFacade(
 
     async def validate_vacation_data(self, vacation_data: Dict[str, Any]) -> Dict[str, Any]:
         """Valida datos de vacación."""
-        return await self._validation_operations.validate_vacation_data(vacation_data)
+        return await self.validation_module.validate_vacation_data(vacation_data)
 
     async def validate_vacation_request(
         self,
         employee_id: int,
-        vacation_type: str,
         start_date: date,
         end_date: date,
-        notes: Optional[str] = None
+        vacation_type: str
     ) -> Dict[str, Any]:
         """Valida una solicitud de vacación."""
-        return await self._validation_operations.validate_vacation_request(
+        return await self.validation_module.validate_vacation_request(
             employee_id, start_date, end_date, vacation_type
         )
 
     async def validate_vacation_id(self, vacation_id: int) -> Dict[str, Any]:
         """Valida que un ID de vacación existe."""
-        return await self._validation_operations.validate_vacation_id(vacation_id)
+        return await self.validation_module.validate_vacation_id(vacation_id)
 
     async def check_vacation_conflicts(
         self,
@@ -214,7 +213,7 @@ class VacationRepositoryFacade(
         exclude_vacation_id: Optional[int] = None
     ) -> Dict[str, Any]:
         """Verifica conflictos de vacaciones."""
-        return await self._validation_operations.check_vacation_conflicts(
+        return await self.validation_module.check_vacation_conflicts(
             employee_id, start_date, end_date, exclude_vacation_id
         )
 
@@ -224,11 +223,11 @@ class VacationRepositoryFacade(
         data: Dict[str, Any]
     ) -> Dict[str, Any]:
         """Valida reglas de negocio."""
-        return await self._validation_operations.validate_business_rules(operation, data)
+        return await self.validation_module.validate_business_rules(operation, data)
 
     async def validate_data_consistency(self) -> Dict[str, Any]:
         """Valida consistencia de datos."""
-        return await self._validation_operations.validate_data_consistency()
+        return await self.validation_module.validate_data_consistency()
 
     # =============================================================================
     # OPERACIONES DE RELACIONES
@@ -239,11 +238,11 @@ class VacationRepositoryFacade(
         vacation_id: int
     ) -> Optional[Dict[str, Any]]:
         """Obtiene vacación con detalles del empleado."""
-        return await self._relationship_operations.get_vacation_with_employee_details(vacation_id)
+        return await self.relationship_module.get_vacation_with_employee_details(vacation_id)
 
     async def validate_employee_exists(self, employee_id: int) -> bool:
         """Valida que un empleado existe."""
-        return await self._relationship_operations.validate_employee_exists(employee_id)
+        return await self.relationship_module.validate_employee_exists(employee_id)
 
     async def get_overlapping_vacations(
         self,
@@ -253,7 +252,7 @@ class VacationRepositoryFacade(
         exclude_vacation_id: Optional[int] = None
     ) -> List[Vacation]:
         """Obtiene vacaciones que se solapan."""
-        return await self._relationship_operations.get_overlapping_vacations(
+        return await self.relationship_module.get_overlapping_vacations(
             employee_id, start_date, end_date, exclude_vacation_id
         )
 
@@ -263,7 +262,7 @@ class VacationRepositoryFacade(
         include_employee: bool = True
     ) -> List[Dict[str, Any]]:
         """Obtiene vacaciones con relaciones cargadas."""
-        return await self._relationship_operations.get_vacations_with_relationships(
+        return await self.relationship_module.get_vacations_with_relationships(
             vacation_ids, include_employee
         )
 
@@ -273,7 +272,7 @@ class VacationRepositoryFacade(
         year: Optional[int] = None
     ) -> Dict[str, Any]:
         """Obtiene resumen de vacaciones del empleado."""
-        return await self._relationship_operations.get_employee_vacation_summary(employee_id, year)
+        return await self.relationship_module.get_employee_vacation_summary(employee_id, year)
 
     # =============================================================================
     # OPERACIONES DE ESTADÍSTICAS
@@ -285,7 +284,7 @@ class VacationRepositoryFacade(
         year: Optional[int] = None
     ) -> Dict[str, Any]:
         """Obtiene estadísticas de vacaciones del empleado."""
-        return await self._statistics_operations.get_employee_vacation_statistics(employee_id, year)
+        return await self.statistics_module.get_employee_vacation_statistics(employee_id, year)
 
     async def get_team_vacation_balance(
         self,
@@ -293,7 +292,7 @@ class VacationRepositoryFacade(
         year: Optional[int] = None
     ) -> Dict[str, Any]:
         """Obtiene balance de vacaciones del equipo."""
-        return await self._statistics_operations.get_team_vacation_balance(team_id, year)
+        return await self.statistics_module.get_team_vacation_balance(team_id, year)
 
     async def get_vacation_trends(
         self,
@@ -302,7 +301,7 @@ class VacationRepositoryFacade(
         granularity: str = "monthly"
     ) -> List[Dict[str, Any]]:
         """Obtiene tendencias de vacaciones."""
-        return await self._statistics_operations.get_vacation_trends(start_date, end_date, granularity)
+        return await self.statistics_module.get_vacation_trends(start_date, end_date, granularity)
 
     async def get_vacation_patterns_analysis(
         self,
@@ -311,7 +310,7 @@ class VacationRepositoryFacade(
         year: Optional[int] = None
     ) -> Dict[str, Any]:
         """Obtiene análisis de patrones de vacaciones."""
-        return await self._statistics_operations.get_vacation_patterns_analysis(
+        return await self.statistics_module.get_vacation_patterns_analysis(
             employee_id, team_id, year
         )
 
@@ -321,7 +320,7 @@ class VacationRepositoryFacade(
         include_projections: bool = False
     ) -> Dict[str, Any]:
         """Genera reporte resumen de vacaciones."""
-        return await self._statistics_operations.generate_vacation_summary_report(
+        return await self.statistics_module.generate_vacation_summary_report(
             year, include_projections
         )
 
@@ -589,334 +588,3 @@ class VacationRepositoryFacade(
                 entity_type="Vacation",
                 original_error=e
             )
-
-    # ========================================
-    # Métodos Faltantes de las Interfaces
-    # ========================================
-
-    async def check_vacation_overlap(
-        self,
-        employee_id: int,
-        start_date: date,
-        end_date: date,
-        exclude_vacation_id: Optional[int] = None
-    ) -> bool:
-        """
-        Verifica solapamiento de vacaciones.
-        
-        Args:
-            employee_id: ID del empleado
-            start_date: Fecha de inicio de la vacación
-            end_date: Fecha de fin de la vacación
-            exclude_vacation_id: ID de vacación a excluir (opcional)
-        
-        Returns:
-            bool: True si hay solapamiento, False en caso contrario
-        
-        Raises:
-            VacationRepositoryError: Si ocurre un error durante la verificación
-        """
-        overlapping_vacations = await self._relationship_operations.get_overlapping_vacations(
-            employee_id=employee_id,
-            start_date=start_date,
-            end_date=end_date,
-            exclude_vacation_id=exclude_vacation_id
-        )
-        return len(overlapping_vacations) > 0
-
-    async def get_by_date_range(self, start_date: date, end_date: date) -> List[Vacation]:
-        """
-        Obtiene vacaciones en un rango de fechas.
-        
-        Args:
-            start_date: Fecha de inicio del rango
-            end_date: Fecha de fin del rango
-        
-        Returns:
-            List[Vacation]: Lista de vacaciones en el rango especificado
-        
-        Raises:
-            VacationRepositoryError: Si ocurre un error durante la consulta
-        """
-        return await self._query_operations.get_by_date_range(
-            start_date=start_date,
-            end_date=end_date
-        )
-
-    async def validate_create_data(self, data: Dict[str, Any]) -> None:
-        """
-        Valida los datos para crear una nueva vacación.
-        
-        Args:
-            data: Diccionario con los datos de la vacación
-        
-        Raises:
-            VacationRepositoryError: Si los datos no son válidos
-        """
-        validation_result = await self._validation_operations.validate_vacation_data(data)
-        if not validation_result['is_valid']:
-            raise VacationRepositoryError(
-                message=f"Datos de vacación inválidos: {validation_result['errors']}",
-                operation="validate_create_data",
-                entity_type="Vacation"
-            )
-
-    # ========================================
-    # Métodos Faltantes de Query Interface
-    # ========================================
-
-    async def get_by_employee_id(self, employee_id: int) -> List[Vacation]:
-        """Obtiene vacaciones por ID de empleado."""
-        return await self._query_operations.get_by_employee_id(employee_id)
-
-    async def get_by_status(self, status: VacationStatus) -> List[Vacation]:
-        """Obtiene vacaciones por estado."""
-        return await self._query_operations.get_by_status(status)
-
-    async def get_by_type(self, vacation_type: VacationType) -> List[Vacation]:
-        """Obtiene vacaciones por tipo."""
-        return await self._query_operations.get_by_type(vacation_type)
-
-    async def get_by_employee_and_date_range(
-        self, 
-        employee_id: int, 
-        start_date: date, 
-        end_date: date
-    ) -> List[Vacation]:
-        """Obtiene vacaciones por empleado y rango de fechas."""
-        return await self._query_operations.get_by_employee_and_date_range(
-            employee_id, start_date, end_date
-        )
-
-    async def search_vacations(
-        self,
-        employee_id: Optional[int] = None,
-        start_date: Optional[date] = None,
-        end_date: Optional[date] = None,
-        status: Optional[VacationStatus] = None,
-        vacation_type: Optional[VacationType] = None,
-        limit: int = 100,
-        offset: int = 0
-    ) -> List[Vacation]:
-        """Busca vacaciones con múltiples filtros."""
-        return await self._query_operations.search_vacations(
-            employee_id=employee_id,
-            start_date=start_date,
-            end_date=end_date,
-            status=status,
-            vacation_type=vacation_type,
-            limit=limit,
-            offset=offset
-        )
-
-    async def get_employee_vacations(
-        self, 
-        employee_id: int, 
-        year: Optional[int] = None
-    ) -> List[Vacation]:
-        """Obtiene vacaciones de un empleado por año."""
-        return await self._query_operations.get_employee_vacations(employee_id, year)
-
-    async def get_pending_approvals(self, limit: int = 50) -> List[Vacation]:
-        """Obtiene vacaciones pendientes de aprobación."""
-        return await self._query_operations.get_pending_approvals(limit)
-
-    async def get_current_month_vacations(self) -> List[Vacation]:
-        """Obtiene vacaciones del mes actual."""
-        return await self._query_operations.get_current_month_vacations()
-
-    async def get_upcoming_vacations(self, days_ahead: int = 30) -> List[Vacation]:
-        """Obtiene vacaciones próximas."""
-        return await self._query_operations.get_upcoming_vacations(days_ahead)
-
-    async def get_with_relations(self, vacation_id: int) -> Optional[Vacation]:
-        """Obtiene vacación con todas las relaciones cargadas."""
-        return await self._query_operations.get_with_relations(vacation_id)
-
-    # ========================================
-    # Métodos Faltantes de Validation Interface
-    # ========================================
-
-    async def validate_update_data(self, vacation_id: int, data: Dict[str, Any]) -> None:
-        """Valida los datos para actualizar una vacación."""
-        await self._validation_operations.validate_update_data(data)
-
-    # ========================================
-    # Métodos Faltantes de Relationship Interface
-    # ========================================
-
-    async def get_vacation_with_employee(self, vacation_id: int) -> Optional[Vacation]:
-        """Obtiene vacación con información del empleado."""
-        return await self._relationship_operations.get_vacation_with_employee(vacation_id)
-
-    async def get_vacation_with_all_relations(self, vacation_id: int) -> Optional[Vacation]:
-        """Obtiene vacación con todas las relaciones cargadas."""
-        return await self._relationship_operations.get_vacation_with_all_relations(vacation_id)
-
-    async def validate_vacation_exists(self, vacation_id: int) -> Vacation:
-        """Valida la existencia de una vacación por ID."""
-        return await self._relationship_operations.validate_vacation_exists(vacation_id)
-
-    async def get_vacation_conflicts(
-        self,
-        employee_id: int,
-        start_date: date,
-        end_date: date,
-        exclude_vacation_id: Optional[int] = None
-    ) -> List[Vacation]:
-        """Obtiene conflictos de vacaciones."""
-        return await self._relationship_operations.get_vacation_conflicts(
-            employee_id, start_date, end_date, exclude_vacation_id
-        )
-
-    async def get_employee_vacations_with_details(self, employee_id: int) -> List[Vacation]:
-        """Obtiene vacaciones de empleado con detalles completos."""
-        return await self._relationship_operations.get_employee_vacations_with_details(employee_id)
-
-    # ========================================
-    # Métodos Faltantes de Statistics Interface
-    # ========================================
-
-    async def get_vacation_summary_by_employee(self, employee_id: int, year: int) -> Dict[str, Any]:
-        """Obtiene resumen de vacaciones por empleado."""
-        return await self._statistics_operations.get_vacation_summary_by_employee(employee_id, year)
-
-    async def get_team_vacation_summary(self, team_id: int, year: int) -> Dict[str, Any]:
-        """Obtiene resumen de vacaciones por equipo."""
-        return await self._statistics_operations.get_team_vacation_summary(team_id, year)
-
-    async def get_vacation_balance_analysis(self, employee_id: int, year: int) -> Dict[str, Any]:
-        """Obtiene análisis de balance de vacaciones."""
-        return await self._statistics_operations.get_vacation_balance_analysis(employee_id, year)
-
-    async def get_vacation_trends_by_employee(
-        self, 
-        employee_id: int, 
-        start_date: date, 
-        end_date: date
-    ) -> Dict[str, Any]:
-        """Obtiene tendencias de vacaciones por empleado."""
-        return await self._statistics_operations.get_vacation_trends_by_employee(
-            employee_id, start_date, end_date
-        )
-
-    async def get_team_vacation_statistics(self, team_id: int, year: int) -> Dict[str, Any]:
-        """Obtiene estadísticas de vacaciones por equipo."""
-        return await self._statistics_operations.get_team_vacation_statistics(team_id, year)
-
-    async def get_team_vacations_summary(
-        self, 
-        team_id: int, 
-        start_date: date, 
-        end_date: date
-    ) -> Dict[str, Any]:
-        """Obtiene resumen de vacaciones del equipo."""
-        return await self._statistics_operations.get_team_vacations_summary(
-            team_id, start_date, end_date
-        )
-
-    # =============================================================================
-    # OPERACIONES ESPECIALES
-    # =============================================================================
-
-    async def approve_vacation(
-        self, 
-        vacation_id: int, 
-        approved_by: str, 
-        notes: Optional[str] = None
-    ) -> Optional[Vacation]:
-        """
-        Aprueba una vacación específica.
-        
-        Args:
-            vacation_id: ID de la vacación a aprobar
-            approved_by: Usuario que aprueba la vacación
-            notes: Notas opcionales sobre la aprobación
-            
-        Returns:
-            Vacación aprobada o None si no se encuentra
-        """
-        from pendulum import now
-        
-        # Obtener la vacación actual
-        vacation = await self._crud_operations.get_vacation_by_id(vacation_id)
-        if not vacation:
-            return None
-            
-        # Actualizar el estado y datos de aprobación
-        update_data = {
-            "status": VacationStatus.APPROVED,
-            "approved_by": approved_by,
-            "approved_at": now(),
-            "notes": notes
-        }
-        
-        return await self._crud_operations.update_vacation(vacation_id, update_data)
-
-    async def reject_vacation(
-        self, 
-        vacation_id: int, 
-        rejected_by: str, 
-        reason: Optional[str] = None
-    ) -> Optional[Vacation]:
-        """
-        Rechaza una vacación específica.
-        
-        Args:
-            vacation_id: ID de la vacación a rechazar
-            rejected_by: Usuario que rechaza la vacación
-            reason: Razón del rechazo
-            
-        Returns:
-            Vacación rechazada o None si no se encuentra
-        """
-        from pendulum import now
-        
-        # Obtener la vacación actual
-        vacation = await self._crud_operations.get_vacation_by_id(vacation_id)
-        if not vacation:
-            return None
-            
-        # Actualizar el estado y datos de rechazo
-        update_data = {
-            "status": VacationStatus.REJECTED,
-            "rejected_by": rejected_by,
-            "rejected_at": now(),
-            "rejection_reason": reason
-        }
-        
-        return await self._crud_operations.update_vacation(vacation_id, update_data)
-
-    async def cancel_vacation(
-        self, 
-        vacation_id: int, 
-        cancelled_by: Optional[int] = None, 
-        reason: Optional[str] = None
-    ) -> Optional[Vacation]:
-        """
-        Cancela una vacación específica.
-        
-        Args:
-            vacation_id: ID de la vacación a cancelar
-            cancelled_by: ID del usuario que cancela la vacación
-            reason: Razón de la cancelación
-            
-        Returns:
-            Vacación cancelada o None si no se encuentra
-        """
-        from pendulum import now
-        
-        # Obtener la vacación actual
-        vacation = await self._crud_operations.get_vacation_by_id(vacation_id)
-        if not vacation:
-            return None
-            
-        # Actualizar el estado y datos de cancelación
-        update_data = {
-            "status": VacationStatus.CANCELLED,
-            "cancelled_by": cancelled_by,
-            "cancelled_at": now(),
-            "cancellation_reason": reason
-        }
-        
-        return await self._crud_operations.update_vacation(vacation_id, update_data)
