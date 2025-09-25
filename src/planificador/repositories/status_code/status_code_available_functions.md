@@ -1,124 +1,120 @@
-# Funciones Disponibles en Status Code Repository
+# Funciones Disponibles en StatusCodeRepositoryFacade
 
-**Fecha de actualización:** 2025-01-21
-**Arquitectura:** Modular con Facade Pattern
+**Fecha de actualización:** 2025-01-24
 
-## Arquitectura del Sistema
+## Métodos del StatusCodeRepositoryFacade
 
-### StatusCodeRepositoryFacade (status_code_repository_facade.py)
+El `StatusCodeRepositoryFacade` es la interfaz principal para todas las operaciones relacionadas con códigos de estado. Proporciona acceso unificado a operaciones CRUD, consultas, validaciones y estadísticas.
 
-El repositorio utiliza una **arquitectura modular** con el patrón Facade que integra módulos especializados:
+### OPERACIONES CRUD (5 métodos)
 
-- **StatusCodeCRUDModule**: Operaciones CRUD básicas
-- **StatusCodeQueryModule**: Consultas y búsquedas avanzadas  
-- **StatusCodeValidationModule**: Validaciones y reglas de negocio
-- **StatusCodeStatisticsModule**: Análisis estadísticos y métricas
+1. `create_status_code(status_code_data: Dict[str, Any]) -> StatusCode` - Crea un nuevo código de estado
+2. `get_status_code_by_id(status_code_id: int) -> Optional[StatusCode]` - Obtiene un código de estado por su ID
+3. `get_all_status_codes() -> List[StatusCode]` - Obtiene todos los códigos de estado
+4. `update_status_code(status_code_id: int, status_code_data: Dict[str, Any]) -> StatusCode` - Actualiza un código de estado existente
+5. `delete_status_code(status_code_id: int) -> bool` - Elimina un código de estado
 
-## Funciones por Módulo
+### OPERACIONES DE CONSULTA (10 métodos)
 
-### Módulo CRUD (StatusCodeCRUDModule)
+6. `find_by_code(code: str) -> Optional[StatusCode]` - Busca un código de estado por su código único
+7. `find_by_name(name: str) -> Optional[StatusCode]` - Busca un código de estado por su nombre
+8. `find_by_text_search(search_text: str) -> List[StatusCode]` - Busca códigos de estado por texto en nombre o descripción
+9. `find_active_status_codes() -> List[StatusCode]` - Obtiene todos los códigos de estado activos
+10. `find_inactive_status_codes() -> List[StatusCode]` - Obtiene todos los códigos de estado inactivos
+11. `find_default_status_codes() -> List[StatusCode]` - Obtiene códigos de estado marcados como predeterminados
+12. `find_by_display_order_range(min_order: int, max_order: int) -> List[StatusCode]` - Busca códigos por rango de orden de visualización
+13. `find_with_advanced_filters(filters: Dict[str, Any]) -> List[StatusCode]` - Busca códigos con filtros avanzados
+14. `get_status_codes_paginated(page: int = 1, page_size: int = 20, filters: Optional[Dict[str, Any]] = None) -> Tuple[List[StatusCode], int]` - Obtiene códigos de estado con paginación
+15. `get_ordered_status_codes(order_by: str = "display_order", ascending: bool = True) -> List[StatusCode]` - Obtiene códigos ordenados por criterio específico
 
-#### Operaciones CRUD Básicas (6 funciones)
-1. `create_status_code(status_code_data: Dict[str, Any]) -> StatusCode` - Crea un nuevo código de estado con validaciones
-2. `get_status_code_by_id(status_code_id: int) -> Optional[StatusCode]` - Obtiene código de estado por ID
-3. `get_status_code_by_code(code: str) -> Optional[StatusCode]` - Busca un código de estado por su código único
-4. `update_status_code(status_code_id: int, update_data: Dict[str, Any]) -> StatusCode` - Actualiza un código de estado existente
-5. `delete_status_code(status_code_id: int) -> bool` - Elimina un código de estado con validaciones
-6. `get_all_status_codes() -> List[StatusCode]` - Obtiene todos los códigos de estado
+### OPERACIONES DE VALIDACIÓN (5 métodos)
 
-### Módulo Query (StatusCodeQueryModule)
+16. `validate_unique_code(code: str, exclude_id: Optional[int] = None) -> bool` - Valida que el código sea único
+17. `validate_unique_name(name: str, exclude_id: Optional[int] = None) -> bool` - Valida que el nombre sea único
+18. `validate_status_code_data(status_code_data: Dict[str, Any]) -> Dict[str, Any]` - Valida datos completos de código de estado
+19. `validate_display_order_conflicts(display_order: int, exclude_id: Optional[int] = None) -> bool` - Valida conflictos en orden de visualización
+20. `validate_default_status_rules(is_default: bool, exclude_id: Optional[int] = None) -> Dict[str, Any]` - Valida reglas de códigos predeterminados
 
-#### Operaciones de Consulta y Búsqueda (5 funciones)
-7. `search_status_codes(search_criteria: Dict[str, Any]) -> List[StatusCode]` - Búsqueda avanzada con múltiples criterios
-8. `get_status_codes_by_category(category: str) -> List[StatusCode]` - Obtiene códigos por categoría específica
-9. `get_active_status_codes() -> List[StatusCode]` - Obtiene todos los códigos de estado activos ordenados
-10. `get_status_codes_by_display_order() -> List[StatusCode]` - Obtiene códigos ordenados por orden de visualización
-11. `find_status_codes_by_name_pattern(name_pattern: str) -> List[StatusCode]` - Busca códigos por patrón de nombre
+### OPERACIONES DE ESTADÍSTICAS (6 métodos)
 
-### Módulo Validation (StatusCodeValidationModule)
+21. `get_status_code_statistics() -> Dict[str, Any]` - Obtiene estadísticas generales de códigos de estado
+22. `get_status_distribution_analysis() -> Dict[str, Any]` - Obtiene análisis de distribución de estados
+23. `get_display_order_metrics() -> Dict[str, Any]` - Obtiene métricas de orden de visualización
+24. `get_usage_performance_metrics() -> Dict[str, Any]` - Obtiene métricas de rendimiento y uso
+25. `get_data_integrity_report() -> Dict[str, Any]` - Genera reporte de integridad de datos
+26. `get_status_code_health_check() -> Dict[str, Any]` - Realiza verificación de salud del sistema
 
-#### Operaciones de Validación (5 funciones)
-12. `validate_status_code_uniqueness(code: str, exclude_id: Optional[int] = None) -> bool` - Valida unicidad de código
-13. `validate_status_code_name_uniqueness(name: str, exclude_id: Optional[int] = None) -> bool` - Valida unicidad de nombre
-14. `validate_status_code_data(status_code_data: Dict[str, Any]) -> Dict[str, Any]` - Validación completa de datos
-15. `validate_display_order_conflicts(display_order: int, exclude_id: Optional[int] = None) -> bool` - Valida conflictos de orden
-16. `validate_default_status_code_rules(status_code_data: Dict[str, Any]) -> bool` - Valida reglas de códigos por defecto
+### OPERACIONES UTILITARIAS (1 método)
 
-### Módulo Statistics (StatusCodeStatisticsModule)
+27. `health_check() -> Dict[str, Any]` - Verifica el estado de salud del repositorio
 
-#### Operaciones de Estadísticas y Análisis (4 funciones)
-17. `get_status_code_usage_statistics() -> Dict[str, Any]` - Obtiene estadísticas de uso completas
-18. `get_status_code_distribution() -> Dict[str, Any]` - Obtiene distribución de códigos por categorías
-19. `analyze_status_code_performance() -> Dict[str, Any]` - Analiza rendimiento y métricas de códigos
-20. `generate_status_code_integrity_report() -> Dict[str, Any]` - Genera reporte de integridad del sistema
+### MÉTODOS HEREDADOS DEL FACADE BASE (5 métodos)
 
-### Métodos del Facade (StatusCodeRepositoryFacade)
+28. `get_all(skip: int = 0, limit: int = 100) -> List[StatusCode]` - Obtiene todos los códigos con paginación
+29. `exists_by_id(status_code_id: int) -> bool` - Verifica si un código existe por su ID
+30. `count_all(filters: Optional[Dict[str, Any]] = None) -> int` - Cuenta todos los códigos con filtros opcionales
+31. `find_by_name_base(name: str) -> Optional[StatusCode]` - Busca un código por nombre exacto (método base)
+32. `find_by_code_base(code: str) -> Optional[StatusCode]` - Busca un código por código exacto (método base)
 
-#### Operaciones de Gestión y Mantenimiento (12 funciones adicionales)
-21. `get_billable_status_codes() -> List[StatusCode]` - Obtiene códigos facturables y activos
-22. `get_productive_status_codes() -> List[StatusCode]` - Obtiene códigos productivos y activos
-23. `get_status_codes_requiring_approval() -> List[StatusCode]` - Obtiene códigos que requieren aprobación
-24. `filter_by_criteria(**criteria) -> List[StatusCode]` - Filtrado avanzado con múltiples criterios
-25. `get_max_sort_order() -> int` - Obtiene el valor máximo de sort_order
-26. `reorder_status_codes(code_order_mapping: Dict[str, int]) -> bool` - Reordena múltiples códigos
-27. `search_by_name(search_term: str) -> List[StatusCode]` - Búsqueda simple por nombre
-28. `exists(entity_id: int) -> bool` - Verifica existencia por ID
-29. `health_check() -> Dict[str, Any]` - Verificación de salud del repositorio
-30. `get_available_methods() -> List[str]` - Lista métodos disponibles
-31. `validate_database_connection() -> bool` - Valida conexión a base de datos
-32. `get_repository_statistics() -> Dict[str, Any]` - Estadísticas del repositorio
+### OPERACIONES DE CONSULTA ESPECÍFICAS (8 métodos)
+
+33. `get_status_codes_by_category(category: str) -> List[StatusCode]` - Obtiene códigos por categoría
+34. `get_status_codes_by_priority(priority: int) -> List[StatusCode]` - Obtiene códigos por prioridad
+35. `search_status_codes_by_criteria(criteria: Dict[str, Any], limit: Optional[int] = None, offset: Optional[int] = None) -> List[StatusCode]` - Busca códigos por criterios específicos
+36. `get_status_codes_with_usage_count() -> List[Dict[str, Any]]` - Obtiene códigos con conteo de uso
+37. `find_status_codes_by_date_range(start_date: date, end_date: date) -> List[StatusCode]` - Busca códigos por rango de fechas
+38. `get_recently_created_status_codes(days: int = 30) -> List[StatusCode]` - Obtiene códigos creados recientemente
+39. `get_recently_updated_status_codes(days: int = 30) -> List[StatusCode]` - Obtiene códigos actualizados recientemente
+40. `count_status_codes(filters: Optional[Dict[str, Any]] = None) -> int` - Cuenta códigos con filtros opcionales
+
+### OPERACIONES DE VALIDACIÓN ADICIONALES (3 métodos)
+
+41. `validate_business_rules(operation: str, data: Dict[str, Any]) -> Dict[str, Any]` - Valida reglas de negocio específicas
+42. `validate_data_consistency() -> Dict[str, Any]` - Valida consistencia general de datos
+43. `check_status_code_dependencies(status_code_id: int) -> Dict[str, Any]` - Verifica dependencias de un código
+
+### OPERACIONES ESTADÍSTICAS ADICIONALES (2 métodos)
+
+44. `generate_status_codes_summary_report(include_inactive: bool = False) -> Dict[str, Any]` - Genera reporte resumen completo
+45. `get_status_code_trends(start_date: date, end_date: date, granularity: str = "monthly") -> List[Dict[str, Any]]` - Obtiene tendencias de uso de códigos
 
 ---
 
-**Total de funciones disponibles:** 17
+## Resumen de Funcionalidades
+
+**Total de métodos públicos:** 45
 
 **Distribución por categorías:**
-- **CRUD básico**: 4 funciones (crear, leer, actualizar, eliminar códigos de estado)
-- **Búsqueda específica**: 5 funciones (por código, nombre, estado activo, facturable, productivo)
-- **Búsqueda por características**: 1 función (códigos que requieren aprobación)
-- **Filtrado avanzado**: 1 función (filtros múltiples con criterios combinados)
-- **Gestión de ordenamiento**: 2 funciones (obtener máximo orden y reordenar códigos)
-- **Estadísticas y análisis**: 1 función (estadísticas de uso y distribución)
-- **Validación**: 1 función (validación de unicidad de códigos)
-- **Métodos heredados**: 2 funciones (operaciones básicas del repositorio base)
+- **CRUD básico**: 5 métodos (crear, obtener, actualizar, eliminar)
+- **Consultas**: 10 métodos (búsquedas y obtención de datos)
+- **Validaciones**: 5 métodos (validación de datos y reglas)
+- **Estadísticas**: 6 métodos (análisis y reportes)
+- **Utilitarias**: 1 método (verificación de salud)
+- **Métodos base**: 5 métodos (heredados del facade base)
+- **Consultas específicas**: 8 métodos (búsquedas especializadas)
+- **Validaciones adicionales**: 3 métodos (validaciones avanzadas)
+- **Estadísticas adicionales**: 2 métodos (reportes y tendencias)
 
-**Funcionalidades especiales:**
-- **Búsqueda por características booleanas**: 4 funciones para filtrar por is_active, is_billable, is_productive, requires_approval
-- **Filtrado combinado**: 1 función que permite aplicar múltiples criterios simultáneamente
-- **Gestión de ordenamiento**: 2 funciones para mantener el orden de presentación de códigos
-- **Validación de integridad**: 1 función para garantizar unicidad de códigos
-- **Análisis estadístico**: 1 función para obtener métricas de uso y distribución
-- **Búsqueda textual**: 2 funciones para búsqueda por nombre y término general
+**Características principales:**
+- **Interfaz unificada**: Acceso centralizado a todas las operaciones de códigos de estado
+- **Validación integrada**: Métodos con validación automática de datos y reglas de negocio
+- **Soporte para paginación**: Múltiples métodos con soporte para paginación
+- **Análisis estadístico**: Amplio conjunto de métodos para análisis y reportes
+- **Búsqueda avanzada**: Múltiples criterios de búsqueda y filtrado
+- **Integridad de datos**: Validaciones exhaustivas y verificaciones de consistencia
+- **Monitoreo de salud**: Métodos especializados para verificación del sistema
 
-**Características de los códigos de estado:**
-- **is_active**: Indica si el código está activo y disponible para uso
-- **is_billable**: Indica si el tiempo registrado con este código es facturable
-- **is_productive**: Indica si el tiempo registrado con este código es productivo
-- **requires_approval**: Indica si el uso de este código requiere aprobación
-- **sort_order**: Orden de presentación en interfaces de usuario
-- **code**: Identificador único alfanumérico del código
-- **name**: Nombre descriptivo del código de estado
-- **description**: Descripción detallada del propósito del código
-
-**Patrones de uso comunes:**
-- **Filtrado por estado**: Usar `get_active_status_codes()` para obtener solo códigos disponibles
-- **Filtrado por facturación**: Usar `get_billable_status_codes()` para reportes financieros
-- **Filtrado por productividad**: Usar `get_productive_status_codes()` para análisis de rendimiento
-- **Búsqueda flexible**: Usar `filter_by_criteria()` para combinaciones complejas de filtros
-- **Validación de datos**: Usar `validate_code_uniqueness()` antes de crear o actualizar códigos
-- **Gestión de orden**: Usar `get_max_sort_order()` y `reorder_status_codes()` para mantener presentación ordenada
-
-**Integración con otras entidades:**
-- **Schedule**: Los códigos de estado se asignan a horarios para categorizar el tipo de trabajo
-- **Workload**: Los códigos de estado pueden usarse para categorizar cargas de trabajo
-- **Project**: Los códigos de estado pueden asociarse con estados específicos de proyectos
+**Integración con módulos:**
+- **CrudModule**: Operaciones CRUD básicas
+- **QueryModule**: Consultas y búsquedas
+- **ValidationModule**: Validación de datos y reglas
+- **StatisticsModule**: Análisis y estadísticas
 
 **Casos de uso principales:**
-1. **Gestión de tiempo**: Categorizar horas trabajadas por tipo de actividad
-2. **Facturación**: Distinguir entre tiempo facturable y no facturable
-3. **Análisis de productividad**: Identificar tiempo productivo vs. administrativo
-4. **Flujos de aprobación**: Gestionar códigos que requieren validación adicional
-5. **Reportes y estadísticas**: Generar análisis basados en categorías de estado
-6. **Configuración del sistema**: Mantener catálogos ordenados y actualizados
-
-**Total de funciones documentadas**: 17
+- Gestión completa del ciclo de vida de códigos de estado
+- Configuración y mantenimiento de estados del sistema
+- Análisis estadístico y generación de reportes
+- Validación de integridad y consistencia de datos
+- Búsqueda y filtrado avanzado de códigos
+- Monitoreo de salud y rendimiento del sistema
+- Integración con sistemas de tiempo y planificación
