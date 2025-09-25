@@ -250,11 +250,59 @@ def team_repository(mock_session):
         }
     })
     
+    # Configurar métodos estadísticos faltantes con valores por defecto
+    statistics_module_mock.get_membership_trends = AsyncMock(return_value={
+        "monthly_trends": [],
+        "summary": {},
+        "peak_periods": {}
+    })
+    
+    statistics_module_mock.get_department_team_distribution = AsyncMock(return_value={
+        "departments": [],
+        "distribution_stats": {}
+    })
+    
+    statistics_module_mock.get_average_team_size = AsyncMock(return_value={
+        "overall_average": 0.0,
+        "by_department": {},
+        "statistics": {}
+    })
+    
+    statistics_module_mock.get_teams_without_leader = AsyncMock(return_value={
+        "teams": [],
+        "summary": {}
+    })
+    
+    statistics_module_mock.get_most_active_employees_in_teams = AsyncMock(return_value={
+        "employees": [],
+        "statistics": {}
+    })
+    
+    statistics_module_mock.get_team_creation_trends = AsyncMock(return_value={
+        "monthly_trends": [],
+        "summary": {},
+        "peak_periods": {}
+    })
+    
     # Asignar el statistics_module_mock al mock_facade
     mock_facade.statistics_module = statistics_module_mock
     
     # Configurar validation_module
     validation_module_mock = AsyncMock()
+    # Configurar métodos de validación específicos
+    validation_module_mock.validate_data_consistency = AsyncMock(return_value={
+        "is_consistent": True,
+        "issues": [],
+        "statistics": {
+            "total_teams": 5,
+            "active_teams": 5,
+            "inactive_teams": 0,
+            "teams_without_members": 0,
+            "teams_without_leader": 0,
+            "data_issues_count": 0
+        },
+        "recommendations": []
+    })
     mock_facade.validation_module = validation_module_mock
     
     # Configurar crud_module
@@ -391,6 +439,38 @@ def team_repository(mock_session):
     mock_facade.generate_teams_summary_report = generate_teams_summary_report
     mock_facade.create_team_with_validation = create_team_with_validation
     mock_facade.add_team_member_with_validation = add_team_member_with_validation
+    
+    # Delegación explícita para métodos estadísticos adicionales
+    mock_facade.get_membership_trends = statistics_module_mock.get_membership_trends
+    mock_facade.get_department_team_distribution = statistics_module_mock.get_department_team_distribution
+    mock_facade.get_average_team_size = statistics_module_mock.get_average_team_size
+    mock_facade.get_teams_without_leader = statistics_module_mock.get_teams_without_leader
+    mock_facade.get_most_active_employees_in_teams = statistics_module_mock.get_most_active_employees_in_teams
+    mock_facade.get_team_creation_trends = statistics_module_mock.get_team_creation_trends
+    
+    # Delegación explícita para métodos de validación
+    # validate_data_consistency debe usar la implementación real, no un mock
+    # Los métodos internos del validation_module serán mockeados individualmente en cada test
+    real_validate_data_consistency = TeamRepositoryFacade.validate_data_consistency
+    mock_facade.validate_data_consistency = lambda: real_validate_data_consistency(mock_facade)
+    
+    # get_team_dashboard_data debe usar la implementación real, no un mock
+    # Los métodos internos serán mockeados individualmente en cada test
+    real_get_team_dashboard_data = TeamRepositoryFacade.get_team_dashboard_data
+    mock_facade.get_team_dashboard_data = lambda team_id=None, department=None: real_get_team_dashboard_data(mock_facade, team_id, department)
+    
+    # bulk_team_operation debe usar la implementación real, no un mock
+    # Los métodos internos (create_team_with_validation, update_team, delete_team) 
+    # serán mockeados individualmente en cada test
+    
+    # Configurar el logger para el mock (sin AsyncMock para evitar warnings)
+    mock_facade._logger = MagicMock()
+    
+    # Obtener la implementación real del método
+    real_bulk_operation = TeamRepositoryFacade.bulk_team_operation
+    
+    # Asignar la implementación real al mock
+    mock_facade.bulk_team_operation = lambda operation, team_data_list: real_bulk_operation(mock_facade, operation, team_data_list)
     async def create_team_with_members_side_effect(team_data, member_ids, **kwargs):
         """Side effect para crear equipo con miembros."""
         # Simular operaciones de base de datos
