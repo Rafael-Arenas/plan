@@ -1,175 +1,120 @@
-# Funciones Disponibles en Team Repository
+# Funciones Disponibles en TeamRepositoryFacade
 
-**Fecha de actualización:** 2025-08-19
+**Fecha de actualización:** 2025-01-24
 
-## Módulos y Funciones
+## Métodos del TeamRepositoryFacade
 
-### CrudTeamRepository (crud_repository.py)
+El `TeamRepositoryFacade` es la interfaz principal para todas las operaciones relacionadas con equipos. Proporciona acceso unificado a operaciones CRUD, consultas, validaciones, relaciones y estadísticas.
 
-#### Operaciones CRUD Básicas (3 funciones)
-1. `create_team(team_data: Dict[str, Any]) -> Team` - Crea un nuevo equipo con validaciones
-2. `update_team(team_id: int, update_data: Dict[str, Any]) -> Optional[Team]` - Actualiza un equipo con validaciones
-4. `delete_team(team_id: int) -> bool` - Elimina un equipo (heredado de BaseRepository)
+### OPERACIONES CRUD (3 métodos)
 
-#### Consultas de Delegación - Query Builder (8 funciones)
-5. `search_by_name(search_term: str) -> List[Team]` - Busca equipos por término en el nombre (búsqueda parcial)
-6. `search_by_code(search_term: str) -> List[Team]` - Busca equipos por término en el código (búsqueda parcial)
-7. `search_by_description(search_term: str) -> List[Team]` - Busca equipos por término en la descripción
-8. `get_active_teams() -> List[Team]` - Obtiene todos los equipos activos
-3. `get_by_name(name: str) -> Optional[Team]` - Obtiene un equipo por su nombre exacto
-9. `get_by_department(department: str) -> List[Team]` - Obtiene equipos por departamento
-10. `get_by_leader(leader_id: int) -> List[Team]` - Obtiene equipos liderados por un empleado específico
-11. `get_teams_by_size_range(min_size: int, max_size: int) -> List[Team]` - Obtiene equipos cuyo número de miembros esté dentro del rango especificado
-12. `get_by_id(team_id: int) -> Optional[Team]` - Obtiene equipo por ID (heredado de BaseRepository)
+1. `create_team(team_data: Dict[str, Any]) -> Team` - Crea un nuevo equipo
+2. `update_team(team_id: int, team_data: Dict[str, Any]) -> Team` - Actualiza un equipo existente
+3. `delete_team(team_id: int) -> bool` - Elimina un equipo
 
-#### Consultas de Delegación - Estadísticas (3 funciones)
-13. `get_team_stats(team_id: int) -> Dict[str, Any]` - Obtiene estadísticas de un equipo específico
-14. `get_teams_by_department_summary() -> Dict[str, int]` - Obtiene un resumen de equipos agrupados por departamento
-15. `get_team_activity_stats(team_id: int) -> Dict[str, Any]` - Calcula estadísticas de actividad de un equipo usando Pendulum
+### OPERACIONES DE CONSULTA (8 métodos)
 
-#### Consultas de Delegación - Relaciones (3 funciones)
-16. `get_with_leader(team_id: int) -> Optional[Team]` - Obtiene un equipo con información del líder cargada
-17. `get_with_members(team_id: int) -> Optional[Team]` - Obtiene un equipo con información de miembros cargada
-18. `get_with_all_relations(team_id: int) -> Optional[Team]` - Obtiene un equipo con todas las relaciones cargadas
+4. `get_team_by_id(team_id: int) -> Optional[Team]` - Obtiene un equipo por su ID
+5. `get_team_by_name(name: str) -> Optional[Team]` - Obtiene un equipo por su nombre
+6. `get_teams_by_department(department: str, active_only: bool = True) -> List[Team]` - Obtiene equipos por departamento
+7. `get_active_teams() -> List[Team]` - Obtiene todos los equipos activos
+8. `get_inactive_teams() -> List[Team]` - Obtiene todos los equipos inactivos
+9. `search_teams_by_criteria(criteria: Dict[str, Any], limit: Optional[int] = None, offset: Optional[int] = None) -> List[Team]` - Busca equipos por criterios específicos
+10. `get_teams_with_pagination(page: int = 1, page_size: int = 20, filters: Optional[Dict[str, Any]] = None) -> Tuple[List[Team], int]` - Obtiene equipos con paginación
+11. `count_teams(filters: Optional[Dict[str, Any]] = None) -> int` - Cuenta equipos con filtros opcionales
 
-#### Consultas de Delegación - Validaciones (2 funciones)
-19. `name_exists(name: str, exclude_id: Optional[int] = None) -> bool` - Verifica si existe un equipo con el nombre dado
-20. `code_exists(code: str, exclude_id: Optional[int] = None) -> bool` - Verifica si existe un equipo con el código dado
+### MÉTODOS HEREDADOS DEL FACADE BASE (5 métodos)
 
-#### Métodos de Compatibilidad (10 funciones)
-21. `get_team_members(team_id: int, active_only: bool = True) -> List[Employee]` - Obtiene los miembros de un equipo
-22. `is_member(team_id: int, employee_id: int, active_only: bool = True) -> bool` - Verifica si un empleado es miembro de un equipo
-23. `add_member(team_id: int, employee_id: int, role: Optional[MembershipRole] = None, start_date: Optional[date] = None) -> TeamMembership` - Añade un miembro a un equipo
-24. `remove_member(team_id: int, employee_id: int, end_date: Optional[date] = None) -> bool` - Remueve un miembro de un equipo
-25. `update_member_role(team_id: int, employee_id: int, new_role: MembershipRole) -> bool` - Actualiza el rol de un miembro en el equipo
-26. `get_teams_created_current_week(**kwargs) -> List[Team]` - Obtiene equipos creados en la semana actual usando Pendulum
-27. `get_teams_created_current_month(**kwargs) -> List[Team]` - Obtiene equipos creados en el mes actual usando Pendulum
-28. `get_teams_created_business_days_only(start_date: Union[date, str, None] = None, end_date: Union[date, str, None] = None, **kwargs) -> List[Team]` - Obtiene equipos creados solo en días laborables
-29. `get_teams_by_age_range(min_days: int = 0, max_days: Optional[int] = None, department: Optional[str] = None, active_only: bool = True) -> List[Dict[str, Any]]` - Obtiene equipos por rango de edad usando Pendulum
-30. `create_team_with_pendulum_validation(team_data: Dict[str, Any], validate_creation_business_day: bool = False) -> Team` - Crea un equipo con validaciones avanzadas usando Pendulum
-31. `get_team_membership_duration_stats(team_id: int, employee_id: int) -> Dict[str, Any]` - Calcula estadísticas de duración de membresía usando Pendulum
-32. `format_team_created_at(team: Team) -> Optional[str]` - Formatea la fecha de creación del equipo
-33. `get_all() -> List[Team]` - Obtiene todos los equipos (heredado de BaseRepository)
+12. `get_all(skip: int = 0, limit: int = 100) -> List[Team]` - Obtiene todos los equipos con paginación
+13. `exists_by_id(team_id: int) -> bool` - Verifica si un equipo existe por su ID
+14. `count_all(filters: Optional[Dict[str, Any]] = None) -> int` - Cuenta todos los equipos con filtros opcionales
+15. `find_by_name(name: str) -> Optional[Team]` - Busca un equipo por nombre exacto
+16. `find_by_code(code: str) -> Optional[Team]` - Busca un equipo por código exacto
 
----
+### OPERACIONES DE BÚSQUEDA AVANZADA (1 método)
 
-### TeamQueryBuilder (team_query_builder.py)
+17. `search_teams(search_term: str, skip: int = 0, limit: int = 100) -> List[Team]` - Busca equipos por término de búsqueda con paginación
 
-#### Consultas Básicas (5 funciones)
-34. `build_base_query() -> select` - Construye la consulta base para equipos
-35. `build_active_teams_query() -> select` - Construye consulta para equipos activos
-36. `build_by_name_query(name: str) -> select` - Construye consulta para buscar equipo por nombre exacto
-37. `build_search_by_name_query(search_term: str) -> select` - Construye consulta para búsqueda parcial por nombre
-38. `search_by_description(search_term: str) -> select` - Construye consulta para búsqueda por descripción
+### OPERACIONES DE RELACIONES - GESTIÓN DE MIEMBROS (8 métodos)
 
-#### Consultas por Relaciones (5 funciones)
-39. `build_by_leader_query(leader_id: int) -> select` - Construye consulta para equipos por líder
-40. `build_by_department_query(department: str) -> select` - Construye consulta para equipos por departamento
-41. `build_with_leader_query(team_id: int) -> select` - Construye consulta para equipo con líder cargado
-42. `build_with_members_query(team_id: int) -> select` - Construye consulta para equipo con miembros cargados
-43. `build_with_all_relations_query(team_id: int) -> select` - Construye consulta para equipo con todas las relaciones
+18. `add_team_member(team_id: int, employee_id: int, role: str, is_leader: bool = False, start_date: Optional[date] = None) -> TeamMembership` - Añade un miembro al equipo
+19. `remove_team_member(team_id: int, employee_id: int, end_date: Optional[date] = None) -> bool` - Remueve un miembro del equipo
+20. `assign_team_leader(team_id: int, employee_id: int) -> TeamMembership` - Asigna un líder al equipo
+21. `get_team_members(team_id: int, active_only: bool = True, include_details: bool = False) -> List[TeamMembership]` - Obtiene miembros de un equipo
+22. `get_team_leader(team_id: int) -> Optional[TeamMembership]` - Obtiene el líder de un equipo
+23. `get_employee_teams(employee_id: int, active_only: bool = True, include_details: bool = False) -> List[TeamMembership]` - Obtiene equipos de un empleado
+24. `get_teams_with_members_details(team_ids: Optional[List[int]] = None, active_only: bool = True) -> List[Dict[str, Any]]` - Obtiene equipos con detalles de miembros
+25. `update_member_role(team_id: int, employee_id: int, new_role: str) -> TeamMembership` - Actualiza el rol de un miembro
 
-#### Consultas de Membresías (3 funciones)
-44. `build_membership_query(team_id: int, employee_id: int, active_only: bool = True) -> select` - Construye consulta para verificar membresía
-45. `build_teams_by_size_query(min_size: int, max_size: int) -> select` - Construye consulta para equipos por tamaño
-46. `build_teams_by_member_query(employee_id: int) -> select` - Construye consulta para equipos de un miembro
+### OPERACIONES DE ESTADÍSTICAS (10 métodos)
 
-#### Consultas de Análisis (4 funciones)
-47. `build_team_size_stats_query() -> select` - Construye consulta para estadísticas de tamaño de equipos
-48. `build_departments_query() -> select` - Construye consulta para obtener departamentos únicos
-49. `build_teams_without_leader_query() -> select` - Construye consulta para equipos sin líder
-50. `build_teams_by_role_query(role: MembershipRole) -> select` - Construye consulta para equipos por rol de membresía
+26. `count_total_teams(active_only: bool = True) -> int` - Cuenta el total de equipos
+27. `get_team_size_distribution() -> Dict[str, int]` - Obtiene distribución de tamaños de equipos
+28. `get_membership_trends(start_date: date, end_date: date, granularity: str = "monthly") -> List[Dict[str, Any]]` - Obtiene tendencias de membresías
+29. `get_leadership_statistics() -> Dict[str, Any]` - Obtiene estadísticas de liderazgo
+30. `get_department_team_distribution() -> Dict[str, int]` - Obtiene distribución de equipos por departamento
+31. `get_average_team_size(department: Optional[str] = None) -> float` - Obtiene el tamaño promedio de equipos
+32. `get_teams_without_leader() -> List[Team]` - Obtiene equipos sin líder
+33. `get_most_active_employees_in_teams(limit: int = 10) -> List[Dict[str, Any]]` - Obtiene empleados más activos en equipos
+34. `get_team_creation_trends(start_date: date, end_date: date, granularity: str = "monthly") -> List[Dict[str, Any]]` - Obtiene tendencias de creación de equipos
+35. `generate_teams_summary_report(include_inactive: bool = False) -> Dict[str, Any]` - Genera reporte resumen de equipos
 
-#### Métodos de Compatibilidad (3 funciones)
-51. `get_teams_by_size_range(min_size: int, max_size: int) -> select` - Alias para build_teams_by_size_query
-52. `get_active_teams() -> select` - Alias para build_active_teams_query
-53. `get_by_name(name: str) -> select` - Alias para build_by_name_query
+### OPERACIONES DE VALIDACIÓN (5 métodos)
+
+36. `validate_team_data(team_data: Dict[str, Any]) -> Dict[str, Any]` - Valida datos de equipo
+37. `validate_membership_data(membership_data: Dict[str, Any]) -> Dict[str, Any]` - Valida datos de membresía
+38. `check_membership_conflicts(employee_id: int, team_id: int) -> Dict[str, Any]` - Verifica conflictos de membresía
+39. `validate_business_rules(operation: str, data: Dict[str, Any]) -> Dict[str, Any]` - Valida reglas de negocio
+40. `validate_data_consistency() -> Dict[str, Any]` - Valida consistencia de datos
+
+### OPERACIONES COMPUESTAS Y AVANZADAS (4 métodos)
+
+41. `get_complete_team_info(team_id: int) -> Optional[Dict[str, Any]]` - Obtiene información completa de un equipo
+42. `create_team_with_validation(team_data: Dict[str, Any]) -> Dict[str, Any]` - Crea equipo con validación completa
+43. `add_team_member_with_validation(team_id: int, employee_id: int, role: str, is_leader: bool = False, start_date: Optional[date] = None) -> Dict[str, Any]` - Añade miembro con validación completa
+44. `get_team_dashboard_data(team_id: Optional[int] = None, department: Optional[str] = None) -> Dict[str, Any]` - Obtiene datos para dashboard de equipos
+
+### OPERACIONES MASIVAS (1 método)
+
+45. `bulk_team_operation(operation: str, team_data_list: List[Dict[str, Any]]) -> List[Dict[str, Any]]` - Ejecuta operaciones masivas en equipos
 
 ---
 
-### TeamValidator (team_validator.py)
+## Resumen de Funcionalidades
 
-#### Validación de Equipo (2 funciones)
-54. `validate_team_data(team_data: Dict[str, Any]) -> Dict[str, Any]` - Valida datos completos de un equipo
-55. `validate_team_name_uniqueness(name: str, exclude_id: Optional[int] = None) -> bool` - Valida unicidad del nombre del equipo
+**Total de métodos públicos:** 45
 
-#### Validación de Membresía (2 funciones)
-56. `validate_membership_data(membership_data: Dict[str, Any]) -> Dict[str, Any]` - Valida datos de membresía de equipo
-57. `validate_membership_uniqueness(team_id: int, employee_id: int) -> bool` - Valida unicidad de membresía
+**Distribución por categorías:**
+- **CRUD básico**: 3 métodos (crear, actualizar, eliminar)
+- **Consultas**: 8 métodos (búsquedas y obtención de datos)
+- **Métodos base**: 5 métodos (heredados del facade base)
+- **Búsqueda avanzada**: 1 método (búsqueda con términos)
+- **Gestión de relaciones**: 8 métodos (miembros y liderazgo)
+- **Estadísticas**: 10 métodos (análisis y reportes)
+- **Validaciones**: 5 métodos (validación de datos y reglas)
+- **Operaciones compuestas**: 4 métodos (operaciones complejas)
+- **Operaciones masivas**: 1 método (procesamiento en lote)
 
-#### Validación de Reglas de Negocio (2 funciones)
-58. `validate_leader_assignment(team_id: int, leader_id: int) -> bool` - Valida asignación de líder a equipo
-59. `validate_role_change(current_role: str, new_role: str) -> bool` - Valida cambio de rol de miembro
+**Características principales:**
+- **Interfaz unificada**: Acceso centralizado a todas las operaciones de equipos
+- **Validación integrada**: Métodos con validación automática de datos y reglas de negocio
+- **Soporte para paginación**: Múltiples métodos con soporte para paginación
+- **Análisis estadístico**: Amplio conjunto de métodos para análisis y reportes
+- **Gestión de relaciones**: Manejo completo de membresías y liderazgo
+- **Operaciones masivas**: Soporte para procesamiento en lote
+- **Dashboard integrado**: Métodos especializados para interfaces de usuario
 
-#### Validación de Consistencia (1 función)
-60. `validate_team_deletion(team_id: int) -> bool` - Valida que un equipo puede ser eliminado
+**Integración con módulos:**
+- **CrudModule**: Operaciones CRUD básicas
+- **QueryModule**: Consultas y búsquedas
+- **ValidationModule**: Validación de datos y reglas
+- **RelationshipModule**: Gestión de relaciones
+- **StatisticsModule**: Análisis y estadísticas
 
-#### Métodos de Compatibilidad (1 función)
-61. `validate_unique_name(name: str, exclude_id: Optional[int] = None) -> bool` - Alias para validate_team_name_uniqueness
-
----
-
-### TeamRelationshipManager (team_relationship_manager.py)
-
-#### Gestión de Membresías (4 funciones)
-62. `add_member(team_id: int, employee_id: int, role: str = MembershipRole.MEMBER.value, start_date: Optional[date] = None) -> TeamMembership` - Añade un miembro al equipo
-63. `remove_member(team_id: int, employee_id: int) -> bool` - Remueve un miembro del equipo
-64. `update_member_role(team_id: int, employee_id: int, new_role: str) -> bool` - Actualiza el rol de un miembro
-65. `get_active_membership(team_id: int, employee_id: int) -> Optional[TeamMembership]` - Obtiene la membresía activa de un empleado en un equipo
-
-#### Gestión de Liderazgo (2 funciones)
-66. `assign_leader(team_id: int, leader_id: int) -> bool` - Asigna un líder al equipo
-67. `remove_leader(team_id: int) -> bool` - Remueve el líder del equipo
-
-#### Consultas de Relaciones (3 funciones)
-68. `get_teams_by_member(employee_id: int) -> List[Team]` - Obtiene equipos donde el empleado es miembro
-69. `get_team_members(team_id: int, active_only: bool = True) -> List[Employee]` - Obtiene miembros de un equipo
-70. `get_members_by_role(team_id: int, role: MembershipRole) -> List[Employee]` - Obtiene miembros de un equipo por rol específico
-
----
-
-### TeamStatistics (team_statistics.py)
-
-#### Estadísticas Básicas (3 funciones)
-71. `get_team_count_stats() -> Dict[str, int]` - Obtiene conteo de equipos (totales, activos, con/sin líder)
-72. `get_team_size_distribution() -> Dict[str, Any]` - Obtiene distribución de tamaños por equipo
-73. `get_department_stats() -> Dict[str, Any]` - Obtiene estadísticas por departamento
-
-#### Estadísticas de Membresías (3 funciones)
-74. `get_membership_stats() -> Dict[str, Any]` - Obtiene conteo de membresías (totales, activas, distribución por rol)
-75. `get_employee_team_participation(employee_id: int) -> Dict[str, Any]` - Obtiene participación de empleados en equipos
-76. `get_membership_trends(start_date: date, end_date: date) -> Dict[str, Any]` - Obtiene tendencias de membresías en un período
-
-#### Métricas Avanzadas (2 funciones)
-77. `get_team_efficiency_metrics(team_id: int) -> Dict[str, Any]` - Obtiene métricas de eficiencia de equipos
-78. `_categorize_team_size(size: int) -> str` - **[PRIVADA]** Categoriza el tamaño de un equipo
-
-#### Reportes (1 función)
-79. `get_summary_report() -> Dict[str, Any]` - Obtiene reporte resumen completo de estadísticas de equipos
-
----
-
-**Total de funciones disponibles:** 79
-
-**Distribución por módulos:**
-- TeamRepository: 33 funciones
-- TeamQueryBuilder: 20 funciones (5 básicas + 5 relaciones + 3 membresías + 4 análisis + 3 compatibilidad)
-- TeamValidator: 8 funciones (2 equipo + 2 membresía + 2 reglas + 1 consistencia + 1 compatibilidad)
-- TeamRelationshipManager: 9 funciones (4 membresías + 2 liderazgo + 3 consultas)
-- TeamStatistics: 9 funciones
-
-**Categorías principales:**
-- **CRUD básico**: 8 funciones (crear, leer, actualizar, eliminar equipos y membresías)
-- **Consultas especializadas**: 34 funciones (por nombre, departamento, líder, miembros, análisis)
-- **Gestión de relaciones**: 9 funciones (membresías, liderazgo, consultas de relaciones)
-- **Análisis y estadísticas**: 17 funciones (conteos, distribuciones, tendencias, métricas y estadísticas adicionales)
-- **Validación de datos**: 8 funciones (equipos, membresías, reglas de negocio y consistencia)
-
-**Funcionalidades especiales:**
-- **Integración con Pendulum**: 6 funciones para manejo avanzado de fechas y tiempo
-- **Análisis de actividad**: 3 funciones para estadísticas de actividad y duración
-- **Validaciones de negocio**: 8 funciones para garantizar integridad de datos
-- **Gestión de membresías**: 9 funciones para administración de miembros y liderazgo
-- **Consultas especializadas**: 34 funciones para búsquedas avanzadas y análisis
-
-**Total de funciones documentadas**: 79
+**Casos de uso principales:**
+- Gestión completa del ciclo de vida de equipos
+- Administración de membresías y liderazgo
+- Análisis estadístico y generación de reportes
+- Validación de integridad de datos
+- Operaciones masivas y procesamiento en lote
+- Integración con interfaces de usuario (dashboards)
