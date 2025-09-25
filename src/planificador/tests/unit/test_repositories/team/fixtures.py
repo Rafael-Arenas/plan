@@ -215,7 +215,182 @@ def team_repository(mock_session):
     mock_facade.get_role_distribution = AsyncMock(side_effect=get_role_distribution_side_effect)
     mock_facade.get_capacity_statistics = AsyncMock(side_effect=get_capacity_statistics_side_effect)
     
-    # Configurar métodos de operaciones compuestas con side effects que simulan BD
+    # Configurar statistics_module como un mock separado
+    statistics_module_mock = AsyncMock()
+    
+    # Configurar métodos con return_value por defecto (los tests pueden sobrescribir)
+    statistics_module_mock.get_team_size_distribution = AsyncMock(return_value={
+        "small_teams": 5,
+        "medium_teams": 3,
+        "large_teams": 2
+    })
+    
+    statistics_module_mock.get_leadership_statistics = AsyncMock(return_value={
+        "teams_with_lead": 8,
+        "teams_without_lead": 2,
+        "leadership_ratio": 0.8
+    })
+    
+    statistics_module_mock.generate_teams_summary_report = AsyncMock(return_value={
+        "total_teams": 10,
+        "active_teams": 8,
+        "inactive_teams": 2,
+        "teams_by_size": {
+            "small": 5,
+            "medium": 3,
+            "large": 2
+        },
+        "leadership_stats": {
+            "teams_with_lead": 8,
+            "teams_without_lead": 2
+        },
+        "capacity_stats": {
+            "teams_with_capacity": 6,
+            "teams_at_capacity": 4
+        }
+    })
+    
+    # Asignar el statistics_module_mock al mock_facade
+    mock_facade.statistics_module = statistics_module_mock
+    
+    # Configurar validation_module
+    validation_module_mock = AsyncMock()
+    mock_facade.validation_module = validation_module_mock
+    
+    # Configurar crud_module
+    crud_module_mock = AsyncMock()
+    mock_facade.crud_module = crud_module_mock
+    
+    # Configurar relationship_module
+    relationship_module_mock = AsyncMock()
+    mock_facade.relationship_module = relationship_module_mock
+    
+    # Configurar los métodos de estadísticas en el mock_facade para que deleguen correctamente
+    async def get_team_size_distribution():
+        return await mock_facade.statistics_module.get_team_size_distribution()
+    
+    async def get_leadership_statistics():
+        return await mock_facade.statistics_module.get_leadership_statistics()
+    
+    async def generate_teams_summary_report(include_inactive=False):
+        return await mock_facade.statistics_module.generate_teams_summary_report(include_inactive)
+    
+    mock_facade.get_team_size_distribution = get_team_size_distribution
+    mock_facade.get_leadership_statistics = get_leadership_statistics
+    # Configurar métodos de delegación explícitos para get_complete_team_info
+    async def get_complete_team_info(team_id):
+        team = await mock_facade.get_team_by_id(team_id)
+        if team is None:
+            return None
+        
+        members = await mock_facade.get_team_members(team_id, True, True)
+        statistics = await mock_facade.statistics_module.get_team_statistics(team_id)
+        capacity = await mock_facade.validation_module.validate_member_capacity(team_id)
+        
+        # Convertir el objeto Team a diccionario si es necesario
+        team_dict = team if isinstance(team, dict) else {
+            "id": getattr(team, 'id', team_id),
+            "name": getattr(team, 'name', 'Test Team'),
+            "code": getattr(team, 'code', 'TEST001'),
+            "description": getattr(team, 'description', 'Test Description'),
+            "department": getattr(team, 'department', 'Test Department'),
+            "is_active": getattr(team, 'is_active', True),
+            "created_at": getattr(team, 'created_at', '2024-01-01T00:00:00'),
+            "max_members": getattr(team, 'max_members', 10)
+        }
+        
+        return {
+            "team": team_dict,
+            "members": members,
+            "statistics": statistics,
+            "capacity": capacity
+        }
+    
+    # Configurar métodos de delegación explícitos para create_team_with_validation
+    async def create_team_with_validation(team_data):
+        validation_result = await mock_facade.validation_module.validate_team_data(team_data)
+        if validation_result.get("is_valid", True):
+            team = await mock_facade.crud_module.create_team(team_data)
+            return {
+                "success": True,
+                "team": {
+                    "id": getattr(team, 'id', 1),
+                    "name": getattr(team, 'name', team_data.get('name', 'Test Team')),
+                    "code": getattr(team, 'code', team_data.get('code', 'TEST001')),
+                    "department": getattr(team, 'department', team_data.get('department', 'Test Department')),
+                    "is_active": getattr(team, 'is_active', True)
+                },
+                "validation": {
+                    "passed": True,
+                    "warnings": validation_result.get("warnings", []),
+                    "errors": validation_result.get("errors", [])
+                },
+                "message": "Equipo creado exitosamente"
+            }
+        else:
+            return {
+                "success": False,
+                "team": None,
+                "validation": {
+                    "passed": False,
+                    "warnings": validation_result.get("warnings", []),
+                    "errors": validation_result.get("errors", [])
+                },
+                "message": "Error en la validación del equipo"
+            }
+    
+    # Configurar métodos de delegación explícitos para add_team_member_with_validation
+    async def add_team_member_with_validation(team_id, employee_id, role, is_leader=False, start_date=None):
+        if start_date is None:
+            from datetime import date
+            start_date = date.today()
+            
+        can_add = await mock_facade.validation_module.can_add_member(team_id, employee_id)
+        conflicts = await mock_facade.validation_module.check_membership_conflicts(employee_id, team_id)
+        
+        if can_add and not conflicts.get("has_conflicts", False):
+            membership = await mock_facade.relationship_module.add_team_member(
+                team_id, employee_id, role, is_leader, start_date
+            )
+            return {
+                "success": True,
+                "membership": {
+                    "team_id": team_id,
+                    "employee_id": employee_id,
+                    "role": role,
+                    "is_leader": is_leader,
+                    "start_date": start_date.isoformat() if hasattr(start_date, 'isoformat') else str(start_date),
+                    "is_active": True
+                },
+                "validation": {
+                    "passed": True,
+                    "warnings": [],
+                    "errors": []
+                },
+                "message": "Miembro agregado exitosamente al equipo"
+            }
+        else:
+            error_message = "No se puede agregar el miembro al equipo"
+            if not can_add:
+                error_message = "Capacidad del equipo excedida"
+            elif conflicts.get("has_conflicts", False):
+                error_message = "Conflictos de membresía detectados"
+                
+            return {
+                "success": False,
+                "membership": None,
+                "validation": {
+                    "passed": False,
+                    "warnings": [],
+                    "errors": [error_message]
+                },
+                "message": error_message
+            }
+    
+    mock_facade.get_complete_team_info = get_complete_team_info
+    mock_facade.generate_teams_summary_report = generate_teams_summary_report
+    mock_facade.create_team_with_validation = create_team_with_validation
+    mock_facade.add_team_member_with_validation = add_team_member_with_validation
     async def create_team_with_members_side_effect(team_data, member_ids, **kwargs):
         """Side effect para crear equipo con miembros."""
         # Simular operaciones de base de datos

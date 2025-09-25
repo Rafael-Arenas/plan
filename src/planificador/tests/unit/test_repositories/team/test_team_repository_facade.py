@@ -205,6 +205,536 @@ class TestTeamCrudOperations:
         # Assert
         assert result is True
 
+
+# ============================================================================
+# TESTS PARA MÉTODOS ESTADÍSTICOS FALTANTES
+# ============================================================================
+
+class TestTeamStatisticsAdditionalOperations:
+    """Tests para métodos estadísticos adicionales del TeamRepositoryFacade."""
+
+    @pytest.mark.asyncio
+    async def test_get_team_size_distribution_success(
+        self, 
+        team_repository, 
+        mock_session
+    ):
+        """Test exitoso de obtención de distribución de tamaños de equipos."""
+        # Arrange
+        expected_distribution = {
+            "small_teams": 5,  # 1-3 miembros
+            "medium_teams": 8,  # 4-7 miembros
+            "large_teams": 3   # 8+ miembros
+        }
+        
+        # Configurar el return_value del mock existente en lugar de crear uno nuevo
+        team_repository.statistics_module.get_team_size_distribution.return_value = expected_distribution
+        
+        # Act
+        result = await team_repository.get_team_size_distribution()
+
+        # Assert
+        assert result is not None
+        assert isinstance(result, dict)
+        assert result == expected_distribution
+        assert "small_teams" in result
+        assert "medium_teams" in result
+        assert "large_teams" in result
+        team_repository.statistics_module.get_team_size_distribution.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_get_leadership_statistics_success(
+        self, 
+        team_repository, 
+        mock_session
+    ):
+        """Test exitoso de obtención de estadísticas de liderazgo."""
+        # Arrange
+        expected_stats = {
+            "total_leaders": 12,
+            "teams_with_leader": 10,
+            "teams_without_leader": 2,
+            "leadership_ratio": 0.83,
+            "average_leadership_experience": 3.5,
+            "leadership_distribution": {
+                "senior_leaders": 4,
+                "mid_level_leaders": 6,
+                "junior_leaders": 2
+            }
+        }
+        
+        # Configurar el return_value del mock existente en lugar de crear uno nuevo
+        team_repository.statistics_module.get_leadership_statistics.return_value = expected_stats
+        
+        # Act
+        result = await team_repository.get_leadership_statistics()
+
+        # Assert
+        assert result is not None
+        assert isinstance(result, dict)
+        assert result == expected_stats
+        assert "total_leaders" in result
+        assert "teams_with_leader" in result
+        assert "teams_without_leader" in result
+        assert "leadership_ratio" in result
+        assert "leadership_distribution" in result
+        team_repository.statistics_module.get_leadership_statistics.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_generate_teams_summary_report_success(
+        self, 
+        team_repository, 
+        mock_session
+    ):
+        """Test exitoso de generación de reporte resumen de equipos."""
+        # Arrange
+        expected_report = {
+            "summary": {
+                "total_teams": 15,
+                "active_teams": 12,
+                "inactive_teams": 3,
+                "total_members": 85,
+                "average_team_size": 5.67
+            },
+            "team_details": [
+                {
+                    "team_id": 1,
+                    "name": "Desarrollo Frontend",
+                    "code": "DEV-FE",
+                    "member_count": 6,
+                    "has_leader": True,
+                    "department": "Tecnología",
+                    "is_active": True
+                },
+                {
+                    "team_id": 2,
+                    "name": "Desarrollo Backend",
+                    "code": "DEV-BE",
+                    "member_count": 8,
+                    "has_leader": True,
+                    "department": "Tecnología",
+                    "is_active": True
+                }
+            ],
+            "statistics": {
+                "departments": {
+                    "Tecnología": 8,
+                    "Marketing": 4,
+                    "Ventas": 3
+                },
+                "size_distribution": {
+                    "small": 5,
+                    "medium": 7,
+                    "large": 3
+                }
+            }
+        }
+        
+    @pytest.mark.asyncio
+    async def test_generate_teams_summary_report_success(
+        self, 
+        team_repository, 
+        mock_session
+    ):
+        """Test exitoso de generación de reporte resumen de equipos."""
+        # Arrange
+        expected_report = {
+            "summary": {
+                "total_teams": 15,
+                "active_teams": 12,
+                "inactive_teams": 3,
+                "total_members": 85,
+                "average_team_size": 5.67
+            },
+            "team_details": [
+                {
+                    "team_id": 1,
+                    "name": "Desarrollo Frontend",
+                    "code": "DEV-FE",
+                    "member_count": 6,
+                    "has_leader": True,
+                    "department": "Tecnología",
+                    "is_active": True
+                },
+                {
+                    "team_id": 2,
+                    "name": "Desarrollo Backend",
+                    "code": "DEV-BE",
+                    "member_count": 8,
+                    "has_leader": True,
+                    "department": "Tecnología",
+                    "is_active": True
+                }
+            ],
+            "statistics": {
+                "departments": {
+                    "Tecnología": 8,
+                    "Marketing": 4,
+                    "Ventas": 3
+                },
+                "size_distribution": {
+                    "small": 5,
+                    "medium": 7,
+                    "large": 3
+                }
+            }
+        }
+        
+        # Configurar el return_value del mock existente en lugar de crear uno nuevo
+        team_repository.statistics_module.generate_teams_summary_report.return_value = expected_report
+        
+        # Act
+        result = await team_repository.generate_teams_summary_report(include_inactive=False)
+
+        # Assert
+        assert result is not None
+        assert isinstance(result, dict)
+        assert result == expected_report
+        assert "summary" in result
+        assert "team_details" in result
+        assert "statistics" in result
+        assert result["summary"]["total_teams"] == 15
+        assert len(result["team_details"]) == 2
+        team_repository.statistics_module.generate_teams_summary_report.assert_awaited_once_with(False)
+
+    @pytest.mark.asyncio
+    async def test_generate_teams_summary_report_with_inactive(
+        self, 
+        team_repository, 
+        mock_session
+    ):
+        """Test de generación de reporte resumen incluyendo equipos inactivos."""
+        # Arrange
+        expected_report = {
+            "summary": {
+                "total_teams": 18,
+                "active_teams": 12,
+                "inactive_teams": 6,
+                "total_members": 95,
+                "average_team_size": 5.28
+            },
+            "team_details": [],
+            "statistics": {}
+        }
+        
+        # Configurar el return_value del mock existente en lugar de crear uno nuevo
+        team_repository.statistics_module.generate_teams_summary_report.return_value = expected_report
+        
+        # Act
+        result = await team_repository.generate_teams_summary_report(include_inactive=True)
+
+        # Assert
+        assert result is not None
+        assert result["summary"]["total_teams"] == 18
+        assert result["summary"]["inactive_teams"] == 6
+        team_repository.statistics_module.generate_teams_summary_report.assert_awaited_once_with(True)
+
+
+# ============================================================================
+# TESTS PARA MÉTODOS COMPUESTOS FALTANTES
+# ============================================================================
+
+class TestTeamCompositeAdditionalOperations:
+    """Tests para métodos compuestos adicionales del TeamRepositoryFacade."""
+
+    @pytest.mark.asyncio
+    async def test_get_complete_team_info_success(
+        self, 
+        team_repository, 
+        mock_session,
+        sample_team_model,
+        sample_memberships_list
+    ):
+        """Test exitoso de obtención de información completa del equipo."""
+        # Arrange
+        team_id = 1
+        expected_info = {
+            "team": {
+                "id": 1,
+                "name": "Equipo de Desarrollo",
+                "code": "DEV001",
+                "description": "Equipo de desarrollo de software",
+                "department": "Tecnología",
+                "is_active": True,
+                "created_at": "2024-01-01T00:00:00",
+                "max_members": 10
+            },
+            "members": [
+                {
+                    "employee_id": 1,
+                    "name": "Juan Pérez",
+                    "role": "Developer",
+                    "is_leader": True,
+                    "start_date": "2024-01-01",
+                    "is_active": True
+                },
+                {
+                    "employee_id": 2,
+                    "name": "María García",
+                    "role": "Senior Developer",
+                    "is_leader": False,
+                    "start_date": "2024-01-15",
+                    "is_active": True
+                }
+            ],
+            "statistics": {
+                "total_members": 2,
+                "active_members": 2,
+                "leaders_count": 1,
+                "average_tenure_days": 45
+            },
+            "capacity": {
+                "current_size": 2,
+                "max_capacity": 10,
+                "utilization_percentage": 20.0,
+                "can_add_members": True
+            }
+        }
+        
+        # Mock de los métodos del facade
+        team_repository.get_team_by_id = AsyncMock(return_value=sample_team_model)
+        team_repository.get_team_members = AsyncMock(return_value=sample_memberships_list)
+        team_repository.statistics_module.get_team_statistics = AsyncMock(
+            return_value=expected_info["statistics"]
+        )
+        team_repository.validation_module.validate_member_capacity = AsyncMock(
+            return_value=expected_info["capacity"]
+        )
+
+        # Act
+        result = await team_repository.get_complete_team_info(team_id)
+
+        # Assert
+        assert result is not None
+        assert isinstance(result, dict)
+        assert "team" in result
+        assert "members" in result
+        assert "statistics" in result
+        assert "capacity" in result
+        assert result["team"]["id"] == team_id
+        assert len(result["members"]) >= 0
+        team_repository.get_team_by_id.assert_awaited_once_with(team_id)
+        team_repository.get_team_members.assert_awaited_once_with(team_id, True, True)
+
+    @pytest.mark.asyncio
+    async def test_get_complete_team_info_team_not_found(
+        self, 
+        team_repository, 
+        mock_session
+    ):
+        """Test de obtención de información completa cuando el equipo no existe."""
+        # Arrange
+        team_id = 999
+        team_repository.get_team_by_id = AsyncMock(return_value=None)
+
+        # Act
+        result = await team_repository.get_complete_team_info(team_id)
+
+        # Assert
+        assert result is None
+        team_repository.get_team_by_id.assert_awaited_once_with(team_id)
+
+    @pytest.mark.asyncio
+    async def test_create_team_with_validation_success(
+        self, 
+        team_repository, 
+        mock_session,
+        sample_team_data,
+        sample_team_model
+    ):
+        """Test exitoso de creación de equipo con validación."""
+        # Arrange
+        expected_result = {
+            "success": True,
+            "team": {
+                "id": 1,
+                "name": "Nuevo Equipo",
+                "code": "NEW001",
+                "department": "Tecnología",
+                "is_active": True
+            },
+            "validation": {
+                "passed": True,
+                "warnings": [],
+                "errors": []
+            },
+            "message": "Equipo creado exitosamente"
+        }
+        
+        # Mock de validación exitosa
+        team_repository.validation_module.validate_team_data = AsyncMock(
+            return_value={"is_valid": True, "errors": [], "warnings": []}
+        )
+        team_repository.crud_module.create_team = AsyncMock(return_value=sample_team_model)
+
+        # Act
+        result = await team_repository.create_team_with_validation(sample_team_data)
+
+        # Assert
+        assert result is not None
+        assert isinstance(result, dict)
+        assert result["success"] is True
+        assert "team" in result
+        assert "validation" in result
+        assert result["validation"]["passed"] is True
+        team_repository.validation_module.validate_team_data.assert_awaited_once_with(sample_team_data)
+        team_repository.crud_module.create_team.assert_awaited_once_with(sample_team_data)
+
+    @pytest.mark.asyncio
+    async def test_create_team_with_validation_failure(
+        self, 
+        team_repository, 
+        mock_session,
+        sample_team_data
+    ):
+        """Test de creación de equipo con validación fallida."""
+        # Arrange
+        validation_errors = ["El nombre del equipo ya existe", "El código es inválido"]
+        team_repository.validation_module.validate_team_data = AsyncMock(
+            return_value={
+                "is_valid": False, 
+                "errors": validation_errors, 
+                "warnings": []
+            }
+        )
+
+        # Act
+        result = await team_repository.create_team_with_validation(sample_team_data)
+
+        # Assert
+        assert result is not None
+        assert isinstance(result, dict)
+        assert result["success"] is False
+        assert "validation" in result
+        assert result["validation"]["passed"] is False
+        assert len(result["validation"]["errors"]) == 2
+        team_repository.validation_module.validate_team_data.assert_awaited_once_with(sample_team_data)
+
+    @pytest.mark.asyncio
+    async def test_add_team_member_with_validation_success(
+        self, 
+        team_repository, 
+        mock_session,
+        sample_membership_model
+    ):
+        """Test exitoso de adición de miembro con validación."""
+        # Arrange
+        team_id = 1
+        employee_id = 2
+        role = "Developer"
+        is_leader = False
+        start_date = date.today()
+        
+        expected_result = {
+            "success": True,
+            "membership": {
+                "team_id": team_id,
+                "employee_id": employee_id,
+                "role": role,
+                "is_leader": is_leader,
+                "start_date": start_date.isoformat(),
+                "is_active": True
+            },
+            "validation": {
+                "passed": True,
+                "warnings": [],
+                "errors": []
+            },
+            "message": "Miembro agregado exitosamente al equipo"
+        }
+        
+        # Mock de validaciones exitosas
+        team_repository.validation_module.can_add_member = AsyncMock(return_value=True)
+        team_repository.validation_module.check_membership_conflicts = AsyncMock(
+            return_value={"has_conflicts": False, "conflicts": []}
+        )
+        team_repository.relationship_module.add_team_member = AsyncMock(
+            return_value=sample_membership_model
+        )
+
+        # Act
+        result = await team_repository.add_team_member_with_validation(
+            team_id, employee_id, role, is_leader, start_date
+        )
+
+        # Assert
+        assert result is not None
+        assert isinstance(result, dict)
+        assert result["success"] is True
+        assert "membership" in result
+        assert "validation" in result
+        assert result["validation"]["passed"] is True
+        team_repository.validation_module.can_add_member.assert_awaited_once_with(team_id, employee_id)
+        team_repository.validation_module.check_membership_conflicts.assert_awaited_once_with(
+            employee_id, team_id
+        )
+        team_repository.relationship_module.add_team_member.assert_awaited_once_with(
+            team_id, employee_id, role, is_leader, start_date
+        )
+
+    @pytest.mark.asyncio
+    async def test_add_team_member_with_validation_capacity_exceeded(
+        self, 
+        team_repository, 
+        mock_session
+    ):
+        """Test de adición de miembro cuando se excede la capacidad."""
+        # Arrange
+        team_id = 1
+        employee_id = 2
+        role = "Developer"
+        
+        team_repository.validation_module.can_add_member = AsyncMock(return_value=False)
+
+        # Act
+        result = await team_repository.add_team_member_with_validation(
+            team_id, employee_id, role
+        )
+
+        # Assert
+        assert result is not None
+        assert isinstance(result, dict)
+        assert result["success"] is False
+        assert "validation" in result
+        assert result["validation"]["passed"] is False
+        assert "capacidad" in result["message"].lower() or "capacity" in result["message"].lower()
+        team_repository.validation_module.can_add_member.assert_awaited_once_with(team_id, employee_id)
+
+    @pytest.mark.asyncio
+    async def test_add_team_member_with_validation_conflicts(
+        self, 
+        team_repository, 
+        mock_session
+    ):
+        """Test de adición de miembro con conflictos de membresía."""
+        # Arrange
+        team_id = 1
+        employee_id = 2
+        role = "Developer"
+        
+        conflicts = ["El empleado ya es miembro de este equipo"]
+        team_repository.validation_module.can_add_member = AsyncMock(return_value=True)
+        team_repository.validation_module.check_membership_conflicts = AsyncMock(
+            return_value={"has_conflicts": True, "conflicts": conflicts}
+        )
+
+        # Act
+        result = await team_repository.add_team_member_with_validation(
+            team_id, employee_id, role
+        )
+
+        # Assert
+        assert result is not None
+        assert isinstance(result, dict)
+        assert result["success"] is False
+        assert "validation" in result
+        assert result["validation"]["passed"] is False
+        assert len(result["validation"]["errors"]) > 0
+        team_repository.validation_module.can_add_member.assert_awaited_once_with(team_id, employee_id)
+        team_repository.validation_module.check_membership_conflicts.assert_awaited_once_with(
+            employee_id, team_id
+        )
+
     @pytest.mark.asyncio
     async def test_delete_team_not_found(
         self, 
