@@ -456,3 +456,189 @@ class TeamQueryModule(BaseRepository[Team], ITeamQueryOperations):
         )
         
         return await self.get_by_field(field_name, value)
+
+    # ========================================================================
+    # MÉTODOS HEREDADOS DEL FACADE BASE
+    # ========================================================================
+
+    async def get_all_teams(
+        self, 
+        skip: int = 0, 
+        limit: int = 100
+    ) -> List[Team]:
+        """
+        Obtiene todos los equipos con paginación.
+        
+        Implementa el método get_all heredado del facade base,
+        delegando en el método get_all de BaseRepository.
+        
+        Args:
+            skip: Número de registros a omitir (offset)
+            limit: Número máximo de registros a retornar
+        
+        Returns:
+            List[Team]: Lista de equipos con paginación aplicada
+        
+        Raises:
+            TeamRepositoryError: Si ocurre un error durante la consulta
+        """
+        self._logger.debug(
+            f"Obteniendo todos los equipos con paginación: skip={skip}, limit={limit}"
+        )
+        
+        return await self.get_all(limit=limit, offset=skip)
+
+    async def exists_by_id(self, team_id: int) -> bool:
+        """
+        Verifica si un equipo existe por su ID.
+        
+        Implementa el método exists_by_id heredado del facade base,
+        delegando en el método exists de BaseRepository.
+        
+        Args:
+            team_id: ID del equipo a verificar
+        
+        Returns:
+            bool: True si el equipo existe, False en caso contrario
+        
+        Raises:
+            TeamRepositoryError: Si ocurre un error durante la verificación
+        """
+        self._logger.debug(f"Verificando existencia del equipo con ID: {team_id}")
+        
+        return await self.exists(team_id)
+
+    async def count_all_teams(self, filters: Optional[Dict[str, Any]] = None) -> int:
+        """
+        Cuenta el número total de equipos con filtros opcionales.
+        
+        Implementa el método count_all heredado del facade base,
+        delegando en el método count de BaseRepository.
+        
+        Args:
+            filters: Diccionario opcional de filtros a aplicar
+        
+        Returns:
+            int: Número total de equipos que cumplen los filtros
+        
+        Raises:
+            TeamRepositoryError: Si ocurre un error durante el conteo
+        """
+        self._logger.debug(f"Contando todos los equipos con filtros: {filters}")
+        
+        return await self.count(filters)
+
+    async def find_by_name(self, name: str) -> Optional[Team]:
+        """
+        Busca un equipo por su nombre exacto.
+        
+        Implementa el método find_by_name heredado del facade base,
+        delegando en el método get_team_by_name existente.
+        
+        Args:
+            name: Nombre exacto del equipo a buscar
+        
+        Returns:
+            Optional[Team]: El equipo encontrado o None si no existe
+        
+        Raises:
+            TeamRepositoryError: Si ocurre un error durante la búsqueda
+        """
+        self._logger.debug(f"Buscando equipo por nombre: {name}")
+        
+        return await self.get_team_by_name(name)
+
+    async def find_by_code(self, code: str) -> Optional[Team]:
+        """
+        Busca un equipo por su código único.
+        
+        Implementa el método find_by_code heredado del facade base,
+        delegando en el método get_by_field de BaseRepository.
+        
+        Args:
+            code: Código único del equipo a buscar
+        
+        Returns:
+            Optional[Team]: El equipo encontrado o None si no existe
+        
+        Raises:
+            TeamRepositoryError: Si ocurre un error durante la búsqueda
+        """
+        self._logger.debug(f"Buscando equipo por código: {code}")
+        
+        return await self.get_by_field("code", code)
+
+    async def search_teams(
+        self, 
+        search_term: str, 
+        skip: int = 0, 
+        limit: int = 100
+    ) -> List[Team]:
+        """
+        Busca equipos por término de búsqueda con paginación.
+        
+        Implementa el método search_teams heredado del facade base,
+        realizando búsqueda por nombre y descripción.
+        
+        Args:
+            search_term: Término de búsqueda a aplicar
+            skip: Número de registros a omitir (offset)
+            limit: Número máximo de registros a retornar
+        
+        Returns:
+            List[Team]: Lista de equipos que coinciden con el término de búsqueda
+        
+        Raises:
+            TeamRepositoryError: Si ocurre un error durante la búsqueda
+        """
+        self._logger.debug(
+            f"Buscando equipos con término: '{search_term}', skip={skip}, limit={limit}"
+        )
+        
+        try:
+            # Construir consulta con búsqueda en nombre y descripción
+            stmt = select(Team).where(
+                or_(
+                    Team.name.ilike(f"%{search_term}%"),
+                    Team.description.ilike(f"%{search_term}%")
+                )
+            ).order_by(Team.name)
+            
+            # Aplicar paginación
+            if skip > 0:
+                stmt = stmt.offset(skip)
+            if limit > 0:
+                stmt = stmt.limit(limit)
+            
+            result = await self.session.execute(stmt)
+            teams = result.scalars().all()
+            
+            self._logger.debug(
+                f"Búsqueda de equipos completada: {len(teams)} resultados encontrados"
+            )
+            
+            return list(teams)
+            
+        except SQLAlchemyError as e:
+            self._logger.error(
+                f"Error al buscar equipos con término '{search_term}': {e}",
+                search_term=search_term,
+                error_type=type(e).__name__
+            )
+            raise convert_sqlalchemy_error(
+                error=e,
+                operation="search_teams",
+                entity_type=self.model_class.__name__
+            )
+        except Exception as e:
+            self._logger.error(
+                f"Error inesperado al buscar equipos: {e}",
+                search_term=search_term,
+                error_type=type(e).__name__
+            )
+            raise TeamRepositoryError(
+                message=f"Error inesperado al buscar equipos: {e}",
+                operation="search_teams",
+                entity_type=self.model_class.__name__,
+                original_error=e
+            )
