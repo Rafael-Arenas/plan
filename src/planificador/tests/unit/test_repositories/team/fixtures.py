@@ -313,6 +313,22 @@ def team_repository(mock_session):
     relationship_module_mock = AsyncMock()
     mock_facade.relationship_module = relationship_module_mock
     
+    # Configurar query_module
+    query_module_mock = MagicMock()
+    query_module_mock.get_all_teams = AsyncMock(return_value=sample_teams_list)
+    query_module_mock.exists_by_id = AsyncMock(return_value=True)
+    query_module_mock.count_all_teams = AsyncMock(return_value=3)  # Usar valor fijo en lugar de len()
+    query_module_mock.find_by_name = AsyncMock(return_value=sample_team_model)
+    query_module_mock.find_by_code = AsyncMock(return_value=sample_team_model)
+    query_module_mock.search_teams = AsyncMock(return_value=sample_teams_list)
+    
+    # Métodos adicionales que usa la implementación real
+    query_module_mock.get_team_by_name = AsyncMock(return_value=sample_team_model)
+    query_module_mock.get_by_field = AsyncMock(return_value=sample_team_model)
+    query_module_mock.get_team_by_id = AsyncMock(return_value=sample_team_model)
+    
+    mock_facade.query_module = query_module_mock
+    
     # Configurar los métodos de estadísticas en el mock_facade para que deleguen correctamente
     async def get_team_size_distribution():
         return await mock_facade.statistics_module.get_team_size_distribution()

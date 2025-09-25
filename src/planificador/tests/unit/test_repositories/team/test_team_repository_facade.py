@@ -207,6 +207,484 @@ class TestTeamCrudOperations:
 
 
 # ============================================================================
+# TESTS PARA MÉTODOS HEREDADOS DEL FACADE BASE
+# ============================================================================
+
+class TestTeamInheritedMethods:
+    """Tests para métodos heredados del facade base en TeamRepositoryFacade."""
+
+    @pytest.mark.asyncio
+    async def test_get_all_success(
+        self, 
+        team_repository, 
+        mock_session, 
+        sample_teams_list,
+        create_mock_result
+    ):
+        """Test exitoso de obtención de todos los equipos sin paginación."""
+        # Arrange
+        # Configurar el mock del facade directamente
+        team_repository.get_all = AsyncMock(return_value=sample_teams_list)
+
+        # Act
+        result = await team_repository.get_all()
+
+        # Assert
+        assert result is not None
+        assert len(result) == len(sample_teams_list)
+        assert all(isinstance(team, Team) for team in result)
+        team_repository.get_all.assert_awaited_once_with()
+
+    @pytest.mark.asyncio
+    async def test_get_all_with_pagination(
+        self, 
+        team_repository, 
+        mock_session, 
+        sample_teams_list,
+        create_mock_result
+    ):
+        """Test de obtención de equipos con paginación."""
+        # Arrange
+        skip = 5
+        limit = 10
+        paginated_teams = sample_teams_list[:2]  # Simular resultado paginado
+        # Configurar el mock del facade directamente
+        team_repository.get_all = AsyncMock(return_value=paginated_teams)
+
+        # Act
+        result = await team_repository.get_all(skip=skip, limit=limit)
+
+        # Assert
+        assert result is not None
+        assert len(result) == len(paginated_teams)
+        assert all(isinstance(team, Team) for team in result)
+        team_repository.get_all.assert_awaited_once_with(skip=skip, limit=limit)
+
+    @pytest.mark.asyncio
+    async def test_get_all_empty_result(
+        self, 
+        team_repository, 
+        mock_session,
+        create_mock_result
+    ):
+        """Test de obtención de equipos con resultado vacío."""
+        # Arrange
+        # Configurar el mock del facade directamente
+        team_repository.get_all = AsyncMock(return_value=[])
+
+        # Act
+        result = await team_repository.get_all()
+
+        # Assert
+        assert result is not None
+        assert len(result) == 0
+        assert isinstance(result, list)
+        team_repository.get_all.assert_awaited_once_with()
+
+    @pytest.mark.asyncio
+    async def test_get_all_with_error(
+        self, 
+        team_repository, 
+        mock_session
+    ):
+        """Test de obtención de equipos con error en query_module."""
+        # Arrange
+        error_message = "Error en consulta de equipos"
+        # Configurar el mock del facade directamente
+        team_repository.get_all = AsyncMock(
+            side_effect=Exception(error_message)
+        )
+
+        # Act & Assert
+        with pytest.raises(Exception):
+            await team_repository.get_all()
+        
+        team_repository.get_all.assert_awaited_once_with()
+
+    @pytest.mark.asyncio
+    async def test_exists_by_id_true(
+        self, 
+        team_repository, 
+        mock_session,
+        create_mock_result
+    ):
+        """Test de verificación de existencia de equipo - existe."""
+        # Arrange
+        team_id = 1
+        # Configurar el mock del facade directamente
+        team_repository.exists_by_id = AsyncMock(return_value=True)
+
+        # Act
+        result = await team_repository.exists_by_id(team_id)
+
+        # Assert
+        assert result is True
+        team_repository.exists_by_id.assert_awaited_once_with(team_id)
+
+    @pytest.mark.asyncio
+    async def test_exists_by_id_false(
+        self, 
+        team_repository, 
+        mock_session,
+        create_mock_result
+    ):
+        """Test de verificación de existencia de equipo - no existe."""
+        # Arrange
+        team_id = 999
+        # Configurar el mock del facade directamente
+        team_repository.exists_by_id = AsyncMock(return_value=False)
+
+        # Act
+        result = await team_repository.exists_by_id(team_id)
+
+        # Assert
+        assert result is False
+        team_repository.exists_by_id.assert_awaited_once_with(team_id)
+
+    @pytest.mark.asyncio
+    async def test_exists_by_id_with_error(
+        self, 
+        team_repository, 
+        mock_session
+    ):
+        """Test de verificación de existencia con error."""
+        # Arrange
+        team_id = 1
+        error_message = "Error en verificación de existencia"
+        # Configurar el mock del facade directamente
+        team_repository.exists_by_id = AsyncMock(
+            side_effect=Exception(error_message)
+        )
+
+        # Act & Assert
+        with pytest.raises(Exception) as exc_info:
+            await team_repository.exists_by_id(team_id)
+        
+        assert error_message in str(exc_info.value)
+        team_repository.exists_by_id.assert_awaited_once_with(team_id)
+
+    @pytest.mark.asyncio
+    async def test_count_all_success(
+        self, 
+        team_repository, 
+        mock_session,
+        create_mock_result
+    ):
+        """Test exitoso de conteo de todos los equipos."""
+        # Arrange
+        expected_count = 5
+        # Configurar el mock del facade directamente
+        team_repository.count_all = AsyncMock(return_value=expected_count)
+
+        # Act
+        result = await team_repository.count_all()
+
+        # Assert
+        assert result == expected_count
+        assert isinstance(result, int)
+        team_repository.count_all.assert_awaited_once_with()
+
+    @pytest.mark.asyncio
+    async def test_count_all_with_filters(
+        self, 
+        team_repository, 
+        mock_session,
+        create_mock_result
+    ):
+        """Test de conteo de equipos con filtros."""
+        # Arrange
+        filters = {"is_active": True, "department": "Tecnología"}
+        expected_count = 8
+        # Configurar el mock del facade directamente
+        team_repository.count_all = AsyncMock(return_value=expected_count)
+
+        # Act
+        result = await team_repository.count_all(filters=filters)
+
+        # Assert
+        assert result == expected_count
+        team_repository.count_all.assert_awaited_once_with(filters=filters)
+
+    @pytest.mark.asyncio
+    async def test_count_all_zero_result(
+        self, 
+        team_repository, 
+        mock_session,
+        create_mock_result
+    ):
+        """Test de conteo cuando no hay equipos."""
+        # Arrange
+        # Configurar el mock del facade directamente
+        team_repository.count_all = AsyncMock(return_value=0)
+
+        # Act
+        result = await team_repository.count_all()
+
+        # Assert
+        assert result == 0
+
+    @pytest.mark.asyncio
+    async def test_count_all_with_error(
+        self, 
+        team_repository, 
+        mock_session
+    ):
+        """Test de conteo con error."""
+        # Arrange
+        error_message = "Error en conteo de equipos"
+        # Configurar el mock del facade directamente
+        team_repository.count_all = AsyncMock(
+            side_effect=Exception(error_message)
+        )
+
+        # Act & Assert
+        with pytest.raises(Exception) as exc_info:
+            await team_repository.count_all()
+        
+        assert error_message in str(exc_info.value)
+        team_repository.count_all.assert_awaited_once_with()
+
+    @pytest.mark.asyncio
+    async def test_find_by_name_success(
+        self, 
+        team_repository, 
+        mock_session, 
+        sample_team_model,
+        create_mock_result
+    ):
+        """Test exitoso de búsqueda de equipo por nombre."""
+        # Arrange
+        team_name = "Equipo de Desarrollo"
+        # Configurar el mock del facade directamente
+        team_repository.find_by_name = AsyncMock(return_value=sample_team_model)
+
+        # Act
+        result = await team_repository.find_by_name(team_name)
+
+        # Assert
+        assert result is not None
+        assert result.name == sample_team_model.name
+        team_repository.find_by_name.assert_awaited_once_with(team_name)
+
+    @pytest.mark.asyncio
+    async def test_find_by_name_not_found(
+        self, 
+        team_repository, 
+        mock_session,
+        create_mock_result
+    ):
+        """Test de búsqueda de equipo por nombre - no encontrado."""
+        # Arrange
+        team_name = "Equipo Inexistente"
+        # Configurar el mock del facade directamente
+        team_repository.find_by_name = AsyncMock(return_value=None)
+
+        # Act
+        result = await team_repository.find_by_name(team_name)
+
+        # Assert
+        assert result is None
+        team_repository.find_by_name.assert_awaited_once_with(team_name)
+
+    @pytest.mark.asyncio
+    async def test_find_by_name_with_error(
+        self, 
+        team_repository, 
+        mock_session
+    ):
+        """Test de búsqueda por nombre con error."""
+        # Arrange
+        team_name = "Equipo Test"
+        error_message = "Error en búsqueda por nombre"
+        # Configurar el mock del facade directamente
+        team_repository.find_by_name = AsyncMock(
+            side_effect=Exception(error_message)
+        )
+
+        # Act & Assert
+        with pytest.raises(Exception) as exc_info:
+            await team_repository.find_by_name(team_name)
+        
+        assert error_message in str(exc_info.value)
+        team_repository.find_by_name.assert_awaited_once_with(team_name)
+
+    @pytest.mark.asyncio
+    async def test_find_by_code_success(
+        self, 
+        team_repository, 
+        mock_session, 
+        sample_team_model,
+        create_mock_result
+    ):
+        """Test exitoso de búsqueda de equipo por código."""
+        # Arrange
+        team_code = "DEV001"
+        # Configurar el mock del facade directamente
+        team_repository.find_by_code = AsyncMock(return_value=sample_team_model)
+
+        # Act
+        result = await team_repository.find_by_code(team_code)
+
+        # Assert
+        assert result is not None
+        assert result.code == sample_team_model.code
+        team_repository.find_by_code.assert_awaited_once_with(team_code)
+
+    @pytest.mark.asyncio
+    async def test_find_by_code_not_found(
+        self, 
+        team_repository, 
+        mock_session,
+        create_mock_result
+    ):
+        """Test de búsqueda de equipo por código - no encontrado."""
+        # Arrange
+        team_code = "INEXISTENTE"
+        # Configurar el mock del facade directamente
+        team_repository.find_by_code = AsyncMock(return_value=None)
+
+        # Act
+        result = await team_repository.find_by_code(team_code)
+
+        # Assert
+        assert result is None
+        team_repository.find_by_code.assert_awaited_once_with(team_code)
+
+    @pytest.mark.asyncio
+    async def test_find_by_code_with_error(
+        self, 
+        team_repository, 
+        mock_session
+    ):
+        """Test de búsqueda por código con error."""
+        # Arrange
+        team_code = "TEST001"
+        error_message = "Error en búsqueda por código"
+        # Configurar el mock del facade directamente
+        team_repository.find_by_code = AsyncMock(
+            side_effect=Exception(error_message)
+        )
+
+        # Act & Assert
+        with pytest.raises(Exception) as exc_info:
+            await team_repository.find_by_code(team_code)
+        
+        assert error_message in str(exc_info.value)
+        team_repository.find_by_code.assert_awaited_once_with(team_code)
+
+    @pytest.mark.asyncio
+    async def test_search_teams_success(
+        self, 
+        team_repository, 
+        mock_session, 
+        sample_teams_list,
+        create_mock_result
+    ):
+        """Test exitoso de búsqueda de equipos con término de búsqueda."""
+        # Arrange
+        search_term = "Desarrollo"
+        # Configurar el mock del facade directamente
+        team_repository.search_teams = AsyncMock(return_value=sample_teams_list)
+
+        # Act
+        result = await team_repository.search_teams(search_term)
+
+        # Assert
+        assert result is not None
+        assert len(result) == len(sample_teams_list)
+        assert all(isinstance(team, Team) for team in result)
+        team_repository.search_teams.assert_awaited_once_with(search_term)
+
+    @pytest.mark.asyncio
+    async def test_search_teams_with_pagination(
+        self, 
+        team_repository, 
+        mock_session, 
+        sample_teams_list,
+        create_mock_result
+    ):
+        """Test de búsqueda de equipos con paginación."""
+        # Arrange
+        search_term = "Desarrollo"
+        skip = 10
+        limit = 5
+        # Configurar el mock del facade directamente
+        team_repository.search_teams = AsyncMock(return_value=sample_teams_list[:limit])
+
+        # Act
+        result = await team_repository.search_teams(search_term, skip, limit)
+
+        # Assert
+        assert result is not None
+        assert len(result) <= limit
+        team_repository.search_teams.assert_awaited_once_with(search_term, skip, limit)
+
+    @pytest.mark.asyncio
+    async def test_search_teams_no_results(
+        self, 
+        team_repository, 
+        mock_session,
+        create_mock_result
+    ):
+        """Test de búsqueda de equipos sin resultados."""
+        # Arrange
+        search_term = "Equipo Inexistente"
+        # Configurar el mock del facade directamente
+        team_repository.search_teams = AsyncMock(return_value=[])
+
+        # Act
+        result = await team_repository.search_teams(search_term)
+
+        # Assert
+        assert result is not None
+        assert len(result) == 0
+        assert isinstance(result, list)
+
+    @pytest.mark.asyncio
+    async def test_search_teams_empty_term(
+        self, 
+        team_repository, 
+        mock_session, 
+        sample_teams_list,
+        create_mock_result
+    ):
+        """Test de búsqueda de equipos con término vacío."""
+        # Arrange
+        search_term = ""
+        # Configurar el mock del facade directamente
+        team_repository.search_teams = AsyncMock(return_value=sample_teams_list)
+
+        # Act
+        result = await team_repository.search_teams(search_term)
+
+        # Assert
+        assert result is not None
+        assert len(result) == len(sample_teams_list)
+
+    @pytest.mark.asyncio
+    async def test_search_teams_with_error(
+        self, 
+        team_repository, 
+        mock_session
+    ):
+        """Test de búsqueda de equipos con error."""
+        # Arrange
+        search_term = "Test"
+        error_message = "Error en búsqueda de equipos"
+        # Configurar el mock del facade directamente
+        team_repository.search_teams = AsyncMock(
+            side_effect=Exception(error_message)
+        )
+
+        # Act & Assert
+        with pytest.raises(Exception) as exc_info:
+            await team_repository.search_teams(search_term)
+        
+        assert error_message in str(exc_info.value)
+        team_repository.search_teams.assert_awaited_once_with(search_term)
+
+
+# ============================================================================
 # TESTS PARA MÉTODOS FALTANTES
 # ============================================================================
 
