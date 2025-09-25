@@ -156,8 +156,128 @@ class TeamRepositoryFacade(
         return await self.query_module.get_teams_with_pagination(page, page_size, filters)
 
     async def count_teams(self, filters: Optional[Dict[str, Any]] = None) -> int:
-        """Cuenta el número total de equipos."""
+        """Cuenta equipos con filtros opcionales."""
         return await self.query_module.count_teams(filters)
+
+    # =============================================================================
+    # MÉTODOS HEREDADOS DEL FACADE BASE
+    # =============================================================================
+
+    async def get_all(self, skip: int = 0, limit: int = 100) -> List[Team]:
+        """
+        Obtiene todos los equipos con paginación.
+        
+        Método heredado del facade base que proporciona acceso
+        a todos los equipos del sistema con soporte para paginación.
+        
+        Args:
+            skip: Número de registros a omitir (offset)
+            limit: Número máximo de registros a retornar
+        
+        Returns:
+            List[Team]: Lista de equipos con paginación aplicada
+        
+        Raises:
+            TeamRepositoryError: Si ocurre un error durante la consulta
+        """
+        return await self.query_module.get_all_teams(skip, limit)
+
+    async def exists_by_id(self, team_id: int) -> bool:
+        """
+        Verifica si un equipo existe por su ID.
+        
+        Método heredado del facade base que verifica la existencia
+        de un equipo específico en el sistema.
+        
+        Args:
+            team_id: ID del equipo a verificar
+        
+        Returns:
+            bool: True si el equipo existe, False en caso contrario
+        
+        Raises:
+            TeamRepositoryError: Si ocurre un error durante la verificación
+        """
+        return await self.query_module.exists_by_id(team_id)
+
+    async def count_all(self, filters: Optional[Dict[str, Any]] = None) -> int:
+        """
+        Cuenta el número total de equipos con filtros opcionales.
+        
+        Método heredado del facade base que proporciona el conteo
+        total de equipos en el sistema con soporte para filtros.
+        
+        Args:
+            filters: Diccionario opcional de filtros a aplicar
+        
+        Returns:
+            int: Número total de equipos que cumplen los filtros
+        
+        Raises:
+            TeamRepositoryError: Si ocurre un error durante el conteo
+        """
+        return await self.query_module.count_all_teams(filters)
+
+    async def find_by_name(self, name: str) -> Optional[Team]:
+        """
+        Busca un equipo por su nombre exacto.
+        
+        Método heredado del facade base que busca un equipo
+        específico por su nombre exacto.
+        
+        Args:
+            name: Nombre exacto del equipo a buscar
+        
+        Returns:
+            Optional[Team]: El equipo encontrado o None si no existe
+        
+        Raises:
+            TeamRepositoryError: Si ocurre un error durante la búsqueda
+        """
+        return await self.query_module.find_by_name(name)
+
+    async def find_by_code(self, code: str) -> Optional[Team]:
+        """
+        Busca un equipo por su código único.
+        
+        Método heredado del facade base que busca un equipo
+        específico por su código único.
+        
+        Args:
+            code: Código único del equipo a buscar
+        
+        Returns:
+            Optional[Team]: El equipo encontrado o None si no existe
+        
+        Raises:
+            TeamRepositoryError: Si ocurre un error durante la búsqueda
+        """
+        return await self.query_module.find_by_code(code)
+
+    async def search_teams(
+        self, 
+        search_term: str, 
+        skip: int = 0, 
+        limit: int = 100
+    ) -> List[Team]:
+        """
+        Busca equipos por término de búsqueda con paginación.
+        
+        Método heredado del facade base que realiza búsqueda
+        de equipos por término en nombre y descripción.
+        
+        Args:
+            search_term: Término de búsqueda a aplicar
+            skip: Número de registros a omitir (offset)
+            limit: Número máximo de registros a retornar
+        
+        Returns:
+            List[Team]: Lista de equipos que coinciden con el término de búsqueda
+        
+        Raises:
+            TeamRepositoryError: Si ocurre un error durante la búsqueda
+        """
+        return await self.query_module.search_teams(search_term, skip, limit)
 
     # =============================================================================
     # OPERACIONES DE RELACIONES
