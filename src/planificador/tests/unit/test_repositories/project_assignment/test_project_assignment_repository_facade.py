@@ -1124,3 +1124,74 @@ class TestValidationOperations:
         project_assignment_repository._validation_operations.validate_business_rules.assert_called_once_with(
             sample_assignment_data, exclude_id
         )
+
+
+class TestSyncValidationOperations:
+    """Pruebas para las operaciones de validación síncronas del facade."""
+
+    def test_validate_required_fields_success(
+        self, 
+        project_assignment_repository: ProjectAssignmentRepositoryFacade,
+        sample_assignment_data: dict
+    ):
+        """Prueba la validación exitosa de campos requeridos."""
+        # Configurar mock
+        project_assignment_repository._validation_operations.validate_required_fields = MagicMock()
+        
+        # Ejecutar
+        project_assignment_repository.validate_required_fields(sample_assignment_data)
+        
+        # Verificar
+        project_assignment_repository._validation_operations.validate_required_fields.assert_called_once_with(
+            sample_assignment_data
+        )
+
+    def test_validate_date_range_success(
+        self, 
+        project_assignment_repository: ProjectAssignmentRepositoryFacade,
+        sample_date_range: tuple[date, date]
+    ):
+        """Prueba la validación exitosa de rango de fechas."""
+        # Configurar mock
+        start_date, end_date = sample_date_range
+        project_assignment_repository._validation_operations.validate_date_range = MagicMock()
+        
+        # Ejecutar
+        project_assignment_repository.validate_date_range(start_date, end_date)
+        
+        # Verificar
+        project_assignment_repository._validation_operations.validate_date_range.assert_called_once_with(
+            start_date, end_date
+        )
+
+    def test_validate_allocation_percentage_success(
+        self, project_assignment_repository: ProjectAssignmentRepositoryFacade
+    ):
+        """Prueba la validación exitosa de porcentaje de asignación."""
+        # Configurar mock
+        allocation_percentage = 80.0
+        project_assignment_repository._validation_operations.validate_allocation_percentage = MagicMock()
+        
+        # Ejecutar
+        project_assignment_repository.validate_allocation_percentage(allocation_percentage)
+        
+        # Verificar
+        project_assignment_repository._validation_operations.validate_allocation_percentage.assert_called_once_with(
+            allocation_percentage
+        )
+
+    def test_validate_hours_per_day_success(
+        self, project_assignment_repository: ProjectAssignmentRepositoryFacade
+    ):
+        """Prueba la validación exitosa de horas por día."""
+        # Configurar mock
+        hours_per_day = 8.0
+        project_assignment_repository._validation_operations.validate_hours_per_day = MagicMock()
+        
+        # Ejecutar
+        project_assignment_repository.validate_hours_per_day(hours_per_day)
+        
+        # Verificar
+        project_assignment_repository._validation_operations.validate_hours_per_day.assert_called_once_with(
+            hours_per_day
+        )
