@@ -6,6 +6,7 @@ from datetime import datetime, date
 from decimal import Decimal
 
 from ..base.base import BaseSchema
+from .workload_update import WorkloadUpdate
 
 
 class WorkloadBase(BaseSchema):
@@ -73,3 +74,7 @@ class Workload(WorkloadBase):
     id: int
     created_at: datetime
     updated_at: datetime
+
+
+# Exportar WorkloadUpdate para compatibilidad con imports existentes
+__all__ = ['WorkloadBase', 'WorkloadCreate', 'Workload', 'WorkloadUpdate']
