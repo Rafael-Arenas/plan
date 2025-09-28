@@ -183,3 +183,32 @@ class QueryOperations(BaseRepository[ProjectAssignment], IQueryOperations):
             f"entre {start_date} y {end_date}"
         )
         return await self.find_by_criteria(criteria)
+
+    async def get_by_unique_field(self, field_name: str, value: Any) -> ProjectAssignment | None:
+        """Obtiene una asignación por un campo único delegando en el repositorio base.
+        
+        Args:
+            field_name: Nombre del campo único
+            value: Valor del campo
+            
+        Returns:
+            Asignación encontrada o None si no existe
+        """
+        self._logger.debug(f"Obteniendo asignación por {field_name}: {value}")
+        return await self.get_by_field(field_name, value)
+
+    async def search_assignments_by_filters(
+        self, filters: dict[str, Any], limit: int = 50, offset: int = 0
+    ) -> list[ProjectAssignment]:
+        """Busca asignaciones usando múltiples filtros.
+        
+        Args:
+            filters: Diccionario de filtros a aplicar
+            limit: Número máximo de resultados
+            offset: Número de resultados a omitir
+            
+        Returns:
+            Lista de asignaciones que coinciden con los filtros
+        """
+        self._logger.debug(f"Buscando asignaciones con filtros: {filters}")
+        return await self.find_by_criteria(filters, limit=limit, offset=offset)

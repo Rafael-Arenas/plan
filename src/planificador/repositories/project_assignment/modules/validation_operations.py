@@ -16,7 +16,7 @@ from planificador.models.project_assignment import ProjectAssignment
 from planificador.models.employee import Employee
 from planificador.models.project import Project
 from planificador.repositories.base_repository import BaseRepository
-from planificador.exceptions.validation_exceptions import ValidationError
+from planificador.exceptions import ValidationError
 from ..interfaces.validation_interface import IValidationOperations
 
 
@@ -77,6 +77,107 @@ class ValidationOperations(BaseRepository[ProjectAssignment], IValidationOperati
             await self.validate_project_exists(assignment_data["project_id"])
         
         return True
+
+    async def get_by_unique_field(self, field_name: str, value: Any) -> ProjectAssignment | None:
+        """Obtiene una asignación por un campo único.
+        
+        Args:
+            field_name: Nombre del campo único
+            value: Valor a buscar
+            
+        Returns:
+            La asignación encontrada o None si no existe
+        """
+        try:
+            self._logger.debug(f"Buscando asignación por {field_name}={value}")
+            
+            # Verificar que el campo existe en el modelo
+            if not hasattr(self.model_class, field_name):
+                self._logger.warning(f"Campo {field_name} no existe en {self.model_class.__name__}")
+                return None
+            
+            field = getattr(self.model_class, field_name)
+            stmt = select(self.model_class).where(field == value)
+            result = await self.session.execute(stmt)
+            assignment = result.scalar_one_or_none()
+            
+            if assignment:
+                self._logger.debug(f"Asignación encontrada: ID {assignment.id}")
+            else:
+                self._logger.debug(f"No se encontró asignación con {field_name}={value}")
+                
+            return assignment
+            
+        except Exception as e:
+            self._logger.error(f"Error buscando por {field_name}: {e}")
+            raise
+
+    async def validate_workload_limits(
+        self, 
+        employee_id: int, 
+        start_date: date, 
+        end_date: date | None,
+        percentage_allocation: float | None,
+        exclude_id: int | None = None
+    ) -> None:
+        """Valida que la carga de trabajo no exceda los límites.
+        
+        Args:
+            employee_id: ID del empleado
+            start_date: Fecha de inicio
+            end_date: Fecha de fin
+            percentage_allocation: Porcentaje de dedicación
+            exclude_id: ID de asignación a excluir
+            
+        Raises:
+            ValidationError: Si la carga de trabajo excede los límites
+        """
+        self._logger.debug(f"Validando límites de carga de trabajo para empleado {employee_id}")
+        
+        if percentage_allocation is None:
+            return
+        
+        try:
+            # Obtener asignaciones existentes que se superponen
+            stmt = select(ProjectAssignment).where(
+                ProjectAssignment.employee_id == employee_id,
+                ProjectAssignment.start_date <= (end_date or date.max),
+                (ProjectAssignment.end_date.is_(None) | 
+                 (ProjectAssignment.end_date >= start_date))
+            )
+            
+            if exclude_id:
+                stmt = stmt.where(ProjectAssignment.id != exclude_id)
+            
+            result = await self.session.execute(stmt)
+            overlapping_assignments = result.scalars().all()
+            
+            # Calcular la carga total
+            total_allocation = percentage_allocation
+            for assignment in overlapping_assignments:
+                if assignment.allocation_percentage:
+                    total_allocation += assignment.allocation_percentage
+            
+            # Validar que no exceda el 100%
+            if total_allocation > 100:
+                raise ValidationError(
+                    message=f"La carga de trabajo total ({total_allocation}%) excede el 100%",
+                    field_errors={
+                        "allocation_percentage": f"Carga actual: {total_allocation - percentage_allocation}%, "
+                                               f"nueva asignación: {percentage_allocation}%"
+                    }
+                )
+            
+            self._logger.debug(f"Validación de carga de trabajo exitosa: {total_allocation}%")
+            
+        except ValidationError:
+            raise
+        except Exception as e:
+            self._logger.error(f"Error validando límites de carga de trabajo: {e}")
+            raise ValidationError(
+                message=f"Error validando límites de carga de trabajo: {e}",
+                original_error=e
+            )
 
     async def validate_required_fields(self, assignment_data: dict[str, Any]) -> bool:
         """Valida que los campos requeridos estén presentes.

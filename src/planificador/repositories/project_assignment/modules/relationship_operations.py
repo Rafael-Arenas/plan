@@ -80,25 +80,23 @@ class RelationshipOperations(BaseRepository[ProjectAssignment], IRelationshipOpe
         return list(result.scalars().all())
 
     async def get_assignments_with_full_data(
-        self, assignment_ids: list[int] | None = None
+        self, limit: int = 50, offset: int = 0
     ) -> list[ProjectAssignment]:
         """Obtiene asignaciones con todos los datos relacionados cargados.
         
         Args:
-            assignment_ids: Lista de IDs de asignaciones específicas (opcional)
+            limit: Número máximo de resultados
+            offset: Número de resultados a omitir
             
         Returns:
             Lista de asignaciones con datos completos
         """
-        self._logger.debug(f"Obteniendo asignaciones con datos completos (ids={assignment_ids})")
+        self._logger.debug(f"Obteniendo asignaciones con datos completos (limit={limit}, offset={offset})")
         
         query = select(ProjectAssignment).options(
             selectinload(ProjectAssignment.employee),
             selectinload(ProjectAssignment.project)
-        )
-        
-        if assignment_ids is not None:
-            query = query.where(ProjectAssignment.id.in_(assignment_ids))
+        ).limit(limit).offset(offset)
         
         result = await self.session.execute(query)
         return list(result.scalars().all())
@@ -257,3 +255,58 @@ class RelationshipOperations(BaseRepository[ProjectAssignment], IRelationshipOpe
             "total_allocation_percentage": total_allocation,
             "include_inactive": include_inactive
         }
+
+    async def get_by_unique_field(self, field_name: str, value: Any) -> ProjectAssignment | None:
+        """Obtiene una asignación por un campo único delegando en el repositorio base.
+        
+        Args:
+            field_name: Nombre del campo único
+            value: Valor del campo
+            
+        Returns:
+            Asignación encontrada o None si no existe
+        """
+        self._logger.debug(f"Obteniendo asignación por {field_name}: {value}")
+        return await self.get_by_field(field_name, value)
+
+    async def get_assignments_with_employee_data(
+        self, limit: int = 50, offset: int = 0
+    ) -> list[ProjectAssignment]:
+        """Obtiene asignaciones con datos del empleado cargados.
+        
+        Args:
+            limit: Número máximo de resultados
+            offset: Número de resultados a omitir
+            
+        Returns:
+            Lista de asignaciones con datos del empleado
+        """
+        self._logger.debug(f"Obteniendo asignaciones con datos del empleado (limit={limit}, offset={offset})")
+        
+        query = select(ProjectAssignment).options(
+            selectinload(ProjectAssignment.employee)
+        ).limit(limit).offset(offset)
+        
+        result = await self.session.execute(query)
+        return list(result.scalars().all())
+
+    async def get_assignments_with_project_data(
+        self, limit: int = 50, offset: int = 0
+    ) -> list[ProjectAssignment]:
+        """Obtiene asignaciones con datos del proyecto cargados.
+        
+        Args:
+            limit: Número máximo de resultados
+            offset: Número de resultados a omitir
+            
+        Returns:
+            Lista de asignaciones con datos del proyecto
+        """
+        self._logger.debug(f"Obteniendo asignaciones con datos del proyecto (limit={limit}, offset={offset})")
+        
+        query = select(ProjectAssignment).options(
+            selectinload(ProjectAssignment.project)
+        ).limit(limit).offset(offset)
+        
+        result = await self.session.execute(query)
+        return list(result.scalars().all())

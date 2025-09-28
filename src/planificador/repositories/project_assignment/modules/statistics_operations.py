@@ -380,3 +380,43 @@ class StatisticsOperations(BaseRepository[ProjectAssignment], IStatisticsOperati
                 "overlap_rate": overlap_stats["overlap_percentage"]
             }
         }
+
+    async def get_assignment_count(self) -> int:
+        """Obtiene el número total de asignaciones.
+        
+        Returns:
+            Número total de asignaciones
+        """
+        self._logger.debug("Obteniendo conteo total de asignaciones")
+        return await self.get_total_assignments_count()
+
+    async def get_active_assignment_count(self) -> int:
+        """Obtiene el número de asignaciones activas.
+        
+        Returns:
+            Número de asignaciones activas
+        """
+        self._logger.debug("Obteniendo conteo de asignaciones activas")
+        return await self.get_active_assignments_count()
+
+    async def get_comprehensive_dashboard_metrics(self) -> dict[str, Any]:
+        """Obtiene métricas completas para dashboard.
+        
+        Returns:
+            Diccionario con métricas completas
+        """
+        self._logger.debug("Obteniendo métricas completas para dashboard")
+        return await self.get_dashboard_metrics()
+
+    async def get_by_unique_field(self, field_name: str, value: Any) -> ProjectAssignment | None:
+        """Obtiene una asignación por un campo único delegando en el repositorio base.
+        
+        Args:
+            field_name: Nombre del campo único
+            value: Valor del campo
+            
+        Returns:
+            Asignación encontrada o None si no existe
+        """
+        self._logger.debug(f"Obteniendo asignación por {field_name}: {value}")
+        return await self.get_by_field(field_name, value)

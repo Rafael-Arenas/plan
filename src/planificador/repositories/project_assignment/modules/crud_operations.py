@@ -83,3 +83,16 @@ class CrudOperations(BaseRepository[ProjectAssignment], ICrudOperations):
         """
         self._logger.debug(f"Obteniendo asignación por ID: {assignment_id}")
         return await self.get_by_id(assignment_id)
+
+    async def get_by_unique_field(self, field_name: str, value: Any) -> ProjectAssignment | None:
+        """Obtiene una asignación por un campo único delegando en el repositorio base.
+        
+        Args:
+            field_name: Nombre del campo único
+            value: Valor del campo
+            
+        Returns:
+            Asignación encontrada o None si no existe
+        """
+        self._logger.debug(f"Obteniendo asignación por {field_name}: {value}")
+        return await self.get_by_field(field_name, value)
