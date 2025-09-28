@@ -842,17 +842,22 @@ class WorkloadValidationModule(BaseRepository[Workload], IWorkloadValidationOper
                 original_error=e
             )
 
-    async def check_employee_project_consistency(self, workload_id: int, employee_id: int, project_id: int) -> bool:
+    async def check_employee_project_consistency(
+        self, 
+        workload_id: int, 
+        employee_id: int, 
+        project_id: int
+    ) -> bool:
         """
         Verifica consistencia entre empleado y proyecto asignados.
         
         Args:
             workload_id: ID de la carga de trabajo
-            employee_id: ID del empleado
-            project_id: ID del proyecto
+            employee_id: ID del empleado esperado
+            project_id: ID del proyecto esperado
         
         Returns:
-            bool: True si la consistencia es válida
+            bool: True si la consistencia es correcta, False en caso contrario
         
         Raises:
             WorkloadRepositoryError: Si ocurre un error durante la verificación
@@ -892,8 +897,11 @@ class WorkloadValidationModule(BaseRepository[Workload], IWorkloadValidationOper
             self._logger.debug(f"Verificación de consistencia completada: {is_consistent}")
             return is_consistent
             
+        except WorkloadRepositoryError:
+            raise
         except SQLAlchemyError as e:
             self._logger.error(f"Error SQLAlchemy al verificar consistencia: {e}")
+            await self.session.rollback()
             raise convert_sqlalchemy_error(
                 error=e,
                 operation="check_employee_project_consistency",
@@ -902,6 +910,7 @@ class WorkloadValidationModule(BaseRepository[Workload], IWorkloadValidationOper
             )
         except Exception as e:
             self._logger.error(f"Error inesperado al verificar consistencia: {e}")
+            await self.session.rollback()
             raise WorkloadRepositoryError(
                 message=f"Error inesperado al verificar consistencia: {e}",
                 operation="check_employee_project_consistency",
