@@ -11,7 +11,7 @@ from typing import Any, Dict, List, Optional, Union
 from datetime import datetime, date
 from decimal import Decimal
 
-from ..base import PlanificadorBaseException, ValidationError, NotFoundError, ConflictError, BusinessLogicError
+from ..base import PlanificadorBaseException, ValidationError, NotFoundError, ConflictError, BusinessLogicError, ErrorCode
 from .base_repository_exceptions import RepositoryError, RepositoryValidationError
 
 
@@ -43,6 +43,44 @@ class WorkloadRepositoryError(RepositoryError):
         )
         # Nota: self.operation se accede a través de la propiedad heredada
         self.workload_id = workload_id
+
+
+class WorkloadNotFoundError(WorkloadRepositoryError):
+    """
+    Excepción lanzada cuando no se encuentra una carga de trabajo específica.
+    
+    Se utiliza cuando se intenta acceder a una carga de trabajo que no existe
+    en la base de datos o cuando las consultas no devuelven resultados.
+    """
+    
+    def __init__(
+        self,
+        workload_id: Optional[Union[int, str]] = None,
+        message: Optional[str] = None,
+        operation: Optional[str] = None,
+        **kwargs
+    ):
+        if message is None:
+            if workload_id:
+                message = f"No se encontró la carga de trabajo con ID {workload_id}"
+            else:
+                message = "No se encontró la carga de trabajo especificada"
+        
+        # Inicializar solo con WorkloadRepositoryError para evitar herencia múltiple
+        super().__init__(
+            message=message,
+            operation=operation,
+            workload_id=workload_id,
+            **kwargs
+        )
+        
+        # Establecer el error_code específico para NotFoundError
+        self.error_code = ErrorCode.NOT_FOUND
+        
+        # Agregar detalles específicos de NotFoundError
+        self.add_detail('resource_type', 'Workload')
+        if workload_id is not None:
+            self.add_detail('resource_id', workload_id)
 
 
 class WorkloadQueryError(WorkloadRepositoryError):
