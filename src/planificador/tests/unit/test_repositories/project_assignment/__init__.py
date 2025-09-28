@@ -1,0 +1,1 @@
+"""Pruebas unitarias para el repositorio de asignaciones de proyecto."""
