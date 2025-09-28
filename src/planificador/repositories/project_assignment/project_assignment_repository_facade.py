@@ -34,7 +34,7 @@ from loguru import logger
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from planificador.models import ProjectAssignment
-from planificador.schemas.project_assignment import ProjectAssignmentCreate, ProjectAssignmentUpdate
+from planificador.schemas.assignment.assignment import ProjectAssignmentCreate, ProjectAssignmentUpdate
 
 # Módulos especializados
 from .modules.crud_operations import CrudOperations
