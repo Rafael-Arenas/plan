@@ -44,6 +44,8 @@ from .team.team import (
     TeamWithSchedules,
 )
 
+from .team_membership import MembershipStatus
+
 from .assignment.assignment import (
     ProjectAssignment,
     ProjectAssignmentCreate,
@@ -181,6 +183,8 @@ __all__ = [
     "TeamWithDetails",
     "TeamWithMembers",
     "TeamWithSchedules",
+    # Team Membership
+    "MembershipStatus",
     # Assignment
     "ProjectAssignment",
     "ProjectAssignmentCreate",
