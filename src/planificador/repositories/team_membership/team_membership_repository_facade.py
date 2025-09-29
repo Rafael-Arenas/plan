@@ -41,11 +41,21 @@ from datetime import date
 from loguru import logger
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from planificador.models.team_membership import TeamMembership, MembershipRole
+from planificador.database.database import db_manager
+from planificador.models.employee import Employee
+from planificador.models.team import Team
+from planificador.models.team_membership import ( 
+    TeamMembership, MembershipRole
+)
+from planificador.schemas.team_membership import (
+    MembershipStatus
+)
 from planificador.repositories.team_membership.interfaces.crud_interface import ITeamMembershipCrudOperations
 from planificador.repositories.team_membership.interfaces.query_interface import ITeamMembershipQueryOperations
 from planificador.repositories.team_membership.interfaces.relationship_interface import ITeamMembershipRelationshipOperations
-from planificador.repositories.team_membership.interfaces.statistics_interface import ITeamMembershipStatisticsOperations
+from planificador.repositories.team_membership.interfaces.statistics_interface import (
+    ITeamMembershipStatisticsOperations, StatisticsPeriod
+)
 from planificador.repositories.team_membership.interfaces.validation_interface import ITeamMembershipValidationOperations
 from planificador.repositories.team_membership.modules.crud_module import TeamMembershipCrudModule
 from planificador.repositories.team_membership.modules.query_module import TeamMembershipQueryModule
@@ -100,29 +110,33 @@ class TeamMembershipRepositoryFacade(
     
     # ==================== OPERACIONES CRUD ====================
     
-    async def create_membership(self, data: Dict[str, Any]) -> TeamMembership:
+    async def create_membership(self, membership_data: Dict[str, Any]) -> TeamMembership:
         """Crea una nueva membresía de equipo."""
-        return await self._crud_module.create_membership(data)
-    
+        return await self._crud_module.create_membership(membership_data)
+
     async def update_membership(
         self,
         membership_id: int,
-        updates: Dict[str, Any]
+        update_data: Dict[str, Any]
     ) -> Optional[TeamMembership]:
         """Actualiza una membresía existente."""
-        return await self._crud_module.update_membership(membership_id, updates)
-    
+        return await self._crud_module.update_membership(membership_id, update_data)
+
     async def delete_membership(self, membership_id: int) -> bool:
         """Elimina una membresía."""
         return await self._crud_module.delete_membership(membership_id)
-    
-    async def activate_membership(self, membership_id: int) -> Optional[TeamMembership]:
+
+    async def activate_membership(self, membership_id: int) -> bool:
         """Activa una membresía."""
         return await self._crud_module.activate_membership(membership_id)
-    
-    async def deactivate_membership(self, membership_id: int) -> Optional[TeamMembership]:
+
+    async def deactivate_membership(
+        self,
+        membership_id: int,
+        end_date: Optional[date] = None
+    ) -> bool:
         """Desactiva una membresía."""
-        return await self._crud_module.deactivate_membership(membership_id)
+        return await self._crud_module.deactivate_membership(membership_id, end_date)
     
     async def update_membership_role(
         self,
@@ -150,289 +164,571 @@ class TeamMembershipRepositoryFacade(
     
     # ==================== OPERACIONES DE CONSULTA ====================
     
-    async def get_by_id(self, membership_id: int) -> Optional[TeamMembership]:
-        """Obtiene una membresía por ID."""
-        return await self._query_module.get_by_id(membership_id)
-    
-    async def get_by_employee_id(self, employee_id: int) -> List[TeamMembership]:
-        """Obtiene todas las membresías de un empleado."""
-        return await self._query_module.get_by_employee_id(employee_id)
-    
-    async def get_by_team_id(self, team_id: int) -> List[TeamMembership]:
-        """Obtiene todas las membresías de un equipo."""
-        return await self._query_module.get_by_team_id(team_id)
-    
-    async def get_by_role(self, role: MembershipRole) -> List[TeamMembership]:
-        """Obtiene membresías por rol."""
-        return await self._query_module.get_by_role(role)
-    
+    async def get_membership_by_id(self, membership_id: int) -> Optional[TeamMembership]:
+        return await self._query_module.get_membership_by_id(membership_id)
+
+    async def get_memberships_by_employee(
+        self, 
+        employee_id: int,
+        active_only: bool = True
+    ) -> List[TeamMembership]:
+        return await self._query_module.get_memberships_by_employee(employee_id, active_only)
+
+    async def get_memberships_by_team(
+        self, 
+        team_id: int,
+        active_only: bool = True
+    ) -> List[TeamMembership]:
+        return await self._query_module.get_memberships_by_team(team_id, active_only)
+
+    async def get_membership_by_employee_and_team(
+        self,
+        employee_id: int,
+        team_id: int,
+        active_only: bool = True
+    ) -> Optional[TeamMembership]:
+        return await self._query_module.get_membership_by_employee_and_team(
+            employee_id, team_id, active_only
+        )
+
+    async def get_memberships_by_role(
+        self, 
+        role: MembershipRole,
+        active_only: bool = True
+    ) -> List[TeamMembership]:
+        return await self._query_module.get_memberships_by_role(role, active_only)
+
     async def get_active_memberships(self) -> List[TeamMembership]:
-        """Obtiene todas las membresías activas."""
         return await self._query_module.get_active_memberships()
-    
-    async def get_by_date_range(
+
+    async def get_memberships_by_date_range(
         self,
         start_date: date,
-        end_date: Optional[date] = None
+        end_date: date,
+        include_overlapping: bool = True
     ) -> List[TeamMembership]:
-        """Obtiene membresías en un rango de fechas."""
-        return await self._query_module.get_by_date_range(start_date, end_date)
-    
+        return await self._query_module.get_memberships_by_date_range(
+            start_date, end_date, include_overlapping
+        )
+
+    async def get_current_memberships(self, as_of_date: Optional[date] = None) -> List[TeamMembership]:
+        return await self._query_module.get_current_memberships(as_of_date)
+
+    async def get_future_memberships(self, from_date: Optional[date] = None) -> List[TeamMembership]:
+        return await self._query_module.get_future_memberships(from_date)
+
+    async def get_past_memberships(self, until_date: Optional[date] = None) -> List[TeamMembership]:
+        return await self._query_module.get_past_memberships(until_date)
+
     async def search_memberships(
         self,
         filters: Dict[str, Any],
         limit: Optional[int] = None,
         offset: Optional[int] = None
     ) -> List[TeamMembership]:
-        """Busca membresías con filtros."""
         return await self._query_module.search_memberships(filters, limit, offset)
-    
+
     async def count_memberships(self, filters: Optional[Dict[str, Any]] = None) -> int:
-        """Cuenta membresías con filtros opcionales."""
         return await self._query_module.count_memberships(filters)
-    
-    async def get_all(
+
+    async def get_all_memberships(
         self,
         limit: Optional[int] = None,
         offset: Optional[int] = None
     ) -> List[TeamMembership]:
-        """Obtiene todas las membresías."""
-        return await self._query_module.get_all(limit, offset)
+        return await self._query_module.get_all_memberships(limit, offset)
     
     # ==================== OPERACIONES DE RELACIONES ====================
-    
-    async def get_membership_with_relations(
-        self,
-        membership_id: int,
-        load_employee: bool = True,
-        load_team: bool = True
-    ) -> Optional[TeamMembership]:
-        """Obtiene una membresía con relaciones cargadas."""
-        return await self._relationship_module.get_membership_with_relations(
-            membership_id, load_employee, load_team
-        )
-    
-    async def get_employee_memberships_with_teams(
-        self,
+
+    async def get_membership_with_employee(self, membership_id: int) -> Optional[TeamMembership]:
+        return await self._relationship_module.get_membership_with_employee(membership_id)
+
+    async def get_membership_with_team(self, membership_id: int) -> Optional[TeamMembership]:
+        return await self._relationship_module.get_membership_with_team(membership_id)
+
+    async def get_membership_with_all_relations(self, membership_id: int) -> Optional[TeamMembership]:
+        return await self._relationship_module.get_membership_with_all_relations(membership_id)
+
+    async def get_employee_teams_with_details(
+        self, 
         employee_id: int,
-        active_only: bool = False
-    ) -> List[TeamMembership]:
-        """Obtiene membresías de un empleado con equipos cargados."""
-        return await self._relationship_module.get_employee_memberships_with_teams(
-            employee_id, active_only
-        )
-    
-    async def get_team_memberships_with_employees(
-        self,
+        active_only: bool = True
+    ) -> List[Dict[str, Any]]:
+        return await self._relationship_module.get_employee_teams_with_details(employee_id, active_only)
+
+    async def get_team_members_with_details(
+        self, 
         team_id: int,
-        active_only: bool = False
-    ) -> List[TeamMembership]:
-        """Obtiene membresías de un equipo con empleados cargados."""
-        return await self._relationship_module.get_team_memberships_with_employees(
-            team_id, active_only
-        )
-    
-    async def transfer_employee_to_team(
+        active_only: bool = True
+    ) -> List[Dict[str, Any]]:
+        return await self._relationship_module.get_team_members_with_details(team_id, active_only)
+
+    async def transfer_employee_between_teams(
         self,
         employee_id: int,
         from_team_id: int,
         to_team_id: int,
-        new_role: Optional[MembershipRole] = None,
-        transfer_date: Optional[date] = None
-    ) -> Tuple[Optional[TeamMembership], Optional[TeamMembership]]:
-        """Transfiere un empleado entre equipos."""
-        return await self._relationship_module.transfer_employee_to_team(
-            employee_id, from_team_id, to_team_id, new_role, transfer_date
+        transfer_date: date,
+        new_role: Optional[MembershipRole] = None
+    ) -> Tuple[TeamMembership, TeamMembership]:
+        return await self._relationship_module.transfer_employee_between_teams(
+            employee_id, from_team_id, to_team_id, transfer_date, new_role
         )
-    
+
     async def get_overlapping_memberships(
         self,
         employee_id: int,
         start_date: date,
         end_date: Optional[date] = None
     ) -> List[TeamMembership]:
-        """Obtiene membresías que se solapan."""
         return await self._relationship_module.get_overlapping_memberships(
             employee_id, start_date, end_date
         )
-    
+
     async def get_membership_conflicts(
         self,
-        employee_id: int
-    ) -> List[Tuple[TeamMembership, TeamMembership]]:
-        """Obtiene conflictos de membresías."""
-        return await self._relationship_module.get_membership_conflicts(employee_id)
-    
-    async def get_membership_history(
-        self,
         employee_id: int,
-        include_inactive: bool = True
+        team_id: int,
+        start_date: date,
+        end_date: Optional[date] = None
     ) -> List[TeamMembership]:
-        """Obtiene el historial de membresías."""
-        return await self._relationship_module.get_membership_history(
-            employee_id, include_inactive
+        return await self._relationship_module.get_membership_conflicts(
+            employee_id, team_id, start_date, end_date
         )
-    
-    async def get_role_change_history(
+
+    async def get_employee_membership_history(
+        self, 
+        employee_id: int,
+        include_future: bool = False
+    ) -> List[TeamMembership]:
+        return await self._relationship_module.get_employee_membership_history(employee_id, include_future)
+
+    async def get_team_membership_timeline(
+        self, 
+        team_id: int,
+        start_date: Optional[date] = None,
+        end_date: Optional[date] = None
+    ) -> List[Dict[str, Any]]:
+        return await self._relationship_module.get_team_membership_timeline(
+            team_id, start_date, end_date
+        )
+
+    async def get_concurrent_memberships(
         self,
         employee_id: int,
+        reference_date: Optional[date] = None
+    ) -> List[TeamMembership]:
+        return await self._relationship_module.get_concurrent_memberships(employee_id, reference_date)
+
+    async def get_leadership_transitions(
+        self,
+        team_id: int,
+        start_date: Optional[date] = None,
+        end_date: Optional[date] = None
+    ) -> List[Dict[str, Any]]:
+        return await self._relationship_module.get_leadership_transitions(
+            team_id, start_date, end_date
+        )
+
+    async def get_role_changes_history(
+        self,
+        employee_id: Optional[int] = None,
         team_id: Optional[int] = None
     ) -> List[Dict[str, Any]]:
-        """Obtiene el historial de cambios de rol."""
-        return await self._relationship_module.get_role_change_history(
-            employee_id, team_id
+        """
+        Obtiene historial de cambios de roles.
+        
+        Args:
+            employee_id: ID del empleado (opcional)
+            team_id: ID del equipo (opcional)
+        
+        Returns:
+            List[Dict[str, Any]]: Historial de cambios de roles
+        
+        Raises:
+            TeamMembershipRepositoryError: Si ocurre un error en la consulta
+        """
+        return await self._relationship_module.get_role_changes_history(
+            employee_id=employee_id,
+            team_id=team_id
         )
-    
-    # ==================== OPERACIONES ESTADÍSTICAS ====================
-    
-    async def count_by_status(self, is_active: bool) -> int:
-        """Cuenta membresías por estado."""
-        return await self._statistics_module.count_by_status(is_active)
-    
-    async def count_by_role(self, role: MembershipRole) -> int:
-        """Cuenta membresías por rol."""
-        return await self._statistics_module.count_by_role(role)
-    
-    async def get_membership_duration_stats(self) -> Dict[str, Any]:
-        """Obtiene estadísticas de duración de membresías."""
-        return await self._statistics_module.get_membership_duration_stats()
-    
-    async def get_team_size_distribution(self) -> Dict[str, Any]:
-        """Obtiene distribución de tamaños de equipos."""
-        return await self._statistics_module.get_team_size_distribution()
-    
-    async def get_employee_participation_stats(self) -> Dict[str, Any]:
-        """Obtiene estadísticas de participación de empleados."""
-        return await self._statistics_module.get_employee_participation_stats()
-    
+
+    async def get_employee_for_membership(self, membership_id: int) -> Optional[Employee]:
+        """Obtiene el empleado asociado a una membresía."""
+        membership = await self._relationship_module.get_membership_with_employee(membership_id)
+        return membership.employee if membership else None
+
+    async def get_team_for_membership(self, membership_id: int) -> Optional[Team]:
+        """Obtiene el equipo asociado a una membresía."""
+        membership = await self._relationship_module.get_membership_with_team(membership_id)
+        return membership.team if membership else None
+
+    # ==================== OPERACIONES DE ESTADÍSTICAS ====================
+
+    async def count_total_memberships(
+        self,
+        active_only: bool = False,
+        as_of_date: Optional[date] = None
+    ) -> int:
+        """
+        Cuenta el total de membresías, delegando al módulo de estadísticas.
+        """
+        return await self._statistics_module.count_total_memberships(
+            active_only=active_only,
+            as_of_date=as_of_date
+        )
+
+    async def count_memberships_by_status(
+        self,
+        as_of_date: Optional[date] = None
+    ) -> Dict[MembershipStatus, int]:
+        """
+        Cuenta membresías por estado, delegando al módulo de estadísticas.
+        """
+        return await self._statistics_module.count_memberships_by_status(
+            as_of_date=as_of_date
+        )
+
+    async def count_memberships_by_role(
+        self,
+        active_only: bool = True,
+        as_of_date: Optional[date] = None
+    ) -> Dict[MembershipRole, int]:
+        """
+        Cuenta membresías por rol, delegando al módulo de estadísticas.
+        """
+        return await self._statistics_module.count_memberships_by_role(
+            active_only=active_only,
+            as_of_date=as_of_date
+        )
+
+    async def get_membership_duration_statistics(
+        self,
+        completed_only: bool = True
+    ) -> Dict[str, Any]:
+        """
+        Obtiene estadísticas de duración, delegando al módulo de estadísticas.
+        """
+        return await self._statistics_module.get_membership_duration_statistics(
+            completed_only=completed_only
+        )
+
+    async def get_team_size_distribution(
+        self,
+        as_of_date: Optional[date] = None
+    ) -> Dict[str, Any]:
+        """
+        Obtiene distribución de tamaños de equipos, delegando al módulo de estadísticas.
+        """
+        return await self._statistics_module.get_team_size_distribution(
+            as_of_date=as_of_date
+        )
+
+    async def get_employee_participation_stats(
+        self,
+        employee_id: Optional[int] = None
+    ) -> Dict[str, Any]:
+        """
+        Obtiene estadísticas de participación de empleados, delegando al módulo de estadísticas.
+        """
+        return await self._statistics_module.get_employee_participation_stats(
+            employee_id=employee_id
+        )
+
     async def get_membership_trends(
         self,
+        period: StatisticsPeriod,
         start_date: date,
-        end_date: date,
-        granularity: str = 'month'
+        end_date: date
     ) -> List[Dict[str, Any]]:
-        """Obtiene tendencias de membresías."""
+        """
+        Obtiene tendencias de membresías, delegando al módulo de estadísticas.
+        """
         return await self._statistics_module.get_membership_trends(
-            start_date, end_date, granularity
+            period=period,
+            start_date=start_date,
+            end_date=end_date
         )
-    
+
     async def get_turnover_rate(
         self,
         team_id: Optional[int] = None,
-        period_months: int = 12
+        start_date: Optional[date] = None,
+        end_date: Optional[date] = None
     ) -> Dict[str, Any]:
-        """Obtiene tasa de rotación."""
-        return await self._statistics_module.get_turnover_rate(team_id, period_months)
-    
+        """
+        Calcula la tasa de rotación, delegando al módulo de estadísticas.
+        """
+        return await self._statistics_module.get_turnover_rate(
+            team_id=team_id,
+            start_date=start_date,
+            end_date=end_date
+        )
+
     async def get_retention_rate(
         self,
         team_id: Optional[int] = None,
-        period_months: int = 12
+        months_threshold: int = 12
     ) -> Dict[str, Any]:
-        """Obtiene tasa de retención."""
-        return await self._statistics_module.get_retention_rate(team_id, period_months)
-    
+        """
+        Calcula la tasa de retención, delegando al módulo de estadísticas.
+        """
+        return await self._statistics_module.get_retention_rate(
+            team_id=team_id,
+            months_threshold=months_threshold
+        )
+
     async def get_role_transition_matrix(
         self,
         team_id: Optional[int] = None
     ) -> Dict[str, Any]:
-        """Obtiene matriz de transición de roles."""
-        return await self._statistics_module.get_role_transition_matrix(team_id)
-    
-    async def get_membership_overlap_stats(self) -> Dict[str, Any]:
-        """Obtiene estadísticas de solapamiento de membresías."""
-        return await self._statistics_module.get_membership_overlap_stats()
-    
-    async def get_team_stability_metrics(self, team_id: int) -> Dict[str, Any]:
-        """Obtiene métricas de estabilidad del equipo."""
-        return await self._statistics_module.get_team_stability_metrics(team_id)
-    
-    async def get_leadership_statistics(self) -> Dict[str, Any]:
-        """Obtiene estadísticas de liderazgo."""
-        return await self._statistics_module.get_leadership_statistics()
-    
-    async def get_membership_summary_report(
+        """
+        Obtiene matriz de transiciones de roles, delegando al módulo de estadísticas.
+        """
+        return await self._statistics_module.get_role_transition_matrix(
+            team_id=team_id
+        )
+
+    async def get_membership_overlap_statistics(
         self,
-        team_id: Optional[int] = None,
         employee_id: Optional[int] = None
     ) -> Dict[str, Any]:
-        """Obtiene reporte resumen de membresías."""
-        return await self._statistics_module.get_membership_summary_report(
-            team_id, employee_id
+        """
+        Obtiene estadísticas de solapamiento, delegando al módulo de estadísticas.
+        """
+        return await self._statistics_module.get_membership_overlap_statistics(
+            employee_id=employee_id
         )
-    
-    async def get_team_composition_analysis(self, team_id: int) -> Dict[str, Any]:
-        """Obtiene análisis de composición del equipo."""
-        return await self._statistics_module.get_team_composition_analysis(team_id)
-    
-    async def get_cross_team_participation(self, employee_id: int) -> Dict[str, Any]:
-        """Obtiene participación cruzada en equipos."""
-        return await self._statistics_module.get_cross_team_participation(employee_id)
-    
-    # ==================== OPERACIONES DE VALIDACIÓN ====================
-    
-    async def validate_membership_data(self, data: Dict[str, Any]) -> Tuple[bool, List[str]]:
-        """Valida datos de membresía."""
-        return await self._validation_module.validate_membership_data(data)
-    
-    async def validate_membership_id(self, membership_id: int) -> bool:
-        """Valida ID de membresía."""
-        return await self._validation_module.validate_membership_id(membership_id)
-    
-    async def validate_employee_id(self, employee_id: int) -> bool:
-        """Valida ID de empleado."""
-        return await self._validation_module.validate_employee_id(employee_id)
-    
-    async def validate_team_id(self, team_id: int) -> bool:
-        """Valida ID de equipo."""
-        return await self._validation_module.validate_team_id(team_id)
-    
-    async def validate_role(self, role: MembershipRole) -> bool:
-        """Valida rol."""
-        return await self._validation_module.validate_role(role)
-    
-    async def validate_date_range(
+
+    async def get_team_stability_metrics(
         self,
-        start_date: date,
+        team_id: int,
+        analysis_period_months: int = 12
+    ) -> Dict[str, Any]:
+        """
+        Calcula métricas de estabilidad de equipo, delegando al módulo de estadísticas.
+        """
+        return await self._statistics_module.get_team_stability_metrics(
+            team_id=team_id,
+            analysis_period_months=analysis_period_months
+        )
+
+    async def get_leadership_statistics(
+        self,
+        team_id: Optional[int] = None
+    ) -> Dict[str, Any]:
+        """
+        Obtiene estadísticas de liderazgo, delegando al módulo de estadísticas.
+        """
+        return await self._statistics_module.get_leadership_statistics(
+            team_id=team_id
+        )
+
+    async def get_membership_summary_report(
+        self,
+        as_of_date: Optional[date] = None
+    ) -> Dict[str, Any]:
+        """
+        Genera un reporte resumen, delegando al módulo de estadísticas.
+        """
+        return await self._statistics_module.get_membership_summary_report(
+            as_of_date=as_of_date
+        )
+
+    async def get_team_composition_analysis(
+        self,
+        team_id: int,
+        as_of_date: Optional[date] = None
+    ) -> Dict[str, Any]:
+        """
+        Analiza la composición de un equipo, delegando al módulo de estadísticas.
+        """
+        return await self._statistics_module.get_team_composition_analysis(
+            team_id=team_id,
+            as_of_date=as_of_date
+        )
+
+    async def get_cross_team_participation(
+        self,
+        employee_id: Optional[int] = None
+    ) -> Dict[str, Any]:
+        """Analiza la participación cruzada, delegando al módulo de estadísticas."""
+        return await self._statistics_module.get_cross_team_participation(
+            employee_id=employee_id
+        )
+
+    async def get_membership_count(self) -> int:
+        """Obtiene el número total de membresías."""
+        return await self.count_total_memberships()
+
+    async def get_active_membership_count(self) -> int:
+        """Obtiene el número de membresías activas."""
+        return await self.count_total_memberships(active_only=True)
+
+    async def get_membership_count_by_role(self, role: MembershipRole) -> int:
+        """Obtiene el número de membresías para un rol específico."""
+        counts = await self.count_memberships_by_role()
+        return counts.get(role, 0)
+
+    async def get_average_membership_duration(self) -> float:
+        """Obtiene la duración promedio de las membresías."""
+        stats = await self.get_membership_duration_statistics()
+        return stats.get("average_duration", 0.0)
+
+    async def get_memberships_per_team(self) -> Dict[int, int]:
+        """Obtiene el número de membresías por equipo."""
+        return await self._statistics_module.get_memberships_per_team()
+
+    async def get_memberships_per_employee(self) -> Dict[int, int]:
+        """Obtiene el número de membresías por empleado."""
+        return await self._statistics_module.get_memberships_per_employee()
+
+    async def get_role_distribution(self) -> Dict[str, int]:
+        """Obtiene la distribución de roles."""
+        return await self._statistics_module.get_role_distribution()
+
+    async def get_average_duration_by_role(self) -> Dict[str, float]:
+        """Obtiene la duración promedio por rol."""
+        return await self._statistics_module.get_average_duration_by_role()
+
+    # --------------------------------------------------------------------------
+    # Validation Operations
+    # --------------------------------------------------------------------------
+
+    async def validate_membership_dates(self, start_date: date, end_date: Optional[date]) -> None:
+        """Valida las fechas de una membresía."""
+        await self._validation_module.validate_dates(start_date, end_date)
+
+    async def check_employee_active_membership(self, employee_id: int) -> bool:
+        """Verifica si un empleado ya tiene una membresía activa."""
+        return await self._validation_module.has_active_membership(employee_id)
+
+    async def validate_role_for_update(self, membership_id: int, new_role: MembershipRole) -> bool:
+        """Valida si el nuevo rol es válido para la actualización."""
+        return await self._validation_module.is_valid_role_for_update(membership_id, new_role)
+
+    async def validate_membership_data(
+        self, data: Dict[str, Any], is_update: bool = False
+    ) -> bool:
+        return await self._validation_module.validate_membership_data(data)
+
+    async def validate_membership_id(self, membership_id: int) -> bool:
+        return await self._validation_module.validate_membership_id(membership_id)
+
+    async def validate_employee_id(self, employee_id: int) -> bool:
+        return await self._validation_module.validate_employee_id(employee_id)
+
+    async def validate_team_id(self, team_id: int) -> bool:
+        return await self._validation_module.validate_team_id(team_id)
+
+    async def validate_membership_role(self, role: MembershipRole) -> bool:
+        return await self._validation_module.validate_membership_role(role)
+
+    async def validate_membership_status(self, status: MembershipStatus) -> bool:
+        return await self._validation_module.validate_membership_status(status)
+
+    async def validate_date_range(
+        self, 
+        start_date: date, 
         end_date: Optional[date] = None
-    ) -> Tuple[bool, List[str]]:
-        """Valida rango de fechas."""
+    ) -> bool:
         return await self._validation_module.validate_date_range(start_date, end_date)
-    
+
     async def validate_membership_overlap(
         self,
         employee_id: int,
+        team_id: int,
         start_date: date,
         end_date: Optional[date] = None,
         exclude_membership_id: Optional[int] = None
-    ) -> Tuple[bool, List[TeamMembership]]:
-        """Valida solapamiento de membresías."""
+    ) -> bool:
         return await self._validation_module.validate_membership_overlap(
-            employee_id, start_date, end_date, exclude_membership_id
+            employee_id, team_id, start_date, end_date, exclude_membership_id
         )
-    
+
     async def validate_leadership_assignment(
         self,
+        employee_id: int,
         team_id: int,
         role: MembershipRole,
-        exclude_membership_id: Optional[int] = None
-    ) -> Tuple[bool, List[str]]:
-        """Valida asignación de liderazgo."""
+        start_date: date,
+        end_date: Optional[date] = None
+    ) -> bool:
         return await self._validation_module.validate_leadership_assignment(
-            team_id, role, exclude_membership_id
+            employee_id, team_id, role, start_date, end_date
         )
-    
+
     async def validate_team_capacity(
         self,
         team_id: int,
-        max_capacity: Optional[int] = None
-    ) -> Tuple[bool, Dict[str, Any]]:
-        """Valida capacidad del equipo."""
-        return await self._validation_module.validate_team_capacity(team_id, max_capacity)
-    
-    async def validate_business_rules(self, data: Dict[str, Any]) -> Tuple[bool, List[str]]:
-        """Valida reglas de negocio."""
-        return await self._validation_module.validate_business_rules(data)
+        as_of_date: Optional[date] = None
+    ) -> bool:
+        return await self._validation_module.validate_team_capacity(team_id, as_of_date)
+
+    async def validate_role_permissions(
+        self,
+        employee_id: int,
+        role: MembershipRole,
+        team_id: int
+    ) -> bool:
+        return await self._validation_module.validate_role_permissions(
+            employee_id, role, team_id
+        )
+
+    async def validate_membership_transition(
+        self,
+        membership_id: int,
+        new_status: MembershipStatus,
+        transition_date: Optional[date] = None
+    ) -> bool:
+        return await self._validation_module.validate_membership_transition(
+            membership_id, new_status, transition_date
+        )
+
+    async def validate_membership_end_date(
+        self,
+        membership_id: int,
+        end_date: date
+    ) -> bool:
+        return await self._validation_module.validate_membership_end_date(
+            membership_id, end_date
+        )
+
+    async def validate_business_rules(
+        self,
+        employee_id: int,
+        team_id: int,
+        role: MembershipRole,
+        start_date: date,
+        end_date: Optional[date] = None
+    ) -> Tuple[bool, List[str]]:
+        return await self._validation_module.validate_business_rules(
+            employee_id, team_id, role, start_date, end_date
+        )
+
+    async def validate_data_consistency(
+        self,
+        membership_id: Optional[int] = None
+    ) -> Tuple[bool, List[str]]:
+        return await self._validation_module.validate_data_consistency(membership_id)
+
+    async def validate_search_criteria(self, criteria: Dict[str, Any]) -> bool:
+        return await self._validation_module.validate_search_criteria(criteria)
+
+    async def validate_bulk_operation_data(
+        self, 
+        operations_data: List[Dict[str, Any]]
+    ) -> Tuple[bool, List[str]]:
+        return await self._validation_module.validate_bulk_operation_data(operations_data)
+
+    async def validate_concurrent_membership_limit(
+        self,
+        employee_id: int,
+        as_of_date: Optional[date] = None
+    ) -> bool:
+        return await self._validation_module.validate_concurrent_membership_limit(
+            employee_id, as_of_date
+        )
     
     # ==================== MÉTODOS DE UTILIDAD ====================
     
