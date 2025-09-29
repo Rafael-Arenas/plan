@@ -56,7 +56,151 @@ class TeamMembershipRelationshipModule(BaseRepository[TeamMembership], ITeamMemb
         """
         super().__init__(session, TeamMembership)
         self._logger = logger.bind(module="TeamMembershipRelationshipModule")
+
+    async def get_membership_with_employee(
+        self,
+        employee_id: int,
+        team_id: int,
+        active_only: bool = True
+    ) -> Optional[TeamMembership]:
+        """
+        Obtiene una membresía específica para un empleado en un equipo.
+
+        Args:
+            employee_id: ID del empleado.
+            team_id: ID del equipo.
+            active_only: Si es True, solo busca membresías activas.
+
+        Returns:
+            La membresía si se encuentra, de lo contrario None.
+        """
+        try:
+            self._logger.debug(f"Buscando membresía para empleado {employee_id} en equipo {team_id}")
+            
+            query = select(TeamMembership).where(
+                and_(
+                    TeamMembership.employee_id == employee_id,
+                    TeamMembership.team_id == team_id
+                )
+            )
+            
+            if active_only:
+                query = query.where(TeamMembership.is_active == True)
+            
+            result = await self.session.execute(query)
+            return result.scalar_one_or_none()
+
+        except SQLAlchemyError as e:
+            self._logger.error(f"Error de BD al buscar membresía: {e}")
+            raise convert_sqlalchemy_error(
+                error=e,
+                operation="get_membership_with_employee",
+                entity_type="TeamMembership"
+            )
+        except Exception as e:
+            self._logger.error(f"Error inesperado al buscar membresía: {e}")
+            raise TeamMembershipRepositoryError(
+                message=f"Error inesperado al buscar membresía: {e}",
+                operation="get_membership_with_employee",
+                entity_type="TeamMembership",
+                original_error=e
+            )
     
+    
+    async def get_membership_with_team(self, membership_id: int) -> Optional[TeamMembership]:
+        """
+        Obtiene una membresía con información del equipo cargada.
+        
+        Args:
+            membership_id: ID de la membresía
+        
+        Returns:
+            Optional[TeamMembership]: Membresía con equipo cargado o None
+        
+        Raises:
+            TeamMembershipRepositoryError: Si ocurre un error en la consulta
+        """
+        try:
+            self._logger.debug(f"Obteniendo membresía {membership_id} con equipo cargado")
+            
+            query = select(TeamMembership).options(
+                joinedload(TeamMembership.team)
+            ).where(TeamMembership.id == membership_id)
+            
+            result = await self.session.execute(query)
+            membership = result.unique().scalar_one_or_none()
+            
+            if membership:
+                self._logger.debug(f"Membresía {membership_id} obtenida con equipo")
+            else:
+                self._logger.warning(f"No se encontró la membresía {membership_id}")
+                
+            return membership
+            
+        except SQLAlchemyError as e:
+            self._logger.error(f"Error de BD al obtener membresía con equipo: {e}")
+            raise convert_sqlalchemy_error(
+                error=e,
+                operation="get_membership_with_team",
+                entity_type="TeamMembership"
+            )
+        except Exception as e:
+            self._logger.error(f"Error inesperado al obtener membresía con equipo: {e}")
+            raise TeamMembershipRepositoryError(
+                message=f"Error inesperado al obtener membresía: {e}",
+                operation="get_membership_with_team",
+                entity_type="TeamMembership",
+                original_error=e
+            )
+
+    
+    async def get_membership_with_all_relations(self, membership_id: int) -> Optional[TeamMembership]:
+        """
+        Obtiene una membresía con todas las relaciones cargadas.
+        
+        Args:
+            membership_id: ID de la membresía
+        
+        Returns:
+            Optional[TeamMembership]: Membresía con todas las relaciones o None
+        
+        Raises:
+            TeamMembershipRepositoryError: Si ocurre un error en la consulta
+        """
+        try:
+            self._logger.debug(f"Obteniendo membresía {membership_id} con todas las relaciones")
+            
+            query = select(TeamMembership).options(
+                joinedload(TeamMembership.employee),
+                joinedload(TeamMembership.team)
+            ).where(TeamMembership.id == membership_id)
+            
+            result = await self.session.execute(query)
+            membership = result.unique().scalar_one_or_none()
+            
+            if membership:
+                self._logger.debug(f"Membresía {membership_id} obtenida con todas las relaciones")
+            else:
+                self._logger.warning(f"No se encontró la membresía {membership_id}")
+                
+            return membership
+            
+        except SQLAlchemyError as e:
+            self._logger.error(f"Error de BD al obtener membresía con todas las relaciones: {e}")
+            raise convert_sqlalchemy_error(
+                error=e,
+                operation="get_membership_with_all_relations",
+                entity_type="TeamMembership"
+            )
+        except Exception as e:
+            self._logger.error(f"Error inesperado al obtener membresía con todas las relaciones: {e}")
+            raise TeamMembershipRepositoryError(
+                message=f"Error inesperado al obtener membresía: {e}",
+                operation="get_membership_with_all_relations",
+                entity_type="TeamMembership",
+                original_error=e
+            )
+
     async def get_memberships_with_employee_and_team(
         self,
         membership_ids: Optional[List[int]] = None
@@ -201,7 +345,142 @@ class TeamMembershipRelationshipModule(BaseRepository[TeamMembership], ITeamMemb
                 entity_type="TeamMembership",
                 original_error=e
             )
+
+    async def get_employee_teams_with_details(
+        self,
+        employee_id: int,
+        active_only: bool = True
+    ) -> List[Dict[str, Any]]:
+        """
+        Obtiene equipos de un empleado con detalles de membresía.
+        
+        Args:
+            employee_id: ID del empleado
+            active_only: Si solo incluir membresías activas
+        
+        Returns:
+            List[Dict[str, Any]]: Lista con detalles de equipos y membresías
+        
+        Raises:
+            TeamMembershipRepositoryError: Si ocurre un error en la consulta
+        """
+        try:
+            self._logger.debug(f"Obteniendo equipos del empleado {employee_id} con detalles")
+            
+            query = select(TeamMembership).options(
+                joinedload(TeamMembership.team)
+            ).where(
+                TeamMembership.employee_id == employee_id
+            )
+            
+            if active_only:
+                query = query.where(TeamMembership.is_active == True)
+            
+            query = query.order_by(TeamMembership.start_date.desc())
+            
+            result = await self.session.execute(query)
+            memberships = result.unique().scalars().all()
+            
+            teams_details = [
+                {
+                    "team_id": m.team.id,
+                    "team_name": m.team.name,
+                    "membership_id": m.id,
+                    "role": m.role.value,
+                    "start_date": m.start_date,
+                    "end_date": m.end_date,
+                    "is_active": m.is_active
+                }
+                for m in memberships if m.team
+            ]
+            
+            self._logger.debug(f"Obtenidos {len(teams_details)} equipos con detalles para empleado {employee_id}")
+            return teams_details
+            
+        except SQLAlchemyError as e:
+            self._logger.error(f"Error de BD al obtener equipos del empleado con detalles: {e}")
+            raise convert_sqlalchemy_error(
+                error=e,
+                operation="get_employee_teams_with_details",
+                entity_type="TeamMembership"
+            )
+        except Exception as e:
+            self._logger.error(f"Error inesperado al obtener equipos del empleado con detalles: {e}")
+            raise TeamMembershipRepositoryError(
+                message=f"Error inesperado al obtener detalles de equipos: {e}",
+                operation="get_employee_teams_with_details",
+                entity_type="TeamMembership",
+                original_error=e
+            )
     
+    
+    async def get_team_members_with_details(
+        self, 
+        team_id: int,
+        active_only: bool = True
+    ) -> List[Dict[str, Any]]:
+        """
+        Obtiene miembros de un equipo con detalles de membresía.
+        
+        Args:
+            team_id: ID del equipo
+            active_only: Si solo incluir membresías activas
+        
+        Returns:
+            List[Dict[str, Any]]: Lista con detalles de empleados y membresías
+        
+        Raises:
+            TeamMembershipRepositoryError: Si ocurre un error en la consulta
+        """
+        try:
+            self._logger.debug(f"Obteniendo miembros del equipo {team_id} con detalles")
+            
+            query = select(TeamMembership).options(
+                joinedload(TeamMembership.employee)
+            ).where(
+                TeamMembership.team_id == team_id
+            )
+            
+            if active_only:
+                query = query.where(TeamMembership.is_active == True)
+            
+            query = query.order_by(TeamMembership.start_date.desc())
+            
+            result = await self.session.execute(query)
+            memberships = result.unique().scalars().all()
+            
+            members_details = [
+                {
+                    "employee_id": m.employee.id,
+                    "employee_name": m.employee.full_name,
+                    "membership_id": m.id,
+                    "role": m.role.value,
+                    "start_date": m.start_date,
+                    "end_date": m.end_date,
+                    "is_active": m.is_active
+                }
+                for m in memberships if m.employee
+            ]
+            
+            self._logger.debug(f"Obtenidos {len(members_details)} miembros con detalles para equipo {team_id}")
+            return members_details
+            
+        except SQLAlchemyError as e:
+            self._logger.error(f"Error de BD al obtener miembros del equipo con detalles: {e}")
+            raise convert_sqlalchemy_error(
+                error=e,
+                operation="get_team_members_with_details",
+                entity_type="TeamMembership"
+            )
+        except Exception as e:
+            self._logger.error(f"Error inesperado al obtener miembros del equipo con detalles: {e}")
+            raise TeamMembershipRepositoryError(
+                message=f"Error inesperado al obtener detalles de miembros: {e}",
+                operation="get_team_members_with_details",
+                entity_type="TeamMembership",
+                original_error=e
+            )
+
     async def transfer_employee_between_teams(
         self,
         employee_id: int,
@@ -399,18 +678,20 @@ class TeamMembershipRelationshipModule(BaseRepository[TeamMembership], ITeamMemb
                 original_error=e
             )
     
-    async def get_membership_history(
+    async def get_employee_membership_history(
         self,
-        employee_id: int
+        employee_id: int,
+        include_future: bool = False
     ) -> List[TeamMembership]:
         """
         Obtiene el historial completo de membresías de un empleado.
         
         Args:
             employee_id: ID del empleado
+            include_future: Si incluir membresías futuras
         
         Returns:
-            List[TeamMembership]: Lista ordenada cronológicamente de membresías
+            List[TeamMembership]: Historial ordenado por fecha de inicio
         
         Raises:
             TeamMembershipRepositoryError: Si ocurre un error en la consulta
@@ -422,7 +703,12 @@ class TeamMembershipRelationshipModule(BaseRepository[TeamMembership], ITeamMemb
                 joinedload(TeamMembership.team)
             ).where(
                 TeamMembership.employee_id == employee_id
-            ).order_by(TeamMembership.start_date.asc())
+            )
+
+            if not include_future:
+                query = query.where(TeamMembership.start_date <= date.today())
+
+            query = query.order_by(TeamMembership.start_date.asc())
             
             result = await self.session.execute(query)
             memberships = result.unique().scalars().all()
@@ -434,14 +720,14 @@ class TeamMembershipRelationshipModule(BaseRepository[TeamMembership], ITeamMemb
             self._logger.error(f"Error de base de datos al obtener historial de membresías: {e}")
             raise convert_sqlalchemy_error(
                 error=e,
-                operation="get_membership_history",
+                operation="get_employee_membership_history",
                 entity_type="TeamMembership"
             )
         except Exception as e:
             self._logger.error(f"Error inesperado al obtener historial de membresías: {e}")
             raise TeamMembershipRepositoryError(
                 message=f"Error inesperado al obtener historial: {e}",
-                operation="get_membership_history",
+                operation="get_employee_membership_history",
                 entity_type="TeamMembership",
                 original_error=e
             )
@@ -466,7 +752,7 @@ class TeamMembershipRelationshipModule(BaseRepository[TeamMembership], ITeamMemb
             self._logger.debug(f"Obteniendo historial de cambios de rol para empleado {employee_id}")
             
             # Obtener todas las membresías ordenadas por fecha
-            memberships = await self.get_membership_history(employee_id)
+            memberships = await self.get_employee_membership_history(employee_id)
             
             role_changes = []
             previous_role = None
@@ -500,6 +786,327 @@ class TeamMembershipRelationshipModule(BaseRepository[TeamMembership], ITeamMemb
             raise TeamMembershipRepositoryError(
                 message=f"Error inesperado al obtener cambios de rol: {e}",
                 operation="get_role_change_history",
+                entity_type="TeamMembership",
+                original_error=e
+            )
+
+    async def get_leadership_transitions(
+        self,
+        team_id: int
+    ) -> List[Dict[str, Any]]:
+        """
+        Obtiene el historial de transiciones de liderazgo de un equipo.
+
+        Args:
+            team_id: ID del equipo.
+
+        Returns:
+            Una lista de diccionarios con información sobre cada transición.
+        """
+        try:
+            self._logger.debug(f"Obteniendo transiciones de liderazgo para el equipo {team_id}")
+            
+            query = (
+                select(TeamMembership)
+                .options(joinedload(TeamMembership.employee))
+                .where(TeamMembership.team_id == team_id)
+                .order_by(TeamMembership.start_date)
+            )
+            
+            result = await self.session.execute(query)
+            memberships = result.unique().scalars().all()
+
+            transitions = []
+            current_leader = None
+
+            for membership in memberships:
+                is_leader = (membership.role == TeamRole.LEADER)
+                
+                if is_leader and current_leader != membership.employee_id:
+                    # Nuevo líder asume
+                    if current_leader is not None:
+                        # Finaliza el liderazgo anterior si no se ha hecho
+                        last_transition = transitions[-1]
+                        if last_transition['event'] == 'assumed':
+                            last_transition['end_date'] = membership.start_date
+                            last_transition['event'] = 'ended'
+
+                    transitions.append({
+                        'event': 'assumed',
+                        'employee_id': membership.employee_id,
+                        'employee_name': membership.employee.full_name,
+                        'start_date': membership.start_date,
+                        'end_date': membership.end_date
+                    })
+                    current_leader = membership.employee_id
+
+                elif not is_leader and current_leader == membership.employee_id:
+                    # Líder actual deja el rol
+                    last_transition = transitions[-1]
+                    last_transition['end_date'] = membership.start_date
+                    last_transition['event'] = 'ended'
+                    current_leader = None
+
+            self._logger.info(f"Se encontraron {len(transitions)} transiciones de liderazgo para el equipo {team_id}")
+            return transitions
+
+        except SQLAlchemyError as e:
+            self._logger.error(f"Error de base de datos al obtener transiciones de liderazgo: {e}")
+            raise convert_sqlalchemy_error(
+                error=e,
+                operation="get_leadership_transitions",
+                entity_type="TeamMembership"
+            )
+        except Exception as e:
+            self._logger.error(f"Error inesperado al obtener transiciones de liderazgo: {e}")
+            raise TeamMembershipRepositoryError(
+                message=f"Error inesperado al obtener transiciones de liderazgo: {e}",
+                operation="get_leadership_transitions",
+                entity_type="TeamMembership",
+                original_error=e
+            )
+
+    
+    async def get_team_membership_timeline(
+        self, 
+        team_id: int,
+        start_date: Optional[date] = None,
+        end_date: Optional[date] = None
+    ) -> List[Dict[str, Any]]:
+        """
+        Obtiene la línea de tiempo de membresías de un equipo.
+        
+        Args:
+            team_id: ID del equipo
+            start_date: Fecha de inicio del período (opcional)
+            end_date: Fecha de fin del período (opcional)
+        
+        Returns:
+            List[Dict[str, Any]]: Timeline con eventos de membresía
+        
+        Raises:
+            TeamMembershipRepositoryError: Si ocurre un error en la consulta
+        """
+        try:
+            self._logger.debug(f"Obteniendo timeline de membresías para equipo {team_id}")
+            
+            query = select(TeamMembership).options(
+                joinedload(TeamMembership.employee)
+            ).where(TeamMembership.team_id == team_id)
+            
+            if start_date:
+                query = query.where(TeamMembership.start_date >= start_date)
+            if end_date:
+                query = query.where(or_(TeamMembership.end_date.is_(None), TeamMembership.end_date <= end_date))
+            
+            query = query.order_by(TeamMembership.start_date.asc())
+            
+            result = await self.session.execute(query)
+            memberships = result.unique().scalars().all()
+            
+            timeline = []
+            for m in memberships:
+                timeline.append({
+                    "event": "start",
+                    "date": m.start_date,
+                    "employee_id": m.employee_id,
+                    "employee_name": m.employee.full_name if m.employee else None,
+                    "role": m.role.value
+                })
+                if m.end_date:
+                    timeline.append({
+                        "event": "end",
+                        "date": m.end_date,
+                        "employee_id": m.employee_id,
+                        "employee_name": m.employee.full_name if m.employee else None,
+                        "role": m.role.value
+                    })
+            
+            # Ordenar el timeline por fecha
+            timeline.sort(key=lambda x: x['date'])
+            
+            self._logger.debug(f"Generado timeline con {len(timeline)} eventos para equipo {team_id}")
+            return timeline
+            
+        except SQLAlchemyError as e:
+            self._logger.error(f"Error de BD al obtener timeline de membresías: {e}")
+            raise convert_sqlalchemy_error(
+                error=e,
+                operation="get_team_membership_timeline",
+                entity_type="TeamMembership"
+            )
+        except Exception as e:
+            self._logger.error(f"Error inesperado al obtener timeline de membresías: {e}")
+            raise TeamMembershipRepositoryError(
+                message=f"Error inesperado al obtener timeline: {e}",
+                operation="get_team_membership_timeline",
+                entity_type="TeamMembership",
+                original_error=e
+            )
+
+    async def get_concurrent_memberships(
+        self,
+        employee_id: int,
+        reference_date: Optional[date] = None
+    ) -> List[TeamMembership]:
+        """
+        Obtiene membresías concurrentes de un empleado en una fecha.
+        
+        Args:
+            employee_id: ID del empleado
+            reference_date: Fecha de referencia (opcional, default hoy)
+        
+        Returns:
+            List[TeamMembership]: Lista de membresías concurrentes
+        
+        Raises:
+            TeamMembershipRepositoryError: Si ocurre un error en la consulta
+        """
+        try:
+            ref_date = reference_date or date.today()
+            self._logger.debug(f"Buscando membresías concurrentes para empleado {employee_id} en fecha {ref_date}")
+            
+            query = select(TeamMembership).where(
+                and_(
+                    TeamMembership.employee_id == employee_id,
+                    TeamMembership.start_date <= ref_date,
+                    or_(
+                        TeamMembership.end_date.is_(None),
+                        TeamMembership.end_date >= ref_date
+                    )
+                )
+            ).order_by(TeamMembership.start_date)
+            
+            result = await self.session.execute(query)
+            memberships = result.scalars().all()
+            
+            self._logger.debug(f"Encontradas {len(memberships)} membresías concurrentes")
+            return list(memberships)
+            
+        except SQLAlchemyError as e:
+            self._logger.error(f"Error de BD al buscar membresías concurrentes: {e}")
+            raise convert_sqlalchemy_error(
+                error=e,
+                operation="get_concurrent_memberships",
+                entity_type="TeamMembership"
+            )
+        except Exception as e:
+            self._logger.error(f"Error inesperado al buscar membresías concurrentes: {e}")
+            raise TeamMembershipRepositoryError(
+                message=f"Error inesperado al buscar concurrencias: {e}",
+                operation="get_concurrent_memberships",
+                entity_type="TeamMembership",
+                original_error=e
+            )
+
+    
+    async def get_role_changes_history(
+        self,
+        employee_id: Optional[int] = None,
+        team_id: Optional[int] = None
+    ) -> List[Dict[str, Any]]:
+        """
+        Obtiene historial de cambios de roles.
+        
+        Args:
+            employee_id: ID del empleado (opcional)
+            team_id: ID del equipo (opcional)
+        
+        Returns:
+            List[Dict[str, Any]]: Historial de cambios de roles
+        
+        Raises:
+            TeamMembershipRepositoryError: Si ocurre un error en la consulta
+        """
+        try:
+            self._logger.debug(f"Obteniendo historial de cambios de rol para empleado {employee_id} y/o equipo {team_id}")
+            
+            query = select(TeamMembership).options(
+                joinedload(TeamMembership.team),
+                joinedload(TeamMembership.employee)
+            ).order_by(TeamMembership.start_date.asc())
+
+            if employee_id:
+                query = query.where(TeamMembership.employee_id == employee_id)
+            if team_id:
+                query = query.where(TeamMembership.team_id == team_id)
+
+            result = await self.session.execute(query)
+            memberships = result.unique().scalars().all()
+
+            role_changes = []
+            # Agrupar por empleado si no se especifica uno
+            if not employee_id:
+                memberships_by_employee = {}
+                for m in memberships:
+                    if m.employee_id not in memberships_by_employee:
+                        memberships_by_employee[m.employee_id] = []
+                    memberships_by_employee[m.employee_id].append(m)
+                
+                for emp_id, emp_memberships in memberships_by_employee.items():
+                    previous_role = None
+                    for m in sorted(emp_memberships, key=lambda x: x.start_date):
+                        if previous_role and previous_role != m.role:
+                            role_changes.append({
+                                'employee_id': emp_id,
+                                'team_id': m.team_id,
+                                'previous_role': previous_role.value,
+                                'new_role': m.role.value,
+                                'change_date': m.start_date
+                            })
+                        previous_role = m.role
+            else:
+                previous_role = None
+                for m in memberships:
+                    if previous_role and previous_role != m.role:
+                        role_changes.append({
+                            'employee_id': m.employee_id,
+                            'team_id': m.team_id,
+                            'previous_role': previous_role.value,
+                            'new_role': m.role.value,
+                            'change_date': m.start_date
+                        })
+                    previous_role = m.role
+
+            self._logger.debug(f"Identificados {len(role_changes)} cambios de rol")
+            return role_changes
+
+        except SQLAlchemyError as e:
+            self._logger.error(f"Error de BD al obtener historial de cambios de rol: {e}")
+            raise convert_sqlalchemy_error(
+                error=e,
+                operation="get_role_changes_history",
+                entity_type="TeamMembership"
+            )
+        except Exception as e:
+            self._logger.error(f"Error inesperado al obtener historial de cambios de rol: {e}")
+            raise TeamMembershipRepositoryError(
+                message=f"Error inesperado al obtener cambios de rol: {e}",
+                operation="get_role_changes_history",
+                entity_type="TeamMembership",
+                original_error=e
+            )
+
+    async def get_by_unique_field(self, field_name: str, value: Any) -> Optional[TeamMembership]:
+        """
+        Obtiene una entidad por un campo único específico.
+        """
+        try:
+            self._logger.debug(f"Obteniendo membresía por campo único: {field_name}={value}")
+            if not hasattr(self.model_class, field_name):
+                raise TeamMembershipRepositoryError(f"Campo '{field_name}' no existe en el modelo.")
+
+            query = select(self.model_class).where(getattr(self.model_class, field_name) == value)
+            result = await self.session.execute(query)
+            return result.scalar_one_or_none()
+        except SQLAlchemyError as e:
+            self._logger.error(f"Error de BD al obtener por campo único: {e}")
+            raise convert_sqlalchemy_error(e, "get_by_unique_field", "TeamMembership")
+        except Exception as e:
+            self._logger.error(f"Error inesperado: {e}")
+            raise TeamMembershipRepositoryError(
+                message=f"Error inesperado: {e}",
+                operation="get_by_unique_field",
                 entity_type="TeamMembership",
                 original_error=e
             )
