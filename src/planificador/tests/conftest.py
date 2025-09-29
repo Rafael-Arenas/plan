@@ -18,7 +18,10 @@ from planificador.tests.fixtures.database import *
 
 
 # Configuración de pytest
-pytest_plugins = ["pytest_asyncio"]
+pytest_plugins = [
+    "pytest_asyncio",
+    "planificador.tests.unit.test_repositories.team_membership.fixtures",
+]
 
 # Configuración de pytest-asyncio para evitar warnings
 pytestmark = pytest.mark.asyncio(scope="session")
