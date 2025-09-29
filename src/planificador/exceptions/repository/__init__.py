@@ -182,6 +182,14 @@ from .status_code_repository_exceptions import (
     create_status_code_statistics_error
 )
 
+from .team_membership_repository_exceptions import (
+    TeamMembershipRepositoryError,
+    TeamMembershipQueryError,
+    TeamMembershipStatisticsError,
+    TeamMembershipValidationRepositoryError,
+    TeamMembershipRelationshipError,
+)
+
 __all__ = [
     # Base repository exceptions
     "RepositoryError",
@@ -364,4 +372,11 @@ __all__ = [
     "create_status_code_ordering_error",
     "create_status_code_filter_error",
     "create_status_code_statistics_error",
+
+    # Team Membership repository exceptions
+    "TeamMembershipRepositoryError",
+    "TeamMembershipQueryError",
+    "TeamMembershipStatisticsError",
+    "TeamMembershipValidationRepositoryError",
+    "TeamMembershipRelationshipError",
 ]
