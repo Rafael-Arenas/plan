@@ -25,7 +25,8 @@ from typing import List, Dict, Any, Optional, Tuple
 from datetime import date
 from enum import Enum
 
-from planificador.models.team_membership import MembershipRole, MembershipStatus
+from planificador.models.team_membership import MembershipRole
+from planificador.schemas.team_membership import MembershipStatus
 
 
 class StatisticsPeriod(Enum):
