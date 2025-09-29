@@ -35,7 +35,6 @@ pythonpath = ["src"]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
-addopts = "-v --tb=long"
 
 [tool.ruff]
 # Configuración de Ruff para linting y formateo
