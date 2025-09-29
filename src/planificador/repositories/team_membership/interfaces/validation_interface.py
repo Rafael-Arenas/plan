@@ -24,7 +24,8 @@ from abc import ABC, abstractmethod
 from typing import List, Dict, Any, Optional, Tuple
 from datetime import date
 
-from planificador.models.team_membership import MembershipRole, MembershipStatus
+from planificador.models.team_membership import MembershipRole
+from planificador.schemas import MembershipStatus
 from planificador.exceptions.repository import TeamMembershipRepositoryError
 from planificador.exceptions.validation import ValidationError
 
