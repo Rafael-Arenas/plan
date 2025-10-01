@@ -16,17 +16,17 @@ import pendulum
 from loguru import logger
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from .base_domain_service import BaseDomainService
-from .client_domain_service_interface import IClientDomainService
-from ...repositories.client.client_repository_facade import ClientRepositoryFacade
-from ...schemas.client import (
-    ClientCreateSchema, 
-    ClientUpdateSchema, 
-    ClientResponseSchema,
-    ClientSearchSchema,
-    ClientStatisticsSchema
+from ..base_domain_service import BaseDomainService
+from interfaces.client_domain_service_interface import IClientDomainService
+from ....repositories.client.client_repository_facade import ClientRepositoryFacade
+from ....schemas.client.client import (
+    ClientCreate, 
+    ClientUpdate, 
+    ClientResponse,
+    ClientSearch,
+    ClientStatistics
 )
-from ...exceptions.domain.client_domain_exceptions import (
+from ....exceptions.domain.client_domain_exceptions import (
     ClientDomainError,
     ClientBusinessRuleViolationError,
     ClientDependencyError,
@@ -40,15 +40,15 @@ from ...exceptions.domain.client_domain_exceptions import (
     create_client_project_transfer_error,
     create_client_analysis_error
 )
-from ...exceptions.repository.client_repository_exceptions import (
+from ....exceptions.repository.client_repository_exceptions import (
     ClientNotFoundError,
     ClientValidationError,
     ClientDuplicateError
 )
-from ...config.config import settings
+from ....config.config import settings
 
 
-class ClientDomainService(BaseDomainService[ClientCreateSchema, ClientUpdateSchema, ClientResponseSchema], IClientDomainService):
+class ClientDomainService(BaseDomainService[ClientCreate, ClientUpdate, ClientResponse], IClientDomainService):
     """
     Servicio de dominio para la gestión integral de clientes.
     
@@ -87,10 +87,10 @@ class ClientDomainService(BaseDomainService[ClientCreateSchema, ClientUpdateSche
 
     async def create_client_with_validation(
         self,
-        client_data: ClientCreateSchema,
+        client_data: ClientCreate,
         validate_dependencies: bool = True,
         notify_stakeholders: bool = True
-    ) -> ClientResponseSchema:
+    ) -> ClientResponse:
         """
         Crea un nuevo cliente con validaciones de negocio completas.
         
@@ -146,10 +146,10 @@ class ClientDomainService(BaseDomainService[ClientCreateSchema, ClientUpdateSche
     async def update_client_with_dependencies(
         self,
         client_id: int,
-        update_data: ClientUpdateSchema,
+        update_data: ClientUpdate,
         validate_impact: bool = True,
         cascade_updates: bool = True
-    ) -> ClientResponseSchema:
+    ) -> ClientResponse:
         """
         Actualiza un cliente considerando dependencias y impacto en cascada.
         
@@ -269,7 +269,7 @@ class ClientDomainService(BaseDomainService[ClientCreateSchema, ClientUpdateSche
 
     async def advanced_client_search(
         self,
-        search_criteria: ClientSearchSchema,
+        search_criteria: ClientSearch,
         include_analytics: bool = False,
         include_relationships: bool = False
     ) -> Dict[str, Any]:
@@ -330,7 +330,7 @@ class ClientDomainService(BaseDomainService[ClientCreateSchema, ClientUpdateSche
         sort_by: Optional[str] = None,
         limit: Optional[int] = None,
         offset: Optional[int] = None
-    ) -> List[ClientResponseSchema]:
+    ) -> List[ClientResponse]:
         """
         Obtiene clientes usando criterios complejos de filtrado.
         
@@ -921,7 +921,7 @@ class ClientDomainService(BaseDomainService[ClientCreateSchema, ClientUpdateSche
     # MÉTODOS PRIVADOS DE APOYO
     # ============================================================================
 
-    async def _validate_business_rules_for_creation(self, client_data: ClientCreateSchema) -> None:
+    async def _validate_business_rules_for_creation(self, client_data: ClientCreate) -> None:
         """Valida reglas de negocio específicas para creación de clientes."""
         # Validar longitud del nombre
         if len(client_data.name) < self._business_rules['min_name_length']:
@@ -950,8 +950,8 @@ class ClientDomainService(BaseDomainService[ClientCreateSchema, ClientUpdateSche
 
     async def _validate_business_rules_for_update(
         self, 
-        current_client: ClientResponseSchema, 
-        update_data: ClientUpdateSchema
+        current_client: ClientResponse, 
+        update_data: ClientUpdate
     ) -> None:
         """Valida reglas de negocio específicas para actualización de clientes."""
         # Validar transiciones de estado si se está actualizando el estado
@@ -971,13 +971,13 @@ class ClientDomainService(BaseDomainService[ClientCreateSchema, ClientUpdateSche
                     }
                 )
 
-    async def _validate_external_dependencies(self, client_data: ClientCreateSchema) -> None:
+    async def _validate_external_dependencies(self, client_data: ClientCreate) -> None:
         """Valida dependencias externas antes de crear un cliente."""
         # Aquí se implementarían validaciones con servicios externos
         # Por ejemplo, validación de CRM, sistemas de facturación, etc.
         pass
 
-    async def _check_for_business_duplicates(self, client_data: ClientCreateSchema) -> None:
+    async def _check_for_business_duplicates(self, client_data: ClientCreate) -> None:
         """Verifica duplicados usando lógica de negocio específica."""
         # Buscar clientes con nombre similar
         similar_clients = await self._client_repository.search_clients_by_name(client_data.name)
@@ -994,7 +994,7 @@ class ClientDomainService(BaseDomainService[ClientCreateSchema, ClientUpdateSche
 
     async def _execute_post_creation_actions(
         self, 
-        created_client: ClientResponseSchema, 
+        created_client: ClientResponse, 
         notify_stakeholders: bool
     ) -> None:
         """Ejecuta acciones posteriores a la creación de un cliente."""
@@ -1009,7 +1009,7 @@ class ClientDomainService(BaseDomainService[ClientCreateSchema, ClientUpdateSche
         if notify_stakeholders:
             await self._notify_client_creation(created_client)
 
-    async def _validate_update_impact(self, client_id: int, update_data: ClientUpdateSchema) -> None:
+    async def _validate_update_impact(self, client_id: int, update_data: ClientUpdate) -> None:
         """Valida el impacto de una actualización en entidades relacionadas."""
         # Obtener proyectos relacionados
         related_projects = await self._client_repository.get_client_projects(client_id)
@@ -1025,8 +1025,8 @@ class ClientDomainService(BaseDomainService[ClientCreateSchema, ClientUpdateSche
 
     async def _execute_cascade_updates(
         self, 
-        current_client: ClientResponseSchema, 
-        updated_client: ClientResponseSchema
+        current_client: ClientResponse, 
+        updated_client: ClientResponse
     ) -> None:
         """Ejecuta actualizaciones en cascada a entidades dependientes."""
         # Coordinar actualizaciones con otros dominios
@@ -1062,7 +1062,7 @@ class ClientDomainService(BaseDomainService[ClientCreateSchema, ClientUpdateSche
         # Limpiar datos históricos si es necesario
         await self._client_repository.cleanup_historical_data(client_id)
 
-    async def _execute_post_deletion_actions(self, deleted_client: ClientResponseSchema) -> None:
+    async def _execute_post_deletion_actions(self, deleted_client: ClientResponse) -> None:
         """Ejecuta acciones posteriores a la eliminación de un cliente."""
         # Registrar evento de eliminación
         await self.coordinate_client_lifecycle_events(
@@ -1084,7 +1084,7 @@ class ClientDomainService(BaseDomainService[ClientCreateSchema, ClientUpdateSche
 
     async def _generate_search_metadata(
         self, 
-        search_criteria: ClientSearchSchema, 
+        search_criteria: ClientSearch, 
         results_count: int
     ) -> Dict[str, Any]:
         """Genera metadatos para resultados de búsqueda."""
@@ -1102,14 +1102,14 @@ class ClientDomainService(BaseDomainService[ClientCreateSchema, ClientUpdateSche
 
     async def _calculate_client_similarity(
         self, 
-        client_data: ClientCreateSchema, 
-        existing_client: ClientResponseSchema
+        client_data: ClientCreate, 
+        existing_client: ClientResponse
     ) -> float:
         """Calcula la similitud entre dos clientes."""
         # Implementar algoritmo de similitud
         return 0.0
 
-    async def _notify_client_creation(self, client: ClientResponseSchema) -> None:
+    async def _notify_client_creation(self, client: ClientResponse) -> None:
         """Notifica la creación de un cliente a stakeholders."""
         # Implementar lógica de notificación
         pass
