@@ -174,6 +174,102 @@ def sample_client_stats() -> ClientStatsResponse:
 
 
 @pytest.fixture
+def sample_client_count_by_status() -> Dict[str, int]:
+    """
+    Fixture que proporciona conteo de clientes por estado.
+    
+    Returns:
+        Dict[str, int]: Conteo de clientes por estado
+    """
+    return {
+        "active": 8,
+        "inactive": 2,
+        "pending": 1,
+        "suspended": 0
+    }
+
+
+@pytest.fixture
+def sample_client_growth_stats() -> Dict[str, Any]:
+    """
+    Fixture que proporciona estadísticas de crecimiento de clientes.
+    
+    Returns:
+        Dict[str, Any]: Estadísticas de crecimiento
+    """
+    return {
+        "period": "monthly",
+        "current_month": 15,
+        "previous_month": 12,
+        "growth_rate": 25.0,
+        "growth_absolute": 3,
+        "monthly_data": [
+            {"month": "2024-01", "count": 10},
+            {"month": "2024-02", "count": 12},
+            {"month": "2024-03", "count": 15}
+        ]
+    }
+
+
+@pytest.fixture
+def sample_client_activity_metrics() -> Dict[str, Any]:
+    """
+    Fixture que proporciona métricas de actividad de clientes.
+    
+    Returns:
+        Dict[str, Any]: Métricas de actividad
+    """
+    return {
+        "total_clients": 10,
+        "active_last_30_days": 8,
+        "active_last_7_days": 6,
+        "never_active": 1,
+        "activity_rate_30_days": 80.0,
+        "activity_rate_7_days": 60.0,
+        "most_active_clients": [
+            {"client_id": "client-1", "activity_score": 95.5},
+            {"client_id": "client-2", "activity_score": 87.2},
+            {"client_id": "client-3", "activity_score": 78.9}
+        ]
+    }
+
+
+@pytest.fixture
+def empty_client_stats() -> ClientStatsResponse:
+    """
+    Fixture que proporciona estadísticas vacías de cliente.
+    
+    Returns:
+        ClientStatsResponse: Estadísticas vacías
+    """
+    return ClientStatsResponse(
+        total_clients=0,
+        active_clients=0,
+        inactive_clients=0,
+        clients_with_projects=0,
+        clients_without_projects=0,
+        average_projects_per_client=0.0,
+        total_projects=0
+    )
+
+
+@pytest.fixture
+def empty_client_count_by_status() -> Dict[str, int]:
+    """
+    Fixture que proporciona conteo vacío de clientes por estado.
+    
+    Returns:
+        Dict[str, int]: Conteo vacío
+    """
+    return {
+        "active": 0,
+        "inactive": 0,
+        "pending": 0,
+        "suspended": 0
+    }
+
+
+@pytest.fixture
 def mock_crud_operations() -> AsyncMock:
     """
     Fixture que mockea las operaciones CRUD.
