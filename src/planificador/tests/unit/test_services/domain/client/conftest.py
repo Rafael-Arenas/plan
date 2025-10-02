@@ -221,6 +221,15 @@ def client_domain_service(
     service.crud.bulk_create_clients = AsyncMock()
     
     service.query = AsyncMock()
+    service.query.get_client_by_name = AsyncMock()
+    service.query.get_client_by_email = AsyncMock()
+    service.query.get_client_by_code = AsyncMock()
+    service.query.get_clients_by_status = AsyncMock()
+    service.query.get_active_clients = AsyncMock()
+    service.query.get_inactive_clients = AsyncMock()
+    service.query.search_clients_basic = AsyncMock()
+    service.query.client_exists = AsyncMock()
+    
     service.advanced_query = AsyncMock()
     service.statistics = AsyncMock()
     service.relationships = AsyncMock()
@@ -244,12 +253,47 @@ def client_domain_service(
     async def bulk_create_clients_mock(clients_data):
         return await service.crud.bulk_create_clients(clients_data)
     
+    # Métodos de consulta que delegan al módulo query
+    async def get_client_by_name_mock(name):
+        return await service.query.get_client_by_name(name)
+    
+    async def get_client_by_email_mock(email):
+        return await service.query.get_client_by_email(email)
+    
+    async def get_client_by_code_mock(code):
+        return await service.query.get_client_by_code(code)
+    
+    async def get_clients_by_status_mock(is_active):
+        return await service.query.get_clients_by_status(is_active)
+    
+    async def get_active_clients_mock():
+        return await service.query.get_active_clients()
+    
+    async def get_inactive_clients_mock():
+        return await service.query.get_inactive_clients()
+    
+    async def search_clients_basic_mock(search_term):
+        return await service.query.search_clients_basic(search_term)
+    
+    async def client_exists_mock(client_id):
+        return await service.query.client_exists(client_id)
+    
     # Asignar los métodos mockeados
     service.create_client = create_client_mock
     service.get_client_by_id = get_client_by_id_mock
     service.update_client = update_client_mock
     service.delete_client = delete_client_mock
     service.bulk_create_clients = bulk_create_clients_mock
+    
+    # Asignar métodos de consulta
+    service.get_client_by_name = get_client_by_name_mock
+    service.get_client_by_email = get_client_by_email_mock
+    service.get_client_by_code = get_client_by_code_mock
+    service.get_clients_by_status = get_clients_by_status_mock
+    service.get_active_clients = get_active_clients_mock
+    service.get_inactive_clients = get_inactive_clients_mock
+    service.search_clients_basic = search_clients_basic_mock
+    service.client_exists = client_exists_mock
     
     yield service
 
