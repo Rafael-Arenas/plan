@@ -25,16 +25,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import SQLAlchemyError
 from loguru import logger
 
-from ...database.models.base import BaseModel
-from ...exceptions.domain import (
-    DomainServiceError,
-    DomainValidationError,
-    DomainBusinessRuleError,
-    DomainTransactionError,
-    create_domain_service_error,
-    create_domain_validation_error,
-    create_domain_business_rule_error,
-    create_domain_transaction_error
+from ...models.base import BaseModel
+from ...exceptions.base import (
+    BusinessLogicError,
+    ValidationError,
+    NotFoundError,
+    ConflictError,
 )
 from ...exceptions import (
     NotFoundError,
@@ -138,20 +134,14 @@ class BaseDomainService(Generic[ModelType], ABC):
         except SQLAlchemyError as e:
             self._logger.error(f"Error de base de datos en transacción: {e}")
             await self.session.rollback()
-            raise create_domain_transaction_error(
-                message=f"Error de base de datos durante la transacción: {e}",
-                service_name=self._service_name,
-                operation="transaction",
-                original_error=e
+            raise BusinessLogicError(
+                message=f"Error de base de datos durante la transacción: {e}"
             )
         except Exception as e:
             self._logger.error(f"Error inesperado en transacción: {e}")
             await self.session.rollback()
-            raise create_domain_transaction_error(
-                message=f"Error inesperado durante la transacción: {e}",
-                service_name=self._service_name,
-                operation="transaction",
-                original_error=e
+            raise BusinessLogicError(
+                message=f"Error inesperado durante la transacción: {e}"
             )
     
     # ============================================================================
@@ -175,7 +165,7 @@ class BaseDomainService(Generic[ModelType], ABC):
             
         Raises:
             NotFoundError: Si la entidad no existe
-            DomainServiceError: Si ocurre un error durante la validación
+            BusinessLogicError: Si ocurre un error durante la validación
         """
         try:
             entity = await self.session.get(self.model_class, entity_id)
@@ -199,13 +189,8 @@ class BaseDomainService(Generic[ModelType], ABC):
             raise
         except Exception as e:
             self._logger.error(f"Error al validar existencia de {self.entity_name}: {e}")
-            raise create_domain_service_error(
-                message=f"Error al validar existencia de {self.entity_name}: {e}",
-                service_name=self._service_name,
-                operation=operation,
-                entity_type=self.entity_name,
-                entity_id=entity_id,
-                original_error=e
+            raise BusinessLogicError(
+                message=f"Error al validar existencia de {self.entity_name}: {e}"
             )
     
     def _validate_required_fields(
@@ -223,7 +208,7 @@ class BaseDomainService(Generic[ModelType], ABC):
             operation: Nombre de la operación para contexto de error
             
         Raises:
-            DomainValidationError: Si faltan campos requeridos
+            ValidationError: Si faltan campos requeridos
         """
         missing_fields = []
         empty_fields = []
@@ -250,12 +235,8 @@ class BaseDomainService(Generic[ModelType], ABC):
                 }
             )
             
-            raise create_domain_validation_error(
-                message=f"Campos requeridos faltantes o vacíos: {missing_fields + empty_fields}",
-                service_name=self._service_name,
-                operation=operation,
-                entity_type=self.entity_name,
-                validation_errors=error_details
+            raise ValidationError(
+                message=f"Campos requeridos faltantes o vacíos: {missing_fields + empty_fields}"
             )
     
     def _validate_field_length(
@@ -274,7 +255,7 @@ class BaseDomainService(Generic[ModelType], ABC):
             operation: Nombre de la operación para contexto de error
             
         Raises:
-            DomainValidationError: Si algún campo no cumple las restricciones
+            ValidationError: Si algún campo no cumple las restricciones
         """
         validation_errors = {}
         
@@ -295,12 +276,8 @@ class BaseDomainService(Generic[ModelType], ABC):
                 extra={"operation": operation, "validation_errors": validation_errors}
             )
             
-            raise create_domain_validation_error(
-                message=f"Errores de validación de longitud en campos: {list(validation_errors.keys())}",
-                service_name=self._service_name,
-                operation=operation,
-                entity_type=self.entity_name,
-                validation_errors=validation_errors
+            raise ValidationError(
+                message=f"Errores de validación de longitud en campos: {list(validation_errors.keys())}"
             )
     
     # ============================================================================
@@ -411,9 +388,8 @@ class BaseDomainService(Generic[ModelType], ABC):
             ModelType: Entidad creada
             
         Raises:
-            DomainValidationError: Si los datos no son válidos
-            DomainBusinessRuleError: Si se violan reglas de negocio
-            DomainServiceError: Si ocurre un error durante la creación
+            ValidationError: Si los datos no son válidos
+            BusinessLogicError: Si se violan reglas de negocio o ocurre un error durante la creación
         """
         operation = "create"
         self._logger.info(f"Iniciando creación de {self.entity_name}")
@@ -441,16 +417,12 @@ class BaseDomainService(Generic[ModelType], ABC):
             
             return entity
             
-        except (DomainValidationError, DomainBusinessRuleError):
+        except (ValidationError, BusinessLogicError):
             raise
         except Exception as e:
             self._logger.error(f"Error al crear {self.entity_name}: {e}")
-            raise create_domain_service_error(
-                message=f"Error al crear {self.entity_name}: {e}",
-                service_name=self._service_name,
-                operation=operation,
-                entity_type=self.entity_name,
-                original_error=e
+            raise BusinessLogicError(
+                message=f"Error al crear {self.entity_name}: {e}"
             )
     
     async def get_by_id(self, entity_id: Union[int, str]) -> ModelType:
@@ -484,13 +456,8 @@ class BaseDomainService(Generic[ModelType], ABC):
             raise
         except Exception as e:
             self._logger.error(f"Error al obtener {self.entity_name}: {e}")
-            raise create_domain_service_error(
-                message=f"Error al obtener {self.entity_name}: {e}",
-                service_name=self._service_name,
-                operation=operation,
-                entity_type=self.entity_name,
-                entity_id=entity_id,
-                original_error=e
+            raise BusinessLogicError(
+                message=f"Error al obtener {self.entity_name}: {e}"
             )
     
     async def update(
@@ -549,13 +516,8 @@ class BaseDomainService(Generic[ModelType], ABC):
             raise
         except Exception as e:
             self._logger.error(f"Error al actualizar {self.entity_name}: {e}")
-            raise create_domain_service_error(
-                message=f"Error al actualizar {self.entity_name}: {e}",
-                service_name=self._service_name,
-                operation=operation,
-                entity_type=self.entity_name,
-                entity_id=entity_id,
-                original_error=e
+            raise BusinessLogicError(
+                message=f"Error al actualizar {self.entity_name}: {e}"
             )
     
     async def delete(self, entity_id: Union[int, str]) -> bool:
@@ -599,13 +561,8 @@ class BaseDomainService(Generic[ModelType], ABC):
             raise
         except Exception as e:
             self._logger.error(f"Error al eliminar {self.entity_name}: {e}")
-            raise create_domain_service_error(
-                message=f"Error al eliminar {self.entity_name}: {e}",
-                service_name=self._service_name,
-                operation=operation,
-                entity_type=self.entity_name,
-                entity_id=entity_id,
-                original_error=e
+            raise BusinessLogicError(
+                message=f"Error al eliminar {self.entity_name}: {e}"
             )
     
     # ============================================================================
