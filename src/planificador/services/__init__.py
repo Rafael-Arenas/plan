@@ -38,15 +38,8 @@ Ejemplos:
 # Importaciones de servicios de dominio
 from .domain import (
     BaseDomainService,
-    ClientService,
-    ProjectService,
-    EmployeeService,
-    TeamService,
-    AssignmentService,
-    ScheduleService,
-    WorkloadService,
-    VacationService,
-    AlertService,
+    IClientDomainService,
+    ClientDomainService,
 )
 
 # Importaciones de servicios de infraestructura
@@ -55,15 +48,8 @@ from .domain import (
 __all__ = [
     # Domain Services
     "BaseDomainService",
-    "ClientService",
-    "ProjectService",
-    "EmployeeService",
-    "TeamService",
-    "AssignmentService",
-    "ScheduleService",
-    "WorkloadService",
-    "VacationService",
-    "AlertService",
+    "IClientDomainService",
+    "ClientDomainService",
     
     # Infrastructure Services
     # (Se agregarán cuando se implementen)

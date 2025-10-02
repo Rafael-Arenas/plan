@@ -35,13 +35,10 @@ from ...exceptions.base import (
 from ...exceptions import (
     NotFoundError,
     ValidationError,
-    ConflictError,
-    create_not_found_error,
-    create_validation_error,
-    create_conflict_error
+    ConflictError
 )
 from ...config.config import get_settings
-from ...utils.date_utils import get_current_datetime
+from ...utils.date_utils import get_current_time
 
 # Type variable para el modelo genérico
 ModelType = TypeVar('ModelType', bound=BaseModel)
@@ -174,9 +171,10 @@ class BaseDomainService(Generic[ModelType], ABC):
                     f"{self.entity_name.capitalize()} no encontrado",
                     extra={"entity_id": entity_id, "operation": operation}
                 )
-                raise create_not_found_error(
+                raise NotFoundError(
+                    message=f"{self.entity_name.capitalize()} no encontrado",
                     entity_type=self.entity_name,
-                    entity_id=entity_id
+                    entity_id=str(entity_id)
                 )
             
             self._logger.debug(
