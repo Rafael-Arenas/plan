@@ -1,1 +1,0 @@
-"""Tests unitarios para $($dir.Replace("test_", ""))."""`n
