@@ -231,11 +231,29 @@ def client_domain_service(
     service.query.client_exists = AsyncMock()
     
     service.advanced_query = AsyncMock()
+    service.advanced_query.search_clients_advanced = AsyncMock()
+    service.advanced_query.get_clients_paginated = AsyncMock()
+    service.advanced_query.search_clients_fuzzy = AsyncMock()
+    
     service.statistics = AsyncMock()
+    service.statistics.get_client_statistics = AsyncMock()
+    service.statistics.count_clients_by_status = AsyncMock()
+    service.statistics.get_client_growth_statistics = AsyncMock()
+    service.statistics.get_client_activity_metrics = AsyncMock()
+    
     service.relationships = AsyncMock()
     service.dates = AsyncMock()
+    
     service.validation = AsyncMock()
+    service.validation.validate_client_creation = AsyncMock()
+    service.validation.validate_client_update = AsyncMock()
+    service.validation.validate_business_rules = AsyncMock()
+    service.validation.validate_email_uniqueness = AsyncMock()
+    
     service.health = AsyncMock()
+    service.health.check_service_health = AsyncMock()
+    service.health.check_database_connectivity = AsyncMock()
+    service.health.generate_health_report = AsyncMock()
     
     # Configurar los métodos principales del servicio para que deleguen a los módulos
     async def create_client_mock(client_data):
@@ -294,6 +312,80 @@ def client_domain_service(
     service.get_inactive_clients = get_inactive_clients_mock
     service.search_clients_basic = search_clients_basic_mock
     service.client_exists = client_exists_mock
+    
+    # Métodos avanzados que delegan a los módulos especializados
+    async def search_clients_advanced_mock(filters=None, sort_by=None, sort_order="asc", page=1, page_size=10):
+        return await service.advanced_query.search_clients_advanced(filters, sort_by, sort_order, page, page_size)
+    
+    async def get_clients_paginated_mock(page=1, page_size=10, sort_by=None):
+        return await service.advanced_query.get_clients_paginated(page, page_size, sort_by)
+    
+    async def search_clients_fuzzy_mock(search_term, threshold=0.6):
+        return await service.advanced_query.search_clients_fuzzy(search_term, threshold)
+    
+    async def get_client_statistics_mock():
+        return await service.statistics.get_client_statistics()
+    
+    async def count_clients_by_status_mock():
+        return await service.statistics.count_clients_by_status()
+    
+    async def get_client_growth_statistics_mock(days=30):
+        return await service.statistics.get_client_growth_statistics(days)
+    
+    async def get_client_activity_metrics_mock():
+        return await service.statistics.get_client_activity_metrics()
+    
+    async def validate_client_creation_mock(client_data):
+        return await service.validation.validate_client_creation(client_data)
+    
+    async def validate_client_update_mock(client_id, client_data):
+        return await service.validation.validate_client_update(client_id, client_data)
+    
+    async def validate_business_rules_mock(client_data):
+        return await service.validation.validate_business_rules(client_data)
+    
+    async def validate_email_uniqueness_mock(email, exclude_client_id=None):
+        return await service.validation.validate_email_uniqueness(email, exclude_client_id)
+    
+    async def check_service_health_mock():
+        return await service.health.check_service_health()
+    
+    async def check_database_connectivity_mock():
+        return await service.health.check_database_connectivity()
+    
+    async def generate_health_report_mock():
+        return await service.health.generate_health_report()
+    
+    # Métodos de utilidad que no delegan a módulos
+    async def get_service_info_mock():
+        return {
+            "service_name": "ClientDomainService",
+            "version": "1.0.0",
+            "modules": ["crud", "query", "advanced_query", "statistics", "relationships", "dates", "validation", "health"],
+            "capabilities": ["create", "read", "update", "delete", "search", "validate", "health_check"],
+            "status": "active"
+        }
+    
+    async def close_mock():
+        return True
+    
+    # Asignar métodos avanzados
+    service.search_clients_advanced = search_clients_advanced_mock
+    service.get_clients_paginated = get_clients_paginated_mock
+    service.search_clients_fuzzy = search_clients_fuzzy_mock
+    service.get_client_statistics = get_client_statistics_mock
+    service.count_clients_by_status = count_clients_by_status_mock
+    service.get_client_growth_statistics = get_client_growth_statistics_mock
+    service.get_client_activity_metrics = get_client_activity_metrics_mock
+    service.validate_client_creation = validate_client_creation_mock
+    service.validate_client_update = validate_client_update_mock
+    service.validate_business_rules = validate_business_rules_mock
+    service.validate_email_uniqueness = validate_email_uniqueness_mock
+    service.check_service_health = check_service_health_mock
+    service.check_database_connectivity = check_database_connectivity_mock
+    service.generate_health_report = generate_health_report_mock
+    service.get_service_info = get_service_info_mock
+    service.close = close_mock
     
     yield service
 
