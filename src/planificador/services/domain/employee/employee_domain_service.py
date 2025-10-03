@@ -62,6 +62,15 @@ class EmployeeDomainService(IEmployeeDomainService):
         self._logger.info("Iniciando creación de empleado")
         return await self._crud_ops.create_employee(employee_data)
 
+    async def create_employee_with_validation(
+        self,
+        employee_data: Dict[str, Any],
+        validate_business_rules: bool = True
+    ) -> Employee:
+        """Crea un nuevo empleado con validaciones completas de negocio."""
+        self._logger.info(f"Iniciando creación de empleado con validación completa: {employee_data.get('email', 'N/A')}")
+        return await self._crud_ops.create_employee_with_validation(employee_data, validate_business_rules)
+
     async def bulk_create_employees(self, employees_data: List[EmployeeCreate]) -> List[Employee]:
         """Crea múltiples empleados en una operación batch."""
         self._logger.info(f"Iniciando creación masiva de {len(employees_data)} empleados")
