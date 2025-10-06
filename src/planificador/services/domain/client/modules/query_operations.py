@@ -8,6 +8,7 @@ proporcionando métodos optimizados para búsquedas frecuentes.
 """
 
 from typing import List, Optional
+from uuid import UUID
 
 from loguru import logger
 
@@ -34,6 +35,189 @@ class QueryOperations(IQueryOperations):
         """
         self._client_repository = client_repository
         self._logger = logger
+
+    # ========== Implementación de métodos abstractos faltantes ==========
+
+    async def find_clients_by_name(
+        self,
+        name: str,
+        exact_match: bool = False,
+        include_inactive: bool = False
+    ) -> List[Client]:
+        """
+        Busca clientes por nombre.
+        
+        Args:
+            name: Nombre o parte del nombre a buscar
+            exact_match: Si buscar coincidencia exacta
+            include_inactive: Si incluir clientes inactivos
+            
+        Returns:
+            List[Client]: Lista de clientes encontrados
+        """
+        try:
+            self._logger.debug(f"Buscando clientes por nombre: '{name}' (exact={exact_match}, include_inactive={include_inactive})")
+            
+            if exact_match:
+                client = await self._client_repository.get_client_by_name(name)
+                if client and (include_inactive or client.is_active):
+                    return [Client.model_validate(client)]
+                return []
+            else:
+                clients = await self._client_repository.search_clients_by_name(name)
+                if not include_inactive:
+                    clients = [c for c in clients if c.is_active]
+                return [Client.model_validate(client) for client in clients]
+                
+        except Exception as e:
+            self._logger.error(f"Error al buscar clientes por nombre '{name}': {e}")
+            raise RepositoryError(
+                message=f"Error al buscar clientes por nombre: {e}",
+                operation="find_clients_by_name",
+                entity_type="Client",
+                original_error=e
+            )
+
+    async def find_clients_by_email(
+        self,
+        email: str,
+        exact_match: bool = True
+    ) -> List[Client]:
+        """
+        Busca clientes por email.
+        
+        Args:
+            email: Email o parte del email a buscar
+            exact_match: Si buscar coincidencia exacta
+            
+        Returns:
+            List[Client]: Lista de clientes encontrados
+        """
+        try:
+            self._logger.debug(f"Buscando clientes por email: '{email}' (exact={exact_match})")
+            
+            if exact_match:
+                client = await self._client_repository.get_client_by_email(email)
+                return [Client.model_validate(client)] if client else []
+            else:
+                # Para búsqueda parcial, usar filtros con patrón
+                filters = {"email__icontains": email}
+                clients = await self._client_repository.get_clients_by_filters(filters)
+                return [Client.model_validate(client) for client in clients]
+                
+        except Exception as e:
+            self._logger.error(f"Error al buscar clientes por email '{email}': {e}")
+            raise RepositoryError(
+                message=f"Error al buscar clientes por email: {e}",
+                operation="find_clients_by_email",
+                entity_type="Client",
+                original_error=e
+            )
+
+    async def find_clients_by_phone(
+        self,
+        phone: str,
+        exact_match: bool = False
+    ) -> List[Client]:
+        """
+        Busca clientes por teléfono.
+        
+        Args:
+            phone: Teléfono o parte del teléfono a buscar
+            exact_match: Si buscar coincidencia exacta
+            
+        Returns:
+            List[Client]: Lista de clientes encontrados
+        """
+        try:
+            self._logger.debug(f"Buscando clientes por teléfono: '{phone}' (exact={exact_match})")
+            
+            if exact_match:
+                filters = {"phone": phone}
+                clients = await self._client_repository.get_clients_by_filters(filters, limit=1)
+                return [Client.model_validate(clients[0])] if clients else []
+            else:
+                # Para búsqueda parcial, usar filtros con patrón
+                filters = {"phone__icontains": phone}
+                clients = await self._client_repository.get_clients_by_filters(filters)
+                return [Client.model_validate(client) for client in clients]
+                
+        except Exception as e:
+            self._logger.error(f"Error al buscar clientes por teléfono '{phone}': {e}")
+            raise RepositoryError(
+                message=f"Error al buscar clientes por teléfono: {e}",
+                operation="find_clients_by_phone",
+                entity_type="Client",
+                original_error=e
+            )
+
+    async def check_client_exists(
+        self,
+        client_id: UUID
+    ) -> bool:
+        """
+        Verifica si un cliente existe.
+        
+        Args:
+            client_id: ID del cliente a verificar
+            
+        Returns:
+            bool: True si el cliente existe
+        """
+        try:
+            self._logger.debug(f"Verificando existencia de cliente ID: {client_id}")
+            
+            client = await self._client_repository.get_client_by_id(client_id)
+            exists = client is not None
+            
+            self._logger.debug(f"Cliente ID {client_id} {'existe' if exists else 'no existe'}")
+            return exists
+            
+        except Exception as e:
+            self._logger.error(f"Error al verificar existencia de cliente ID {client_id}: {e}")
+            raise RepositoryError(
+                message=f"Error al verificar existencia: {e}",
+                operation="check_client_exists",
+                entity_type="Client",
+                entity_id=str(client_id),
+                original_error=e
+            )
+
+    async def get_clients_by_type(
+        self,
+        client_type: str,
+        include_inactive: bool = False
+    ) -> List[Client]:
+        """
+        Obtiene clientes por tipo.
+        
+        Args:
+            client_type: Tipo de cliente (individual, corporate, etc.)
+            include_inactive: Si incluir clientes inactivos
+            
+        Returns:
+            List[Client]: Lista de clientes del tipo especificado
+        """
+        try:
+            self._logger.debug(f"Buscando clientes por tipo: {client_type} (include_inactive={include_inactive})")
+            
+            filters = {"client_type": client_type}
+            if not include_inactive:
+                filters["is_active"] = True
+                
+            clients = await self._client_repository.get_clients_by_filters(filters)
+            return [Client.model_validate(client) for client in clients]
+                
+        except Exception as e:
+            self._logger.error(f"Error al buscar clientes por tipo '{client_type}': {e}")
+            raise RepositoryError(
+                message=f"Error al buscar clientes por tipo: {e}",
+                operation="get_clients_by_type",
+                entity_type="Client",
+                original_error=e
+            )
+
+    # ========== Métodos existentes ==========
 
     async def get_client_by_name(self, name: str) -> Optional[Client]:
         """
@@ -150,26 +334,48 @@ class QueryOperations(IQueryOperations):
                 original_error=e
             )
 
-    async def get_clients_by_status(self, is_active: bool) -> List[Client]:
+    async def get_clients_by_status(
+        self,
+        status: str,
+        include_relationships: bool = False
+    ) -> List[Client]:
         """
-        Obtiene clientes filtrados por su estado activo/inactivo.
+        Obtiene clientes por estado.
         
         Args:
-            is_active: True para clientes activos, False para inactivos
+            status: Estado del cliente (active, inactive, suspended, etc.)
+            include_relationships: Si incluir relaciones del cliente
             
         Returns:
-            List[Client]: Lista de clientes que coinciden con el estado
+            List[Client]: Lista de clientes con el estado especificado
         """
         try:
-            self._logger.debug(f"Buscando clientes por estado activo: {is_active}")
+            self._logger.debug(f"Buscando clientes por estado: '{status}' (include_relationships={include_relationships})")
             
-            filters = {"is_active": is_active}
+            # Mapear estados de string a boolean para is_active
+            status_mapping = {
+                "active": True,
+                "inactive": False,
+                "suspended": False
+            }
+            
+            if status in status_mapping:
+                is_active = status_mapping[status]
+                filters = {"is_active": is_active}
+            else:
+                # Si no es un estado conocido, buscar por el campo status directamente
+                filters = {"status": status}
+            
             clients = await self._client_repository.get_clients_by_filters(filters)
+            
+            # TODO: Implementar include_relationships cuando sea necesario
+            if include_relationships:
+                self._logger.warning("include_relationships no implementado aún")
             
             return [Client.model_validate(client) for client in clients]
             
         except Exception as e:
-            self._logger.error(f"Error al buscar clientes por estado {is_active}: {e}")
+            self._logger.error(f"Error al buscar clientes por estado '{status}': {e}")
             raise RepositoryError(
                 message=f"Error al buscar clientes por estado: {e}",
                 operation="get_clients_by_status",
@@ -177,12 +383,17 @@ class QueryOperations(IQueryOperations):
                 original_error=e
             )
 
-    async def get_clients_by_ids(self, client_ids: List[int]) -> List[Client]:
+    async def get_clients_by_ids(
+        self,
+        client_ids: List[UUID],
+        include_relationships: bool = False
+    ) -> List[Client]:
         """
         Obtiene múltiples clientes por sus IDs.
         
         Args:
-            client_ids: Lista de IDs de clientes a buscar
+            client_ids: Lista de IDs de clientes
+            include_relationships: Si incluir relaciones
             
         Returns:
             List[Client]: Lista de clientes encontrados
@@ -196,6 +407,10 @@ class QueryOperations(IQueryOperations):
                 if client:
                     clients.append(Client.model_validate(client))
             
+            # TODO: Implementar include_relationships cuando sea necesario
+            if include_relationships:
+                self._logger.warning("include_relationships no implementado aún")
+            
             self._logger.debug(f"Encontrados {len(clients)} de {len(client_ids)} clientes")
             return clients
             
@@ -207,32 +422,42 @@ class QueryOperations(IQueryOperations):
                 entity_type="Client",
                 original_error=e
             )
+            self._logger.error(f"Error al buscar clientes por IDs: {e}")
+            raise RepositoryError(
+                message=f"Error al buscar clientes por IDs: {e}",
+                operation="get_clients_by_ids",
+                entity_type="Client",
+                original_error=e
+            )
 
     async def search_clients_basic(
         self,
         search_term: str,
-        fields: Optional[List[str]] = None
+        search_fields: Optional[List[str]] = None,
+        limit: int = 50
     ) -> List[Client]:
         """
-        Realiza una búsqueda básica de clientes en campos específicos.
+        Búsqueda básica de clientes en múltiples campos.
         
         Args:
             search_term: Término de búsqueda
-            fields: Lista de campos donde buscar (por defecto: name, email, contact_person)
+            search_fields: Campos específicos donde buscar (None = todos)
+            limit: Límite de resultados
             
         Returns:
-            List[Client]: Lista de clientes que coinciden con la búsqueda
+            List[Client]: Lista de clientes que coinciden
         """
         try:
-            self._logger.debug(f"Búsqueda básica de clientes: '{search_term}'")
+            self._logger.debug(f"Búsqueda básica de clientes: '{search_term}' (limit={limit})")
             
             # Campos por defecto si no se especifican
-            if fields is None:
-                fields = ["name", "email", "contact_person"]
+            if search_fields is None:
+                search_fields = ["name", "email", "contact_person"]
             
             clients = await self._client_repository.search_clients_by_text(
                 search_text=search_term,
-                fields=fields
+                fields=search_fields,
+                limit=limit
             )
             
             result = [Client.model_validate(client) for client in clients]
@@ -315,17 +540,23 @@ class QueryOperations(IQueryOperations):
                 original_error=e
             )
 
-    async def get_active_clients(self) -> List[Client]:
+    async def get_active_clients(
+        self,
+        include_relationships: bool = False
+    ) -> List[Client]:
         """
         Obtiene todos los clientes activos.
         
+        Args:
+            include_relationships: Si incluir relaciones del cliente
+            
         Returns:
             List[Client]: Lista de clientes activos
         """
         try:
-            self._logger.debug("Obteniendo clientes activos")
+            self._logger.debug(f"Obteniendo clientes activos (include_relationships={include_relationships})")
             
-            return await self.get_clients_by_status(is_active=True)
+            return await self.get_clients_by_status("active", include_relationships)
             
         except Exception as e:
             self._logger.error(f"Error al obtener clientes activos: {e}")
@@ -336,17 +567,23 @@ class QueryOperations(IQueryOperations):
                 original_error=e
             )
 
-    async def get_inactive_clients(self) -> List[Client]:
+    async def get_inactive_clients(
+        self,
+        include_relationships: bool = False
+    ) -> List[Client]:
         """
         Obtiene todos los clientes inactivos.
         
+        Args:
+            include_relationships: Si incluir relaciones del cliente
+            
         Returns:
             List[Client]: Lista de clientes inactivos
         """
         try:
-            self._logger.debug("Obteniendo clientes inactivos")
+            self._logger.debug(f"Obteniendo clientes inactivos (include_relationships={include_relationships})")
             
-            return await self.get_clients_by_status(is_active=False)
+            return await self.get_clients_by_status("inactive", include_relationships)
             
         except Exception as e:
             self._logger.error(f"Error al obtener clientes inactivos: {e}")

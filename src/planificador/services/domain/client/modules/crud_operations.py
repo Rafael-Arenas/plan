@@ -7,7 +7,7 @@ Este módulo implementa las operaciones básicas de Crear, Leer, Actualizar y El
 para la entidad Cliente, aplicando reglas de negocio específicas del dominio.
 """
 
-from typing import List, Optional
+from typing import List, Optional, Any, Dict
 from uuid import UUID
 
 from loguru import logger
@@ -32,12 +32,12 @@ class CrudOperations(ICrudOperations):
     y aplicando validaciones de dominio.
     """
 
-    def __init__(self, client_repository: ClientRepositoryFacade):
+    def __init__(self, client_repository: 'ClientRepositoryFacade'):
         """
         Inicializa el módulo de operaciones CRUD.
         
         Args:
-            client_repository: Facade del repositorio de cliente
+            client_repository: Instancia del repositorio de cliente
         """
         self._client_repository = client_repository
         self._logger = logger
@@ -178,6 +178,87 @@ class CrudOperations(ICrudOperations):
                 original_error=e
             )
 
+    async def get_all_clients(
+        self,
+        include_inactive: bool = False,
+        include_relationships: bool = False
+    ) -> List[Client]:
+        """
+        Obtiene todos los clientes del sistema.
+        
+        Args:
+            include_inactive: Si incluir clientes inactivos
+            include_relationships: Si incluir relaciones
+            
+        Returns:
+            List[Client]: Lista de todos los clientes
+        """
+        try:
+            self._logger.debug(f"Obteniendo todos los clientes (include_inactive={include_inactive})")
+            
+            clients = await self._client_repository.get_all_clients()
+            
+            result = [Client.model_validate(client) for client in clients]
+            self._logger.debug(f"Obtenidos {len(result)} clientes")
+            
+            return result
+            
+        except Exception as e:
+            self._logger.error(f"Error al obtener todos los clientes: {e}")
+            raise RepositoryError(
+                message=f"Error al obtener todos los clientes: {e}",
+                operation="get_all_clients",
+                entity_type="Client",
+                original_error=e
+            )
+
+    async def bulk_update_clients(
+        self,
+        updates: Dict[UUID, ClientUpdate],
+        validate_business_rules: bool = True
+    ) -> List[Client]:
+        """
+        Actualiza múltiples clientes en una operación transaccional.
+        
+        Args:
+            updates: Diccionario con ID del cliente y datos de actualización
+            validate_business_rules: Si aplicar validaciones de negocio
+            
+        Returns:
+            List[Client]: Lista de clientes actualizados
+            
+        Raises:
+            ValidationError: Si alguna actualización no cumple las reglas
+            TransactionError: Si falla la operación transaccional
+        """
+        try:
+            self._logger.debug(f"Actualizando {len(updates)} clientes en lote")
+            
+            updated_clients = []
+            
+            for client_id, client_data in updates.items():
+                if validate_business_rules:
+                    await self._validate_client_update(client_id, client_data)
+                
+                updated_client = await self.update_client(
+                    client_id=client_id,
+                    client_data=client_data,
+                    validate_business_rules=False  # Ya validado arriba
+                )
+                updated_clients.append(updated_client)
+            
+            self._logger.info(f"✅ {len(updated_clients)} clientes actualizados en lote")
+            return updated_clients
+            
+        except Exception as e:
+            self._logger.error(f"Error en actualización en lote: {e}")
+            raise RepositoryError(
+                message=f"Error en actualización en lote: {e}",
+                operation="bulk_update_clients",
+                entity_type="Client",
+                original_error=e
+            )
+
     async def delete_client(self, client_id: int) -> bool:
         """Elimina un cliente por su ID aplicando validaciones de negocio."""
         try:
@@ -255,6 +336,38 @@ class CrudOperations(ICrudOperations):
             raise RepositoryError(
                 message=f"Error inesperado en creación en lote: {e}",
                 operation="bulk_create_clients",
+                entity_type="Client",
+                original_error=e
+            )
+
+    async def get_by_unique_field(self, field_name: str, field_value: Any) -> Optional[Client]:
+        """
+        Obtiene un cliente por un campo único específico.
+        
+        Args:
+            field_name: Nombre del campo único
+            field_value: Valor del campo único
+            
+        Returns:
+            Optional[Client]: Cliente encontrado o None
+            
+        Raises:
+            RepositoryError: Si hay errores en la consulta
+        """
+        try:
+            self._logger.debug(f"Buscando cliente por {field_name}={field_value}")
+            
+            client = await self._client_repository.get_by_unique_field(field_name, field_value)
+            
+            if client:
+                return Client.model_validate(client)
+            return None
+            
+        except Exception as e:
+            self._logger.error(f"Error al buscar cliente por {field_name}={field_value}: {e}")
+            raise RepositoryError(
+                message=f"Error al buscar cliente por campo único: {e}",
+                operation="get_by_unique_field",
                 entity_type="Client",
                 original_error=e
             )

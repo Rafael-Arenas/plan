@@ -170,3 +170,24 @@ class ICrudOperations(ABC):
             TransactionError: Si falla la operación transaccional
         """
         pass
+
+    @abstractmethod
+    async def get_by_unique_field(
+        self,
+        field_name: str,
+        field_value: Any
+    ) -> Optional[Client]:
+        """
+        Obtiene un cliente por un campo único específico.
+        
+        Args:
+            field_name: Nombre del campo único
+            field_value: Valor del campo único
+            
+        Returns:
+            Optional[Client]: Cliente encontrado o None
+            
+        Raises:
+            RepositoryError: Si hay errores en la consulta
+        """
+        pass

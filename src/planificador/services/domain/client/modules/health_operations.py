@@ -46,16 +46,15 @@ class HealthOperations:
         _logger: Logger configurado para el módulo
     """
     
-    def __init__(self, session: AsyncSession, repository_facade: ClientRepositoryFacade):
+    def __init__(self, client_repository: ClientRepositoryFacade):
         """
         Inicializa el módulo de operaciones de salud.
         
         Args:
-            session: Sesión asíncrona de SQLAlchemy
-            repository_facade: Facade del repositorio cliente
+            client_repository: Facade del repositorio cliente
         """
-        self.session = session
-        self.repository_facade = repository_facade
+        self.repository_facade = client_repository
+        self.session = client_repository._session
         self._logger = logger.bind(module="HealthOperations", service="ClientDomainService")
         
         self._logger.debug("HealthOperations inicializado correctamente")

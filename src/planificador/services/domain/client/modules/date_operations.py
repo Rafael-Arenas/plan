@@ -8,6 +8,8 @@ utilizando Pendulum para manejo robusto de fechas y zonas horarias.
 """
 
 from typing import Any, Dict, List, Optional
+from datetime import date
+from uuid import UUID
 
 import pendulum
 from loguru import logger
@@ -544,5 +546,275 @@ class DateOperations(IDateOperations):
                 operation="schedule_client_date_reminders",
                 entity_type="Client",
                 entity_id=str(client_id),
+                original_error=e
+            )
+
+    async def calculate_client_activity_periods(
+        self,
+        client_id: UUID,
+        period_type: str = "month"
+    ) -> Dict[str, Any]:
+        """
+        Calcula los períodos de actividad de un cliente.
+        
+        Args:
+            client_id: ID del cliente
+            period_type: Tipo de período (day, week, month, year)
+            
+        Returns:
+            Dict[str, Any]: Análisis de períodos de actividad
+        """
+        try:
+            self._logger.debug(f"Calculando períodos de actividad para cliente {client_id}, tipo: {period_type}")
+            
+            # Validar entrada
+            if not client_id:
+                raise ValidationError(
+                    message="ID de cliente es requerido",
+                    field="client_id",
+                    value=client_id
+                )
+            
+            valid_periods = ["day", "week", "month", "year"]
+            if period_type not in valid_periods:
+                raise ValidationError(
+                    message=f"Tipo de período debe ser uno de: {valid_periods}",
+                    field="period_type",
+                    value=period_type
+                )
+            
+            # Verificar que el cliente existe
+            client = await self._client_repository.get_client_by_id(int(client_id))
+            if not client:
+                raise ValidationError(
+                    message=f"Cliente con ID {client_id} no encontrado",
+                    field="client_id",
+                    value=client_id
+                )
+            
+            # Calcular períodos de actividad (placeholder con lógica básica)
+            now = pendulum.now()
+            
+            # TODO: Integrar con entidades de proyectos, equipos y asignaciones
+            # cuando estén disponibles para calcular actividad real
+            
+            activity_periods = {
+                "client_id": str(client_id),
+                "client_name": client.name,
+                "period_type": period_type,
+                "analysis_date": now.to_iso8601_string(),
+                "total_periods_analyzed": 12,  # Placeholder
+                "active_periods": 8,  # Placeholder
+                "inactive_periods": 4,  # Placeholder
+                "activity_percentage": 66.67,  # Placeholder
+                "periods_detail": []
+            }
+            
+            # Generar detalles de períodos según el tipo
+            for i in range(12):
+                if period_type == "month":
+                    period_start = now.subtract(months=i)
+                    period_end = period_start.end_of("month")
+                elif period_type == "week":
+                    period_start = now.subtract(weeks=i)
+                    period_end = period_start.end_of("week")
+                elif period_type == "day":
+                    period_start = now.subtract(days=i)
+                    period_end = period_start.end_of("day")
+                else:  # year
+                    period_start = now.subtract(years=i)
+                    period_end = period_start.end_of("year")
+                
+                # Simular actividad (placeholder)
+                has_activity = i < 8  # Los primeros 8 períodos tienen actividad
+                
+                activity_periods["periods_detail"].append({
+                    "period_number": i + 1,
+                    "period_start": period_start.to_iso8601_string(),
+                    "period_end": period_end.to_iso8601_string(),
+                    "has_activity": has_activity,
+                    "activity_score": 0.8 if has_activity else 0.0,
+                    "events_count": 5 if has_activity else 0,  # Placeholder
+                    "projects_count": 2 if has_activity else 0,  # Placeholder
+                    "teams_count": 1 if has_activity else 0  # Placeholder
+                })
+            
+            # Estadísticas adicionales
+            activity_periods["statistics"] = {
+                "most_active_period": activity_periods["periods_detail"][0] if activity_periods["periods_detail"] else None,
+                "least_active_period": activity_periods["periods_detail"][-1] if activity_periods["periods_detail"] else None,
+                "average_activity_score": 0.53,  # Placeholder
+                "trend": "stable"  # Placeholder: stable, increasing, decreasing
+            }
+            
+            self._logger.debug(f"Períodos de actividad calculados para cliente {client_id}")
+            
+            return activity_periods
+            
+        except ValidationError:
+            raise
+        except Exception as e:
+            self._logger.error(f"Error al calcular períodos de actividad: {e}")
+            raise RepositoryError(
+                message=f"Error en cálculo de períodos de actividad: {e}",
+                operation="calculate_client_activity_periods",
+                entity_type="Client",
+                entity_id=str(client_id),
+                original_error=e
+            )
+
+    async def get_clients_anniversary_dates(
+        self,
+        month: Optional[int] = None,
+        include_inactive: bool = False
+    ) -> List[Dict[str, Any]]:
+        """
+        Obtiene fechas de aniversario de clientes.
+        
+        Args:
+            month: Mes específico (1-12, None para todos)
+            include_inactive: Si incluir clientes inactivos
+            
+        Returns:
+            List[Dict[str, Any]]: Lista de clientes con fechas de aniversario
+        """
+        try:
+            self._logger.debug(f"Obteniendo fechas de aniversario - mes: {month}, incluir inactivos: {include_inactive}")
+            
+            # Validar entrada
+            if month is not None and (month < 1 or month > 12):
+                raise ValidationError(
+                    message="El mes debe estar entre 1 y 12",
+                    field="month",
+                    value=month
+                )
+            
+            # Obtener clientes
+            if include_inactive:
+                clients = await self._client_repository.get_all_clients()
+            else:
+                clients = await self._client_repository.get_active_clients()
+            
+            anniversary_list = []
+            now = pendulum.now()
+            
+            for client in clients:
+                # TODO: Usar fecha real de creación cuando esté disponible en el modelo
+                # Por ahora usamos fecha simulada
+                creation_date = now.subtract(days=365)  # Placeholder: hace 1 año
+                
+                # Filtrar por mes si se especifica
+                if month is not None and creation_date.month != month:
+                    continue
+                
+                # Calcular próximo aniversario
+                next_anniversary = creation_date.replace(year=now.year)
+                if next_anniversary < now:
+                    next_anniversary = next_anniversary.add(years=1)
+                
+                # Calcular años de antigüedad
+                years_since_creation = (now - creation_date).days // 365
+                days_until_anniversary = (next_anniversary - now).days
+                
+                anniversary_data = {
+                    "client_id": client.id,
+                    "client_name": client.name,
+                    "client_status": "active" if client.is_active else "inactive",
+                    "creation_date": creation_date.to_iso8601_string(),
+                    "creation_month": creation_date.month,
+                    "creation_day": creation_date.day,
+                    "years_since_creation": years_since_creation,
+                    "next_anniversary": {
+                        "date": next_anniversary.to_iso8601_string(),
+                        "year": next_anniversary.year,
+                        "days_until": days_until_anniversary,
+                        "is_this_year": next_anniversary.year == now.year
+                    },
+                    "milestones": {
+                        "is_milestone_year": years_since_creation > 0 and years_since_creation % 5 == 0,
+                        "milestone_type": f"{years_since_creation}_years" if years_since_creation > 0 else "new_client",
+                        "celebration_priority": "high" if years_since_creation % 5 == 0 else "medium"
+                    }
+                }
+                
+                # TODO: Agregar información adicional cuando estén disponibles:
+                # - Primer proyecto asignado
+                # - Hitos importantes del cliente
+                # - Métricas de rendimiento
+                
+                anniversary_list.append(anniversary_data)
+            
+            # Ordenar por proximidad del aniversario
+            anniversary_list.sort(key=lambda x: x["next_anniversary"]["days_until"])
+            
+            self._logger.debug(f"Fechas de aniversario obtenidas: {len(anniversary_list)} clientes")
+            
+            return anniversary_list
+            
+        except ValidationError:
+            raise
+        except Exception as e:
+            self._logger.error(f"Error al obtener fechas de aniversario: {e}")
+            raise RepositoryError(
+                message=f"Error en obtención de fechas de aniversario: {e}",
+                operation="get_clients_anniversary_dates",
+                entity_type="Client",
+                original_error=e
+            )
+
+    async def get_clients_by_creation_date(
+        self,
+        target_date: date,
+        include_inactive: bool = False
+    ) -> List[Client]:
+        """
+        Obtiene clientes creados en una fecha específica.
+        
+        Args:
+            target_date: Fecha específica de creación
+            include_inactive: Si incluir clientes inactivos
+            
+        Returns:
+            List[Client]: Lista de clientes creados en la fecha
+        """
+        try:
+            self._logger.debug(f"Obteniendo clientes creados en {target_date}, incluir inactivos: {include_inactive}")
+            
+            # Validar entrada
+            if not target_date:
+                raise ValidationError(
+                    message="Fecha objetivo es requerida",
+                    field="target_date",
+                    value=target_date
+                )
+            
+            # Validar que la fecha no sea futura
+            today = pendulum.now().date()
+            if target_date > today:
+                raise ValidationError(
+                    message="La fecha no puede ser futura",
+                    field="target_date",
+                    value=target_date
+                )
+            
+            # TODO: Implementar filtro real por fecha de creación cuando esté disponible
+            # el campo created_at en el modelo Client
+            
+            self._logger.warning("Filtro por fecha de creación no implementado - campo created_at no disponible")
+            
+            # Por ahora retornamos lista vacía con mensaje informativo
+            # En el futuro, esto debería usar:
+            # return await self._client_repository.get_clients_by_creation_date(target_date, include_inactive)
+            
+            return []
+            
+        except ValidationError:
+            raise
+        except Exception as e:
+            self._logger.error(f"Error al obtener clientes por fecha de creación: {e}")
+            raise RepositoryError(
+                message=f"Error en filtro por fecha de creación: {e}",
+                operation="get_clients_by_creation_date",
+                entity_type="Client",
                 original_error=e
             )

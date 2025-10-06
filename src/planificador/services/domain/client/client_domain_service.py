@@ -88,14 +88,14 @@ class ClientDomainService(IClientDomainService):
         self.repository_facade = ClientRepositoryFacade(session)
         
         # Inicializar todos los módulos especializados
-        self.crud = CrudOperations(session, self.repository_facade)
-        self.query = QueryOperations(session, self.repository_facade)
-        self.advanced_query = AdvancedQueryOperations(session, self.repository_facade)
-        self.statistics = StatisticsOperations(session, self.repository_facade)
-        self.relationships = RelationshipOperations(session, self.repository_facade)
-        self.dates = DateOperations(session, self.repository_facade)
-        self.validation = ValidationOperations(session, self.repository_facade)
-        self.health = HealthOperations(session, self.repository_facade)
+        self.crud = CrudOperations(client_repository=self.repository_facade)
+        self.query = QueryOperations(client_repository=self.repository_facade)
+        self.advanced_query = AdvancedQueryOperations(client_repository=self.repository_facade)
+        self.statistics = StatisticsOperations(client_repository=self.repository_facade)
+        self.relationships = RelationshipOperations(client_repository=self.repository_facade)
+        self.dates = DateOperations(client_repository=self.repository_facade)
+        self.validation = ValidationOperations(client_repository=self.repository_facade)
+        self.health = HealthOperations(client_repository=self.repository_facade)
         
         self._logger.info("ClientDomainService inicializado correctamente")
     

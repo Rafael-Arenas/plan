@@ -10,8 +10,8 @@ if TYPE_CHECKING:
 
 
 class ClientBase(BaseSchema):
-    name: str = Field(..., min_length=1, max_length=100)
-    code: str = Field(..., min_length=1, max_length=20)
+    name: str = Field(..., min_length=1, max_length=200)
+    code: Optional[str] = Field(None, min_length=1, max_length=20)
     contact_person: Optional[str] = Field(None, max_length=100)
     email: Optional[EmailStr] = None
     phone: Optional[str] = Field(None, max_length=20)

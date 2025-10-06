@@ -8,6 +8,7 @@ de integridad específicas del dominio de cliente.
 """
 
 from typing import Any, Dict, List, Optional
+from uuid import UUID
 
 from loguru import logger
 
@@ -842,3 +843,99 @@ class ValidationOperations(IValidationOperations):
             validation_result["warnings"].append("Notas muy largas - considerar resumir")
         
         return validation_result
+
+    # Métodos abstractos faltantes
+
+    async def validate_client_data(
+        self,
+        client_data: ClientCreate,
+        check_duplicates: bool = True
+    ) -> Dict[str, Any]:
+        """
+        Valida los datos de un cliente antes de la creación.
+        
+        Args:
+            client_data: Datos del cliente a validar
+            check_duplicates: Si verificar duplicados
+            
+        Returns:
+            Dict[str, Any]: Resultado de la validación con detalles
+        """
+        try:
+            self._logger.debug(f"Validando datos de cliente para creación")
+            
+            # Usar el método existente validate_client_creation_data
+            return await self.validate_client_creation_data(client_data, check_duplicates)
+            
+        except ValidationError:
+            raise
+        except Exception as e:
+            self._logger.error(f"Error al validar datos de cliente: {e}")
+            raise RepositoryError(
+                message=f"Error en validación de datos: {e}",
+                operation="validate_client_data",
+                entity_type="Client",
+                original_error=e
+            )
+
+    async def check_client_email_uniqueness(
+        self,
+        email: str,
+        exclude_client_id: Optional[UUID] = None
+    ) -> bool:
+        """
+        Verifica la unicidad del email de un cliente.
+        
+        Args:
+            email: Email a verificar
+            exclude_client_id: ID del cliente a excluir de la verificación
+            
+        Returns:
+            bool: True si el email es único
+        """
+        try:
+            self._logger.debug(f"Verificando unicidad de email: {email}")
+            
+            # Usar el método existente validate_email_uniqueness
+            validation_result = await self.validate_email_uniqueness(email, exclude_client_id)
+            return validation_result.get("is_unique", False)
+            
+        except Exception as e:
+            self._logger.error(f"Error al verificar unicidad de email: {e}")
+            raise RepositoryError(
+                message=f"Error en verificación de email: {e}",
+                operation="check_client_email_uniqueness",
+                entity_type="Client",
+                original_error=e
+            )
+
+    async def check_client_phone_uniqueness(
+        self,
+        phone: str,
+        exclude_client_id: Optional[UUID] = None
+    ) -> bool:
+        """
+        Verifica la unicidad del teléfono de un cliente.
+        
+        Args:
+            phone: Teléfono a verificar
+            exclude_client_id: ID del cliente a excluir de la verificación
+            
+        Returns:
+            bool: True si el teléfono es único
+        """
+        try:
+            self._logger.debug(f"Verificando unicidad de teléfono: {phone}")
+            
+            # Usar el método existente validate_phone_uniqueness
+            validation_result = await self.validate_phone_uniqueness(phone, exclude_client_id)
+            return validation_result.get("is_unique", False)
+            
+        except Exception as e:
+            self._logger.error(f"Error al verificar unicidad de teléfono: {e}")
+            raise RepositoryError(
+                message=f"Error en verificación de teléfono: {e}",
+                operation="check_client_phone_uniqueness",
+                entity_type="Client",
+                original_error=e
+            )

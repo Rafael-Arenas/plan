@@ -8,6 +8,7 @@ del sistema como proyectos, equipos y asignaciones.
 """
 
 from typing import Any, Dict, List, Optional
+from uuid import UUID
 
 from loguru import logger
 
@@ -35,10 +36,18 @@ class RelationshipOperations(IRelationshipOperations):
         self._client_repository = client_repository
         self._logger = logger
 
-    async def get_clients_with_projects(self) -> List[Client]:
+    async def get_clients_with_projects(
+        self,
+        include_inactive_projects: bool = False,
+        include_inactive_clients: bool = False
+    ) -> List[Client]:
         """
         Obtiene clientes que tienen proyectos asociados.
         
+        Args:
+            include_inactive_projects: Si incluir proyectos inactivos
+            include_inactive_clients: Si incluir clientes inactivos
+            
         Returns:
             List[Client]: Lista de clientes con proyectos
         """
@@ -49,7 +58,10 @@ class RelationshipOperations(IRelationshipOperations):
             # Por ahora retornamos todos los clientes activos como placeholder
             self._logger.warning("Relación con proyectos no implementada aún")
             
-            filters = {"is_active": True}
+            filters = {"is_active": True if not include_inactive_clients else None}
+            if filters["is_active"] is None:
+                del filters["is_active"]
+                
             clients = await self._client_repository.get_clients_by_filters(filters)
             result = [Client.model_validate(client) for client in clients]
             
@@ -66,10 +78,16 @@ class RelationshipOperations(IRelationshipOperations):
                 original_error=e
             )
 
-    async def get_clients_without_projects(self) -> List[Client]:
+    async def get_clients_without_projects(
+        self,
+        include_inactive_clients: bool = False
+    ) -> List[Client]:
         """
         Obtiene clientes que no tienen proyectos asociados.
         
+        Args:
+            include_inactive_clients: Si incluir clientes inactivos
+            
         Returns:
             List[Client]: Lista de clientes sin proyectos
         """
@@ -80,7 +98,10 @@ class RelationshipOperations(IRelationshipOperations):
             # Por ahora retornamos clientes inactivos como placeholder
             self._logger.warning("Relación con proyectos no implementada aún")
             
-            filters = {"is_active": False}
+            filters = {"is_active": False if not include_inactive_clients else None}
+            if filters["is_active"] is None:
+                del filters["is_active"]
+                
             clients = await self._client_repository.get_clients_by_filters(filters)
             result = [Client.model_validate(client) for client in clients]
             
@@ -97,10 +118,67 @@ class RelationshipOperations(IRelationshipOperations):
                 original_error=e
             )
 
-    async def get_clients_with_teams(self) -> List[Client]:
+    async def get_client_projects_count(
+        self,
+        client_id: UUID,
+        include_inactive: bool = False
+    ) -> int:
+        """
+        Obtiene el número de proyectos asociados a un cliente.
+        
+        Args:
+            client_id: ID del cliente
+            include_inactive: Si incluir proyectos inactivos
+            
+        Returns:
+            int: Número de proyectos del cliente
+        """
+        try:
+            self._logger.debug(f"Contando proyectos para cliente {client_id}")
+            
+            # Verificar que el cliente existe
+            client = await self._client_repository.get_client_by_id(client_id)
+            if not client:
+                raise ValidationError(
+                    message=f"Cliente con ID {client_id} no encontrado",
+                    field="client_id",
+                    value=str(client_id)
+                )
+            
+            # TODO: Implementar conteo real cuando exista la entidad Project
+            self._logger.warning("Conteo de proyectos no implementado aún")
+            
+            # Por ahora retornamos 0
+            project_count = 0
+            
+            self._logger.debug(f"Proyectos para cliente {client_id}: {project_count}")
+            
+            return project_count
+            
+        except ValidationError:
+            raise
+        except Exception as e:
+            self._logger.error(f"Error al contar proyectos del cliente {client_id}: {e}")
+            raise RepositoryError(
+                message=f"Error al contar proyectos: {e}",
+                operation="get_client_projects_count",
+                entity_type="Client",
+                entity_id=str(client_id),
+                original_error=e
+            )
+
+    async def get_clients_with_teams(
+        self,
+        include_inactive_teams: bool = False,
+        include_inactive_clients: bool = False
+    ) -> List[Client]:
         """
         Obtiene clientes que tienen equipos asociados.
         
+        Args:
+            include_inactive_teams: Si incluir equipos inactivos
+            include_inactive_clients: Si incluir clientes inactivos
+            
         Returns:
             List[Client]: Lista de clientes con equipos
         """
@@ -122,86 +200,17 @@ class RelationshipOperations(IRelationshipOperations):
                 original_error=e
             )
 
-    async def get_clients_without_teams(self) -> List[Client]:
+    async def get_client_teams_count(
+        self,
+        client_id: UUID,
+        include_inactive: bool = False
+    ) -> int:
         """
-        Obtiene clientes que no tienen equipos asociados.
-        
-        Returns:
-            List[Client]: Lista de clientes sin equipos
-        """
-        try:
-            self._logger.debug("Obteniendo clientes sin equipos")
-            
-            # TODO: Implementar cuando exista la entidad Team y su relación
-            # Por ahora retornamos todos los clientes
-            self._logger.warning("Relación con equipos no implementada aún")
-            
-            clients = await self._client_repository.get_all_clients()
-            result = [Client.model_validate(client) for client in clients]
-            
-            self._logger.debug(f"Clientes sin equipos (placeholder): {len(result)}")
-            
-            return result
-            
-        except Exception as e:
-            self._logger.error(f"Error al obtener clientes sin equipos: {e}")
-            raise RepositoryError(
-                message=f"Error al obtener clientes sin equipos: {e}",
-                operation="get_clients_without_teams",
-                entity_type="Client",
-                original_error=e
-            )
-
-    async def count_projects_for_client(self, client_id: int) -> int:
-        """
-        Cuenta el número de proyectos asociados a un cliente.
+        Obtiene el número de equipos asociados a un cliente.
         
         Args:
             client_id: ID del cliente
-            
-        Returns:
-            int: Número de proyectos del cliente
-        """
-        try:
-            self._logger.debug(f"Contando proyectos para cliente {client_id}")
-            
-            # Verificar que el cliente existe
-            client = await self._client_repository.get_client_by_id(client_id)
-            if not client:
-                raise ValidationError(
-                    message=f"Cliente con ID {client_id} no encontrado",
-                    field="client_id",
-                    value=client_id
-                )
-            
-            # TODO: Implementar conteo real cuando exista la entidad Project
-            self._logger.warning("Conteo de proyectos no implementado aún")
-            
-            # Por ahora retornamos 0
-            project_count = 0
-            
-            self._logger.debug(f"Proyectos para cliente {client_id}: {project_count}")
-            
-            return project_count
-            
-        except ValidationError:
-            raise
-        except Exception as e:
-            self._logger.error(f"Error al contar proyectos del cliente {client_id}: {e}")
-            raise RepositoryError(
-                message=f"Error al contar proyectos: {e}",
-                operation="count_projects_for_client",
-                entity_type="Client",
-                entity_id=str(client_id),
-                original_error=e
-            )
-
-    async def count_teams_for_client(self, client_id: int) -> int:
-        """
-        Cuenta el número de equipos asociados a un cliente.
-        
-        Args:
-            client_id: ID del cliente
+            include_inactive: Si incluir equipos inactivos
             
         Returns:
             int: Número de equipos del cliente
@@ -215,7 +224,7 @@ class RelationshipOperations(IRelationshipOperations):
                 raise ValidationError(
                     message=f"Cliente con ID {client_id} no encontrado",
                     field="client_id",
-                    value=client_id
+                    value=str(client_id)
                 )
             
             # TODO: Implementar conteo real cuando exista la entidad Team
@@ -234,23 +243,27 @@ class RelationshipOperations(IRelationshipOperations):
             self._logger.error(f"Error al contar equipos del cliente {client_id}: {e}")
             raise RepositoryError(
                 message=f"Error al contar equipos: {e}",
-                operation="count_teams_for_client",
+                operation="get_client_teams_count",
                 entity_type="Client",
                 entity_id=str(client_id),
                 original_error=e
             )
 
+
+
     async def get_clients_by_project_count_range(
         self,
         min_projects: int,
-        max_projects: Optional[int] = None
+        max_projects: Optional[int] = None,
+        include_inactive: bool = False
     ) -> List[Client]:
         """
-        Obtiene clientes que tienen un número de proyectos en el rango especificado.
+        Obtiene clientes por rango de número de proyectos.
         
         Args:
             min_projects: Número mínimo de proyectos
-            max_projects: Número máximo de proyectos (opcional)
+            max_projects: Número máximo de proyectos (None = sin límite)
+            include_inactive: Si incluir clientes/proyectos inactivos
             
         Returns:
             List[Client]: Lista de clientes en el rango especificado
@@ -289,52 +302,67 @@ class RelationshipOperations(IRelationshipOperations):
                 original_error=e
             )
 
-    async def get_client_relationships_summary(self, client_id: int) -> Dict[str, Any]:
+    async def get_clients_relationship_summary(
+        self,
+        client_id: Optional[UUID] = None
+    ) -> Dict[str, Any]:
         """
-        Obtiene un resumen de todas las relaciones de un cliente.
+        Obtiene un resumen de las relaciones de un cliente o todos los clientes.
         
         Args:
-            client_id: ID del cliente
+            client_id: ID específico del cliente (None para todos)
             
         Returns:
-            Dict[str, Any]: Resumen de relaciones del cliente
+            Dict[str, Any]: Resumen detallado de relaciones
         """
         try:
-            self._logger.debug(f"Obteniendo resumen de relaciones para cliente {client_id}")
-            
-            # Verificar que el cliente existe
-            client = await self._client_repository.get_client_by_id(client_id)
-            if not client:
-                raise ValidationError(
-                    message=f"Cliente con ID {client_id} no encontrado",
-                    field="client_id",
-                    value=client_id
-                )
-            
-            # Obtener conteos de relaciones
-            project_count = await self.count_projects_for_client(client_id)
-            team_count = await self.count_teams_for_client(client_id)
-            
-            summary = {
-                "client_id": client_id,
-                "client_name": client.name,
-                "client_code": client.code,
-                "is_active": client.is_active,
-                "relationships": {
-                    "projects": {
-                        "count": project_count,
-                        "has_projects": project_count > 0
+            if client_id:
+                self._logger.debug(f"Obteniendo resumen de relaciones para cliente {client_id}")
+                
+                # Verificar que el cliente existe
+                client = await self._client_repository.get_client_by_id(client_id)
+                if not client:
+                    raise ValidationError(
+                        message=f"Cliente con ID {client_id} no encontrado",
+                        field="client_id",
+                        value=str(client_id)
+                    )
+                
+                # Obtener conteos de relaciones
+                project_count = await self.get_client_projects_count(client_id)
+                team_count = await self.get_client_teams_count(client_id)
+                
+                summary = {
+                    "client_id": str(client_id),
+                    "client_name": client.name,
+                    "client_code": client.code,
+                    "is_active": client.is_active,
+                    "relationships": {
+                        "projects": {
+                            "count": project_count,
+                            "has_projects": project_count > 0
+                        },
+                        "teams": {
+                            "count": team_count,
+                            "has_teams": team_count > 0
+                        }
                     },
-                    "teams": {
-                        "count": team_count,
-                        "has_teams": team_count > 0
-                    }
-                },
-                "total_relationships": project_count + team_count,
-                "relationship_score": self._calculate_relationship_score(project_count, team_count)
-            }
+                    "total_relationships": project_count + team_count,
+                    "relationship_score": self._calculate_relationship_score(project_count, team_count)
+                }
+            else:
+                self._logger.debug("Obteniendo resumen de relaciones para todos los clientes")
+                
+                # TODO: Implementar resumen global cuando sea necesario
+                summary = {
+                    "total_clients": 0,
+                    "clients_with_projects": 0,
+                    "clients_with_teams": 0,
+                    "average_projects_per_client": 0.0,
+                    "average_teams_per_client": 0.0
+                }
             
-            self._logger.debug(f"Resumen de relaciones generado para cliente {client_id}")
+            self._logger.debug(f"Resumen de relaciones generado")
             
             return summary
             
@@ -344,13 +372,16 @@ class RelationshipOperations(IRelationshipOperations):
             self._logger.error(f"Error al obtener resumen de relaciones: {e}")
             raise RepositoryError(
                 message=f"Error en resumen de relaciones: {e}",
-                operation="get_client_relationships_summary",
+                operation="get_clients_relationship_summary",
                 entity_type="Client",
-                entity_id=str(client_id),
+                entity_id=str(client_id) if client_id else None,
                 original_error=e
             )
 
-    async def validate_client_relationships_integrity(self, client_id: int) -> Dict[str, Any]:
+    async def validate_client_relationships(
+        self,
+        client_id: UUID
+    ) -> Dict[str, Any]:
         """
         Valida la integridad de las relaciones de un cliente.
         
@@ -358,7 +389,7 @@ class RelationshipOperations(IRelationshipOperations):
             client_id: ID del cliente a validar
             
         Returns:
-            Dict[str, Any]: Resultado de la validación
+            Dict[str, Any]: Resultado de la validación con detalles
         """
         try:
             self._logger.debug(f"Validando integridad de relaciones para cliente {client_id}")
@@ -369,11 +400,11 @@ class RelationshipOperations(IRelationshipOperations):
                 raise ValidationError(
                     message=f"Cliente con ID {client_id} no encontrado",
                     field="client_id",
-                    value=client_id
+                    value=str(client_id)
                 )
             
             validation_result = {
-                "client_id": client_id,
+                "client_id": str(client_id),
                 "is_valid": True,
                 "issues": [],
                 "warnings": [],
@@ -383,7 +414,7 @@ class RelationshipOperations(IRelationshipOperations):
             # Verificar estado del cliente vs relaciones
             validation_result["checks_performed"].append("client_status_check")
             if not client.is_active:
-                project_count = await self.count_projects_for_client(client_id)
+                project_count = await self.get_client_projects_count(client_id)
                 if project_count > 0:
                     validation_result["warnings"].append(
                         f"Cliente inactivo tiene {project_count} proyectos asociados"
@@ -409,16 +440,22 @@ class RelationshipOperations(IRelationshipOperations):
             self._logger.error(f"Error al validar integridad de relaciones: {e}")
             raise RepositoryError(
                 message=f"Error en validación de integridad: {e}",
-                operation="validate_client_relationships_integrity",
+                operation="validate_client_relationships",
                 entity_type="Client",
                 entity_id=str(client_id),
                 original_error=e
             )
 
-    async def get_clients_with_active_assignments(self) -> List[Client]:
+    async def get_clients_with_active_assignments(
+        self,
+        assignment_type: Optional[str] = None
+    ) -> List[Client]:
         """
         Obtiene clientes que tienen asignaciones activas.
         
+        Args:
+            assignment_type: Tipo específico de asignación (None para todos)
+            
         Returns:
             List[Client]: Lista de clientes con asignaciones activas
         """
@@ -446,15 +483,20 @@ class RelationshipOperations(IRelationshipOperations):
                 original_error=e
             )
 
-    async def get_client_dependency_tree(self, client_id: int) -> Dict[str, Any]:
+    async def get_client_dependency_tree(
+        self,
+        client_id: UUID,
+        max_depth: int = 3
+    ) -> Dict[str, Any]:
         """
         Obtiene el árbol de dependencias de un cliente.
         
         Args:
             client_id: ID del cliente
+            max_depth: Profundidad máxima del árbol
             
         Returns:
-            Dict[str, Any]: Árbol de dependencias del cliente
+            Dict[str, Any]: Árbol de dependencias estructurado
         """
         try:
             self._logger.debug(f"Obteniendo árbol de dependencias para cliente {client_id}")
@@ -465,13 +507,13 @@ class RelationshipOperations(IRelationshipOperations):
                 raise ValidationError(
                     message=f"Cliente con ID {client_id} no encontrado",
                     field="client_id",
-                    value=client_id
+                    value=str(client_id)
                 )
             
             # Construir árbol de dependencias básico
             dependency_tree = {
                 "client": {
-                    "id": client.id,
+                    "id": str(client.id),
                     "name": client.name,
                     "code": client.code,
                     "is_active": client.is_active
@@ -483,7 +525,8 @@ class RelationshipOperations(IRelationshipOperations):
                 },
                 "dependency_count": 0,
                 "can_be_deleted": True,  # Se actualizará basado en dependencias
-                "blocking_dependencies": []
+                "blocking_dependencies": [],
+                "max_depth": max_depth
             }
             
             # TODO: Implementar lógica real de dependencias
@@ -527,4 +570,4 @@ class RelationshipOperations(IRelationshipOperations):
         
         total_score = base_score + project_score + team_score
         
-        return round(min(100.0, total_score), 2)
+        return min(100.0, total_score)

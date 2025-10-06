@@ -18,18 +18,23 @@ Versión: 2.0.0
 
 from typing import Any, Dict, List, Optional
 
+from loguru import logger
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.exc import SQLAlchemyError
 
+from planificador.exceptions.validation import ValidationError
+from planificador.exceptions.repository.client_repository_exceptions import ClientRepositoryError
+from planificador.exceptions.repository.base_repository_exceptions import convert_sqlalchemy_error
 from planificador.models.client import Client
 from planificador.repositories.base_repository import BaseRepository
-from planificador.exceptions import (
-    RepositoryError,
-    ValidationError,
+from planificador.repositories.client.interfaces.query_interface import (
+    IAdvancedQueryOperations,
+    IQueryOperations,
 )
-from ..interfaces.query_interface import IQueryOperations
 
 
-class AdvancedQueryOperations(BaseRepository[Client], IQueryOperations):
+class AdvancedQueryOperations(BaseRepository[Client], IAdvancedQueryOperations, IQueryOperations):
     """Implementación de operaciones de consulta avanzadas para clientes.
     
     Hereda de BaseRepository para reutilizar la lógica CRUD y de consulta
@@ -247,3 +252,260 @@ class AdvancedQueryOperations(BaseRepository[Client], IQueryOperations):
             limit=50,
             order_by="name"
         )
+
+    # Implementación de métodos de IQueryOperations
+    async def get_client_by_id(self, client_id: int) -> Client | None:
+        """Obtiene un cliente por su ID."""
+        self._logger.debug(f"Obteniendo cliente por ID: {client_id}")
+        
+        try:
+            async with self.get_session() as session:
+                query = select(self.model_class).where(self.model_class.id == client_id)
+                result = await session.execute(query)
+                client = result.scalar_one_or_none()
+                
+                if client:
+                    self._logger.debug(f"Cliente encontrado: {client.name}")
+                else:
+                    self._logger.debug(f"No se encontró cliente con ID: {client_id}")
+                
+                return client
+                
+        except SQLAlchemyError as e:
+            self._logger.error(f"Error obteniendo cliente por ID {client_id}: {e}")
+            raise convert_sqlalchemy_error(
+                error=e,
+                operation="get_client_by_id",
+                entity_type=self.model_class.__name__,
+                entity_id=client_id
+            )
+        except Exception as e:
+            self._logger.error(f"Error inesperado obteniendo cliente: {e}")
+            raise ClientRepositoryError(
+                message=f"Error inesperado obteniendo cliente con ID {client_id}",
+                operation="get_client_by_id",
+                entity_type=self.model_class.__name__,
+                entity_id=client_id,
+                original_error=e
+            )
+
+    async def get_client_by_name(self, name: str) -> Client | None:
+        """Busca un cliente por nombre exacto (case-insensitive)."""
+        self._logger.debug(f"Buscando cliente por nombre: {name}")
+        
+        try:
+            async with self.get_session() as session:
+                query = select(self.model_class).where(
+                    self.model_class.name.ilike(name)
+                )
+                result = await session.execute(query)
+                client = result.scalar_one_or_none()
+                
+                if client:
+                    self._logger.debug(f"Cliente encontrado: {client.id}")
+                else:
+                    self._logger.debug(f"No se encontró cliente con nombre: {name}")
+                
+                return client
+                
+        except SQLAlchemyError as e:
+            self._logger.error(f"Error buscando cliente por nombre {name}: {e}")
+            raise convert_sqlalchemy_error(
+                error=e,
+                operation="get_client_by_name",
+                entity_type=self.model_class.__name__
+            )
+        except Exception as e:
+            self._logger.error(f"Error inesperado buscando cliente: {e}")
+            raise ClientRepositoryError(
+                message=f"Error inesperado buscando cliente por nombre {name}",
+                operation="get_client_by_name",
+                entity_type=self.model_class.__name__,
+                original_error=e
+            )
+
+    async def get_client_by_code(self, code: str) -> Client | None:
+        """Busca un cliente por código único."""
+        self._logger.debug(f"Buscando cliente por código: {code}")
+        
+        try:
+            async with self.get_session() as session:
+                query = select(self.model_class).where(self.model_class.code == code)
+                result = await session.execute(query)
+                client = result.scalar_one_or_none()
+                
+                if client:
+                    self._logger.debug(f"Cliente encontrado: {client.name}")
+                else:
+                    self._logger.debug(f"No se encontró cliente con código: {code}")
+                
+                return client
+                
+        except SQLAlchemyError as e:
+            self._logger.error(f"Error buscando cliente por código {code}: {e}")
+            raise convert_sqlalchemy_error(
+                error=e,
+                operation="get_client_by_code",
+                entity_type=self.model_class.__name__
+            )
+        except Exception as e:
+            self._logger.error(f"Error inesperado buscando cliente: {e}")
+            raise ClientRepositoryError(
+                message=f"Error inesperado buscando cliente por código {code}",
+                operation="get_client_by_code",
+                entity_type=self.model_class.__name__,
+                original_error=e
+            )
+
+    async def get_client_by_email(self, email: str) -> Client | None:
+        """Busca un cliente por email (case-insensitive)."""
+        self._logger.debug(f"Buscando cliente por email: {email}")
+        
+        try:
+            async with self.get_session() as session:
+                query = select(self.model_class).where(
+                    self.model_class.email.ilike(email)
+                )
+                result = await session.execute(query)
+                client = result.scalar_one_or_none()
+                
+                if client:
+                    self._logger.debug(f"Cliente encontrado: {client.name}")
+                else:
+                    self._logger.debug(f"No se encontró cliente con email: {email}")
+                
+                return client
+                
+        except SQLAlchemyError as e:
+            self._logger.error(f"Error buscando cliente por email {email}: {e}")
+            raise convert_sqlalchemy_error(
+                error=e,
+                operation="get_client_by_email",
+                entity_type=self.model_class.__name__
+            )
+        except Exception as e:
+            self._logger.error(f"Error inesperado buscando cliente: {e}")
+            raise ClientRepositoryError(
+                message=f"Error inesperado buscando cliente por email {email}",
+                operation="get_client_by_email",
+                entity_type=self.model_class.__name__,
+                original_error=e
+            )
+
+    async def search_clients_by_name(self, name_pattern: str) -> list[Client]:
+        """Busca clientes por patrón de nombre (case-insensitive)."""
+        self._logger.debug(f"Buscando clientes por patrón de nombre: {name_pattern}")
+        
+        try:
+            async with self.get_session() as session:
+                pattern = f"%{name_pattern}%"
+                query = select(self.model_class).where(
+                    self.model_class.name.ilike(pattern)
+                ).order_by(self.model_class.name)
+                
+                result = await session.execute(query)
+                clients = result.scalars().all()
+                
+                self._logger.debug(f"Encontrados {len(clients)} clientes con patrón: {name_pattern}")
+                return list(clients)
+                
+        except SQLAlchemyError as e:
+            self._logger.error(f"Error buscando clientes por patrón {name_pattern}: {e}")
+            raise convert_sqlalchemy_error(
+                error=e,
+                operation="search_clients_by_name",
+                entity_type=self.model_class.__name__
+            )
+        except Exception as e:
+            self._logger.error(f"Error inesperado buscando clientes: {e}")
+            raise ClientRepositoryError(
+                message=f"Error inesperado buscando clientes por patrón {name_pattern}",
+                operation="search_clients_by_name",
+                entity_type=self.model_class.__name__,
+                original_error=e
+            )
+
+    async def get_all_clients(
+        self, limit: int | None = None, offset: int = 0
+    ) -> list[Client]:
+        """Obtiene todos los clientes con paginación opcional."""
+        self._logger.debug(f"Obteniendo todos los clientes (limit: {limit}, offset: {offset})")
+        
+        try:
+            async with self.get_session() as session:
+                query = select(self.model_class).order_by(self.model_class.name)
+                
+                if offset > 0:
+                    query = query.offset(offset)
+                if limit is not None:
+                    query = query.limit(limit)
+                
+                result = await session.execute(query)
+                clients = result.scalars().all()
+                
+                self._logger.debug(f"Obtenidos {len(clients)} clientes")
+                return list(clients)
+                
+        except SQLAlchemyError as e:
+            self._logger.error(f"Error obteniendo todos los clientes: {e}")
+            raise convert_sqlalchemy_error(
+                error=e,
+                operation="get_all_clients",
+                entity_type=self.model_class.__name__
+            )
+        except Exception as e:
+            self._logger.error(f"Error inesperado obteniendo clientes: {e}")
+            raise ClientRepositoryError(
+                message="Error inesperado obteniendo todos los clientes",
+                operation="get_all_clients",
+                entity_type=self.model_class.__name__,
+                original_error=e
+            )
+
+    # Implementación del método abstracto de BaseRepository
+    async def get_by_unique_field(self, field_name: str, value: Any) -> Optional[Client]:
+        """
+        Obtiene un cliente por un campo único específico.
+        
+        Args:
+            field_name: Nombre del campo único (email, code, etc.)
+            value: Valor a buscar
+            
+        Returns:
+            Cliente encontrado o None si no existe
+        """
+        self._logger.debug(f"Buscando cliente por {field_name} = {value}")
+        
+        try:
+            async with self.get_session() as session:
+                # Obtener el atributo del modelo dinámicamente
+                if not hasattr(self.model_class, field_name):
+                    raise ValueError(f"El campo '{field_name}' no existe en el modelo Client")
+                
+                field_attr = getattr(self.model_class, field_name)
+                query = select(self.model_class).where(field_attr == value)
+                result = await session.execute(query)
+                client = result.scalar_one_or_none()
+                
+                if client:
+                    self._logger.debug(f"Cliente encontrado: {client.id}")
+                else:
+                    self._logger.debug(f"No se encontró cliente con {field_name} = {value}")
+                
+                return client
+                
+        except SQLAlchemyError as e:
+            self._logger.error(f"Error buscando cliente por {field_name}: {e}")
+            raise convert_sqlalchemy_error(
+                error=e,
+                operation="get_by_unique_field",
+                entity_type=self.model_class.__name__
+            )
+        except Exception as e:
+            self._logger.error(f"Error inesperado buscando cliente: {e}")
+            raise ClientRepositoryError(
+                message=f"Error inesperado buscando cliente por {field_name} = {value}",
+                operation="get_by_unique_field",
+                entity_type=self.model_class.__name__,
+                original_error=e
+            )

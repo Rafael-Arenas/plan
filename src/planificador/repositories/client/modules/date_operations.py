@@ -5,11 +5,16 @@ la gestión de fechas para la entidad Cliente, delegando la lógica
 de consulta al BaseRepository.
 """
 
+from typing import Any, Optional
 import pendulum
+from sqlalchemy import select
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from planificador.models.client import Client
 from planificador.repositories.base_repository import BaseRepository
+from planificador.exceptions.repository import convert_sqlalchemy_error
+from planificador.exceptions.repository.client_repository_exceptions import ClientRepositoryError
 from ..interfaces.date_interface import IDateOperations
 
 
@@ -56,6 +61,56 @@ class DateOperations(BaseRepository[Client], IDateOperations):
             }
         }
         return await self.find_by_criteria(criteria)
+
+    # Implementación del método abstracto de BaseRepository
+    async def get_by_unique_field(self, field_name: str, value: Any) -> Optional[Client]:
+        """
+        Obtiene un cliente por un campo único específico.
+        
+        Args:
+            field_name: Nombre del campo único (email, code, etc.)
+            value: Valor a buscar
+            
+        Returns:
+            Cliente encontrado o None si no existe
+        """
+        self._logger.debug(f"Buscando cliente por {field_name} = {value}")
+        
+        try:
+            async with self.get_session() as session:
+                # Obtener el atributo del modelo dinámicamente
+                if not hasattr(self.model_class, field_name):
+                    raise ValueError(f"El campo '{field_name}' no existe en el modelo Client")
+                
+                field_attr = getattr(self.model_class, field_name)
+                query = select(self.model_class).where(field_attr == value)
+                result = await session.execute(query)
+                client = result.scalar_one_or_none()
+                
+                if client:
+                    self._logger.debug(f"Cliente encontrado: {client.id}")
+                else:
+                    self._logger.debug(f"No se encontró cliente con {field_name} = {value}")
+                
+                return client
+                
+        except SQLAlchemyError as e:
+            self._logger.error(f"Error buscando cliente por {field_name}: {e}")
+            raise convert_sqlalchemy_error(
+                error=e,
+                operation="get_by_unique_field",
+                entity_type="Client",
+                entity_id=value
+            )
+        except Exception as e:
+            self._logger.error(f"Error inesperado buscando cliente: {e}")
+            raise ClientRepositoryError(
+                message=f"Error inesperado buscando cliente por {field_name}",
+                operation="get_by_unique_field",
+                entity_type="Client",
+                entity_id=value,
+                original_error=e
+            )
 
     async def get_clients_updated_in_date_range(
         self, start_date: pendulum.DateTime, end_date: pendulum.DateTime

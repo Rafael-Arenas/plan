@@ -7,7 +7,7 @@ relacionadas.
 Versión: 2.0.0
 """
 
-from typing import Any
+from typing import Any, Optional, List
 
 from sqlalchemy import func, select, update
 from sqlalchemy.exc import SQLAlchemyError
@@ -97,3 +97,140 @@ class RelationshipOperations(BaseRepository[Client], IClientRelationshipOperatio
         if not await self.exists(client_id):
             raise ClientNotFoundError(entity_id=client_id)
         return await self.count(Project, criteria={"client_id": client_id})
+
+    # Implementación de métodos abstractos de IClientRelationshipOperations
+    async def get_projects_by_client(self, client_id: int) -> List[Project]:
+        """
+        Obtiene todos los proyectos asociados a un cliente.
+        
+        Args:
+            client_id: ID del cliente.
+            
+        Returns:
+            Lista de proyectos del cliente.
+        """
+        self._logger.debug(f"Obteniendo proyectos del cliente {client_id}")
+        
+        try:
+            async with self.get_session() as session:
+                query = select(Project).where(Project.client_id == client_id)
+                result = await session.execute(query)
+                projects = result.scalars().all()
+                
+                self._logger.debug(f"Encontrados {len(projects)} proyectos para cliente {client_id}")
+                return list(projects)
+                
+        except SQLAlchemyError as e:
+            self._logger.error(f"Error obteniendo proyectos del cliente {client_id}: {e}")
+            raise convert_sqlalchemy_error(
+                error=e,
+                operation="get_projects_by_client",
+                entity_type="Project",
+                entity_id=client_id
+            )
+        except Exception as e:
+            self._logger.error(f"Error inesperado obteniendo proyectos: {e}")
+            raise ClientRepositoryError(
+                message=f"Error inesperado obteniendo proyectos del cliente {client_id}",
+                operation="get_projects_by_client",
+                entity_type="Project",
+                entity_id=client_id,
+                original_error=e
+            )
+
+    async def get_client_with_projects(self, client_id: int) -> Optional[Client]:
+        """
+        Obtiene un cliente con todos sus proyectos cargados.
+        
+        Args:
+            client_id: ID del cliente.
+            
+        Returns:
+            Cliente con sus proyectos o None si no se encuentra.
+        """
+        self._logger.debug(f"Obteniendo cliente {client_id} con proyectos")
+        
+        try:
+            async with self.get_session() as session:
+                query = (
+                    select(Client)
+                    .options(selectinload(Client.projects))
+                    .where(Client.id == client_id)
+                )
+                result = await session.execute(query)
+                client = result.scalar_one_or_none()
+                
+                if client:
+                    self._logger.debug(f"Cliente {client_id} encontrado con {len(client.projects)} proyectos")
+                else:
+                    self._logger.debug(f"Cliente {client_id} no encontrado")
+                
+                return client
+                
+        except SQLAlchemyError as e:
+            self._logger.error(f"Error obteniendo cliente {client_id} con proyectos: {e}")
+            raise convert_sqlalchemy_error(
+                error=e,
+                operation="get_client_with_projects",
+                entity_type="Client",
+                entity_id=client_id
+            )
+        except Exception as e:
+            self._logger.error(f"Error inesperado obteniendo cliente con proyectos: {e}")
+            raise ClientRepositoryError(
+                message=f"Error inesperado obteniendo cliente {client_id} con proyectos",
+                operation="get_client_with_projects",
+                entity_type="Client",
+                entity_id=client_id,
+                original_error=e
+            )
+
+    # Implementación del método abstracto de BaseRepository
+    async def get_by_unique_field(self, field_name: str, value: Any) -> Optional[Client]:
+        """
+        Obtiene un cliente por un campo único específico.
+        
+        Args:
+            field_name: Nombre del campo único (email, code, etc.)
+            value: Valor a buscar
+            
+        Returns:
+            Cliente encontrado o None si no existe
+        """
+        self._logger.debug(f"Buscando cliente por {field_name} = {value}")
+        
+        try:
+            async with self.get_session() as session:
+                # Obtener el atributo del modelo dinámicamente
+                if not hasattr(self.model_class, field_name):
+                    raise ValueError(f"El campo '{field_name}' no existe en el modelo Client")
+                
+                field_attr = getattr(self.model_class, field_name)
+                query = select(self.model_class).where(field_attr == value)
+                result = await session.execute(query)
+                client = result.scalar_one_or_none()
+                
+                if client:
+                    self._logger.debug(f"Cliente encontrado: {client.id}")
+                else:
+                    self._logger.debug(f"No se encontró cliente con {field_name} = {value}")
+                
+                return client
+                
+        except SQLAlchemyError as e:
+            self._logger.error(f"Error buscando cliente por {field_name}: {e}")
+            raise convert_sqlalchemy_error(
+                error=e,
+                operation="get_by_unique_field",
+                entity_type="Client",
+                entity_id=value
+            )
+        except Exception as e:
+            self._logger.error(f"Error inesperado buscando cliente: {e}")
+            raise ClientRepositoryError(
+                message=f"Error inesperado buscando cliente por {field_name}",
+                operation="get_by_unique_field",
+                entity_type="Client",
+                entity_id=value,
+                original_error=e
+            )

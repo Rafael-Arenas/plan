@@ -74,33 +74,42 @@ class ClientRepositoryFacade:
         self._session = session
         self._logger = logger
 
-        # Inicialización de los módulos
-        self._crud_operations = CrudOperations(session)
+        # Inicialización de los módulos (sin CrudOperations por ahora)
         self._query_operations = QueryOperations(session)
-        self._advanced_query_operations = AdvancedQueryOperations(session)
-        self._validation_operations = ValidationOperations(session)
+        # AdvancedQueryOperations necesita el facade completo, no solo la sesión
+        # Se inicializará después de que el facade esté completamente construido
+        # ValidationOperations del repositorio requiere session_factory, no session
+        # Por ahora, comentamos esta línea hasta resolver la arquitectura
+        # self._validation_operations = ValidationOperations(session)
+        self._validation_operations = None  # Temporal
         self._statistics_operations = StatisticsOperations(session)
         self._relationship_operations = RelationshipOperations(session)
         self._date_operations = DateOperations(session)
         self._health_operations = HealthOperations(
             session=session,
             modules={
-                "crud": self._crud_operations,
                 "query": self._query_operations,
-                "advanced_query": self._advanced_query_operations,
-                "validation": self._validation_operations,
+                # advanced_query se agregará después de inicializar el facade
+                # "validation": self._validation_operations,  # Comentado temporalmente
                 "statistics": self._statistics_operations,
                 "relationship": self._relationship_operations,
                 "date": self._date_operations,
             },
         )
 
+        # Inicializar CrudOperations y AdvancedQueryOperations después de que el facade esté completamente construido
+        self._crud_operations = CrudOperations(session=self._session)
+        self._advanced_query_operations = AdvancedQueryOperations(session=self._session)
+        
+        # Actualizar el diccionario de módulos de HealthOperations
+        self._health_operations.modules["advanced_query"] = self._advanced_query_operations
+
         # --- Módulos Legacy (para compatibilidad con tests) ---
         # Estos atributos apuntan a los módulos para que los tests
         # que acceden a `facade.crud_ops` sigan funcionando sin cambios.
         self.crud_ops = self._crud_operations
         self.query_builder = self._query_operations
-        self.validator = self._validation_operations
+        self.validator = self._validation_operations  # Temporal: None
         self.statistics = self._statistics_operations
         self.relationship_manager = self._relationship_operations
         self.date_ops = self._date_operations
