@@ -89,6 +89,16 @@ def mock_validation_operations() -> AsyncMock:
     mock_instance.validate_required_fields.return_value = None
     mock_instance.validate_all.return_value = None
     mock_instance.get_by_unique_field = AsyncMock(return_value=None)
+    
+    # Agregar métodos que están siendo probados en los tests
+    mock_instance.validate_client_data = AsyncMock(return_value=None)
+    mock_instance.validate_business_rules = AsyncMock(return_value=None)
+    mock_instance.validate_client_name_unique = AsyncMock(return_value=None)
+    mock_instance.validate_client_code_unique = AsyncMock(return_value=None)
+    mock_instance.validate_client_deletion = AsyncMock(return_value=None)
+    mock_instance.validate_field_lengths = MagicMock(return_value=None)
+    mock_instance.validate_code_format = MagicMock(return_value=None)
+    
     return mock_instance
 
 
@@ -126,7 +136,10 @@ def mock_date_operations() -> AsyncMock:
 @pytest.fixture
 def mock_health_operations() -> AsyncMock:
     """Fixture para crear un mock de `HealthOperations`."""
-    return AsyncMock(spec=HealthOperations)
+    mock = AsyncMock(spec=HealthOperations)
+    # Agregar el atributo 'modules' que necesita ClientRepositoryFacade
+    mock.modules = {}
+    return mock
 
 
 @pytest.fixture
@@ -174,6 +187,8 @@ def client_facade(
         return_value=mock_health_operations,
     ):
         facade = ClientRepositoryFacade(session=mock_session)
+        # Asignar manualmente el mock de validation_operations ya que está configurado como None temporalmente
+        facade._validation_operations = mock_validation_operations
         yield facade
 
 
