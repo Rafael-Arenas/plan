@@ -76,6 +76,7 @@ from .team_membership import MembershipStatus
 from .assignment.assignment import (
     ProjectAssignment,
     ProjectAssignmentCreate,
+    ProjectAssignmentUpdate,
 )
 
 from .schedule.schedule import (
@@ -215,6 +216,7 @@ __all__ = [
     # Assignment
     "ProjectAssignment",
     "ProjectAssignmentCreate",
+    "ProjectAssignmentUpdate",
     # Schedule
     "Schedule",
     "ScheduleCreate",
