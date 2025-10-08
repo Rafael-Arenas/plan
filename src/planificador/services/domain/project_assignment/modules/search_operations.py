@@ -1,24 +1,23 @@
-# src/planificador/services/domain/project_assignment/modules/search_operations.py
-
 """
-Módulo de Operaciones de Búsqueda para Asignaciones de Proyecto
+Módulo de operaciones de búsqueda y filtrado para el dominio de asignaciones de proyecto.
 
-Implementa operaciones especializadas de búsqueda, filtrado y consultas
-complejas para asignaciones de proyecto, incluyendo filtros avanzados,
-rangos de fechas, búsquedas por rol y detección de solapamientos.
+Este módulo implementa las operaciones especializadas de búsqueda, filtrado y consultas
+complejas para asignaciones de proyecto, incluyendo búsquedas por criterios múltiples,
+rangos de fechas, roles específicos y detección de solapamientos.
+
+Métodos implementados según PROJECT_ASSIGNMENT_DOMAIN_SERVICE_METHODS.md:
+- search_assignments_by_criteria: Búsqueda con criterios múltiples
+- get_assignments_by_date_range: Obtiene asignaciones en rango de fechas
+- get_assignments_by_role: Busca asignaciones por rol específico
+- get_overlapping_assignments: Detecta solapamientos entre asignaciones
 """
 
-from typing import List, Optional, Dict, Any, Union
+from typing import List, Optional, Dict, Any
 from datetime import date
-from decimal import Decimal
 from loguru import logger
 from collections import defaultdict
 
-from planificador.schemas.assignment.assignment import ProjectAssignment
-from planificador.schemas.assignment.advanced_schemas import (
-    AssignmentAdvancedFilters,
-    ProjectAssignmentResponseSchema
-)
+from planificador.schemas import ProjectAssignment
 from planificador.repositories.project_assignment import ProjectAssignmentRepositoryFacade
 from planificador.exceptions import RepositoryError, ValidationError
 from ..interfaces import ISearchOperations
@@ -26,86 +25,74 @@ from ..interfaces import ISearchOperations
 
 class SearchOperations(ISearchOperations):
     """
-    Implementación de operaciones de búsqueda para asignaciones de proyecto.
+    Implementa operaciones de búsqueda y filtrado para asignaciones de proyecto.
     
-    Proporciona métodos especializados para realizar búsquedas complejas,
-    aplicar filtros avanzados, buscar por rangos de fechas, roles específicos
-    y detectar solapamientos entre asignaciones.
+    Esta clase proporciona métodos especializados para realizar búsquedas complejas,
+    aplicar filtros, buscar por rangos de fechas, roles específicos y detectar
+    solapamientos entre asignaciones.
     """
     
     def __init__(self, repository_facade: ProjectAssignmentRepositoryFacade):
-        """
-        Inicializa el módulo de operaciones de búsqueda.
-        
-        Args:
-            repository_facade: Facade del repositorio de asignaciones
-        """
+        """Inicializa el módulo de operaciones de búsqueda."""
         self._repository = repository_facade
-        self._logger = logger.bind(module="project_assignment_search_operations")
+        self._logger = logger.bind(module="search_operations")
     
-    async def get_assignments_with_filters(
+    # ============================================================================
+    # MÉTODOS DOCUMENTADOS OFICIALMENTE
+    # ============================================================================
+    
+    async def search_assignments_by_criteria(
         self, 
-        filters: AssignmentAdvancedFilters
-    ) -> List[ProjectAssignmentResponseSchema]:
+        criteria: Dict[str, Any]
+    ) -> List[ProjectAssignment]:
         """
-        Busca asignaciones aplicando filtros avanzados múltiples.
+        Busca asignaciones aplicando criterios múltiples de filtrado.
         
         Args:
-            filters: Filtros avanzados a aplicar
-            
+            criteria: Diccionario con criterios de búsqueda
+                - employee_id: ID del empleado (opcional)
+                - project_id: ID del proyecto (opcional)
+                - role_in_project: Rol en el proyecto (opcional)
+                - is_active: Estado activo (opcional)
+                - start_date_from: Fecha inicio desde (opcional)
+                - start_date_to: Fecha inicio hasta (opcional)
+                - end_date_from: Fecha fin desde (opcional)
+                - end_date_to: Fecha fin hasta (opcional)
+                - min_percentage: Porcentaje mínimo de asignación (opcional)
+                - max_percentage: Porcentaje máximo de asignación (opcional)
+                
         Returns:
-            List[ProjectAssignmentResponseSchema]: Lista de asignaciones filtradas
+            List[ProjectAssignment]: Lista de asignaciones que cumplen los criterios
             
         Raises:
-            ValidationError: Si los filtros no son válidos
-            RepositoryError: Si hay errores en la base de datos
+            ValidationError: Si los criterios no son válidos
+            RepositoryError: Si hay errores en la consulta
         """
-        self._logger.debug(f"Aplicando filtros avanzados: {filters}")
-        
         try:
-            # Validar filtros
-            await self._validate_filters(filters)
+            self._logger.info(f"Buscando asignaciones con criterios: {criteria}")
+            
+            # Validar criterios
+            await self._validate_search_criteria(criteria)
             
             # Obtener todas las asignaciones base
-            base_assignments = await self._repository.queries.get_all_assignments()
+            all_assignments = await self._repository.queries.get_all_assignments()
             
             # Aplicar filtros secuencialmente
-            filtered_assignments = await self._apply_advanced_filters(base_assignments, filters)
-            
-            # Convertir a esquemas de respuesta
-            response_assignments = []
-            for assignment in filtered_assignments:
-                response_schema = await self._convert_to_response_schema(assignment)
-                response_assignments.append(response_schema)
-            
-            # Aplicar ordenamiento si se especifica
-            if hasattr(filters, 'sort_by') and filters.sort_by:
-                sort_order = getattr(filters, 'sort_order', 'asc')
-                response_assignments = self._sort_assignments(response_assignments, filters.sort_by, sort_order)
-            
-            # Aplicar paginación si se especifica
-            limit = getattr(filters, 'limit', None)
-            offset = getattr(filters, 'offset', None)
-            if limit or offset:
-                response_assignments = self._paginate_assignments(
-                    response_assignments, 
-                    limit, 
-                    offset or 0
-                )
+            filtered_assignments = await self._apply_search_criteria(all_assignments, criteria)
             
             self._logger.info(
-                f"Filtros aplicados exitosamente: {len(response_assignments)} asignaciones encontradas"
+                f"Búsqueda completada: {len(filtered_assignments)} asignaciones encontradas"
             )
             
-            return response_assignments
+            return filtered_assignments
             
+        except ValidationError:
+            raise
         except Exception as e:
-            self._logger.error(f"Error aplicando filtros avanzados: {e}")
-            if isinstance(e, (RepositoryError, ValidationError)):
-                raise
+            self._logger.error(f"Error en búsqueda por criterios: {e}")
             raise RepositoryError(
-                message=f"Error inesperado aplicando filtros: {e}",
-                operation="get_assignments_with_filters",
+                message=f"Error en búsqueda por criterios: {e}",
+                operation="search_assignments_by_criteria",
                 entity_type="ProjectAssignment",
                 original_error=e
             )
@@ -117,7 +104,7 @@ class SearchOperations(ISearchOperations):
         include_partial_overlap: bool = True
     ) -> List[ProjectAssignment]:
         """
-        Busca asignaciones dentro de un rango de fechas específico.
+        Obtiene asignaciones que se encuentran en un rango de fechas específico.
         
         Args:
             start_date: Fecha de inicio del rango
@@ -128,91 +115,51 @@ class SearchOperations(ISearchOperations):
             List[ProjectAssignment]: Lista de asignaciones en el rango
             
         Raises:
-            ValidationError: Si el rango de fechas no es válido
-            RepositoryError: Si hay errores en la base de datos
+            ValidationError: Si las fechas no son válidas
+            RepositoryError: Si hay errores en la consulta
         """
-        self._logger.debug(
-            f"Buscando asignaciones en rango: {start_date} - {end_date}, "
-            f"solapamiento parcial: {include_partial_overlap}"
-        )
-        
-        # Validar rango de fechas
-        if start_date > end_date:
-            raise ValidationError(
-                message="La fecha de inicio debe ser anterior a la fecha de fin",
-                field="date_range",
-                value=f"{start_date} - {end_date}"
-            )
-        
         try:
+            self._logger.info(
+                f"Obteniendo asignaciones en rango {start_date} - {end_date} "
+                f"(solapamiento parcial: {include_partial_overlap})"
+            )
+            
+            # Validar fechas
+            if start_date >= end_date:
+                raise ValidationError(
+                    message="La fecha de inicio debe ser anterior a la fecha de fin",
+                    field="date_range",
+                    value=f"{start_date} - {end_date}"
+                )
+            
             # Obtener todas las asignaciones
             all_assignments = await self._repository.queries.get_all_assignments()
             
             # Filtrar por rango de fechas
-            filtered_assignments = []
+            assignments_in_range = []
             for assignment in all_assignments:
-                if self._assignment_in_date_range(assignment, start_date, end_date, include_partial_overlap):
-                    filtered_assignments.append(assignment)
+                if self._assignment_in_date_range(
+                    assignment, start_date, end_date, include_partial_overlap
+                ):
+                    assignments_in_range.append(assignment)
             
             self._logger.info(
-                f"Encontradas {len(filtered_assignments)} asignaciones en el rango "
-                f"{start_date} - {end_date}"
+                f"Se encontraron {len(assignments_in_range)} asignaciones en el rango"
             )
             
-            return filtered_assignments
+            return assignments_in_range
             
+        except ValidationError:
+            raise
         except Exception as e:
-            self._logger.error(f"Error inesperado obteniendo asignaciones por rango de fechas: {e}")
-            if isinstance(e, (RepositoryError, ValidationError)):
-                raise
+            self._logger.error(f"Error al obtener asignaciones por rango de fechas: {e}")
             raise RepositoryError(
-                message=f"Error inesperado obteniendo asignaciones por rango de fechas: {e}",
+                message=f"Error al obtener asignaciones por rango de fechas: {e}",
                 operation="get_assignments_by_date_range",
                 entity_type="ProjectAssignment",
                 original_error=e
             )
     
-    def _assignment_start_date_in_range(
-        self, 
-        assignment: ProjectAssignment, 
-        start_date_from: Optional[date], 
-        start_date_to: Optional[date]
-    ) -> bool:
-        """Verifica si la fecha de inicio de una asignación está dentro del rango especificado."""
-        
-        assignment_start = assignment.start_date
-        if not assignment_start:
-            return False
-        
-        if start_date_from and assignment_start < start_date_from:
-            return False
-        
-        if start_date_to and assignment_start > start_date_to:
-            return False
-        
-        return True
-    
-    def _assignment_end_date_in_range(
-        self, 
-        assignment: ProjectAssignment, 
-        end_date_from: Optional[date], 
-        end_date_to: Optional[date]
-    ) -> bool:
-        """Verifica si la fecha de fin de una asignación está dentro del rango especificado."""
-        
-        assignment_end = assignment.end_date
-        if not assignment_end:
-            # Si no tiene fecha de fin, consideramos que está activa indefinidamente
-            return end_date_from is None
-        
-        if end_date_from and assignment_end < end_date_from:
-            return False
-        
-        if end_date_to and assignment_end > end_date_to:
-            return False
-        
-        return True
-
     async def get_assignments_by_role(
         self, 
         role: str,
@@ -223,49 +170,52 @@ class SearchOperations(ISearchOperations):
         
         Args:
             role: Rol a buscar
-            exact_match: Si buscar coincidencia exacta o parcial
+            exact_match: Si realizar coincidencia exacta o parcial
             
         Returns:
             List[ProjectAssignment]: Lista de asignaciones con el rol especificado
             
         Raises:
             ValidationError: Si el rol no es válido
-            RepositoryError: Si hay errores en la base de datos
+            RepositoryError: Si hay errores en la consulta
         """
-        self._logger.debug(f"Buscando asignaciones por rol: '{role}', exacto: {exact_match}")
-        
-        # Validar rol
-        if not role or not role.strip():
-            raise ValidationError(
-                message="El rol no puede estar vacío",
-                field="role",
-                value=role
-            )
-        
-        role = role.strip()
-        
         try:
+            self._logger.info(
+                f"Buscando asignaciones por rol '{role}' "
+                f"(coincidencia exacta: {exact_match})"
+            )
+            
+            # Validar rol
+            if not role or not role.strip():
+                raise ValidationError(
+                    message="El rol no puede estar vacío",
+                    field="role",
+                    value=role
+                )
+            
+            role = role.strip()
+            
             # Obtener todas las asignaciones
             all_assignments = await self._repository.queries.get_all_assignments()
             
             # Filtrar por rol
-            filtered_assignments = []
+            role_assignments = []
             for assignment in all_assignments:
                 if self._assignment_matches_role(assignment, role, exact_match):
-                    filtered_assignments.append(assignment)
+                    role_assignments.append(assignment)
             
             self._logger.info(
-                f"Encontradas {len(filtered_assignments)} asignaciones con rol '{role}'"
+                f"Se encontraron {len(role_assignments)} asignaciones con rol '{role}'"
             )
             
-            return filtered_assignments
+            return role_assignments
             
+        except ValidationError:
+            raise
         except Exception as e:
-            self._logger.error(f"Error buscando asignaciones por rol: {e}")
-            if isinstance(e, (RepositoryError, ValidationError)):
-                raise
+            self._logger.error(f"Error al buscar asignaciones por rol: {e}")
             raise RepositoryError(
-                message=f"Error inesperado buscando por rol: {e}",
+                message=f"Error al buscar asignaciones por rol: {e}",
                 operation="get_assignments_by_role",
                 entity_type="ProjectAssignment",
                 original_error=e
@@ -278,56 +228,68 @@ class SearchOperations(ISearchOperations):
         threshold_percentage: float = 100.0
     ) -> List[Dict[str, Any]]:
         """
-        Detecta asignaciones que se solapan temporalmente.
+        Detecta solapamientos entre asignaciones que pueden causar conflictos.
         
         Args:
-            employee_id: ID del empleado (opcional, para filtrar)
-            project_id: ID del proyecto (opcional, para filtrar)
-            threshold_percentage: Umbral de solapamiento para considerar conflicto
+            employee_id: ID del empleado para filtrar (opcional)
+            project_id: ID del proyecto para filtrar (opcional)
+            threshold_percentage: Umbral de porcentaje para considerar solapamiento
             
         Returns:
-            List[Dict[str, Any]]: Lista de grupos de asignaciones solapadas
+            List[Dict[str, Any]]: Lista de solapamientos detectados con detalles
             
         Raises:
             ValidationError: Si los parámetros no son válidos
-            RepositoryError: Si hay errores en la base de datos
+            RepositoryError: Si hay errores en la detección
         """
-        self._logger.debug(
-            f"Detectando solapamientos - empleado: {employee_id}, "
-            f"proyecto: {project_id}, umbral: {threshold_percentage}%"
-        )
-        
-        # Validar parámetros
-        if threshold_percentage < 0 or threshold_percentage > 200:
-            raise ValidationError(
-                message="El umbral de solapamiento debe estar entre 0 y 200%",
-                field="threshold_percentage",
-                value=threshold_percentage
-            )
-        
         try:
-            # Obtener asignaciones base
-            base_assignments = await self._get_assignments_for_overlap_detection(
+            self._logger.info(
+                f"Detectando solapamientos (empleado: {employee_id}, "
+                f"proyecto: {project_id}, umbral: {threshold_percentage}%)"
+            )
+            
+            # Validar parámetros
+            if threshold_percentage < 0 or threshold_percentage > 200:
+                raise ValidationError(
+                    message="El umbral de porcentaje debe estar entre 0 y 200",
+                    field="threshold_percentage",
+                    value=threshold_percentage
+                )
+            
+            if employee_id is not None and employee_id <= 0:
+                raise ValidationError(
+                    message="El ID del empleado debe ser un número positivo",
+                    field="employee_id",
+                    value=employee_id
+                )
+            
+            if project_id is not None and project_id <= 0:
+                raise ValidationError(
+                    message="El ID del proyecto debe ser un número positivo",
+                    field="project_id",
+                    value=project_id
+                )
+            
+            # Obtener asignaciones para análisis
+            assignments = await self._get_assignments_for_overlap_detection(
                 employee_id, project_id
             )
             
             # Detectar solapamientos
-            overlapping_groups = await self._detect_overlapping_assignments(
-                base_assignments, threshold_percentage
+            overlaps = await self._detect_overlapping_assignments(
+                assignments, threshold_percentage
             )
             
-            self._logger.info(
-                f"Detectados {len(overlapping_groups)} grupos de asignaciones solapadas"
-            )
+            self._logger.info(f"Se detectaron {len(overlaps)} solapamientos")
             
-            return overlapping_groups
+            return overlaps
             
+        except ValidationError:
+            raise
         except Exception as e:
-            self._logger.error(f"Error detectando solapamientos: {e}")
-            if isinstance(e, (RepositoryError, ValidationError)):
-                raise
+            self._logger.error(f"Error al detectar solapamientos: {e}")
             raise RepositoryError(
-                message=f"Error inesperado detectando solapamientos: {e}",
+                message=f"Error al detectar solapamientos: {e}",
                 operation="get_overlapping_assignments",
                 entity_type="ProjectAssignment",
                 original_error=e
@@ -337,147 +299,145 @@ class SearchOperations(ISearchOperations):
     # MÉTODOS PRIVADOS DE VALIDACIÓN Y FILTRADO
     # ============================================================================
     
-    async def _validate_filters(self, filters: AssignmentAdvancedFilters) -> None:
-        """Valida los filtros avanzados."""
-        
-        # Validar rango de fechas de inicio
-        if filters.start_date_from and filters.start_date_to:
-            if filters.start_date_from > filters.start_date_to:
-                raise ValidationError(
-                    message="La fecha de inicio 'desde' debe ser anterior a la fecha de inicio 'hasta'",
-                    field="start_date_range",
-                    value=f"{filters.start_date_from} - {filters.start_date_to}"
-                )
-        
-        # Validar rango de fechas de fin
-        if filters.end_date_from and filters.end_date_to:
-            if filters.end_date_from > filters.end_date_to:
-                raise ValidationError(
-                    message="La fecha de fin 'desde' debe ser anterior a la fecha de fin 'hasta'",
-                    field="end_date_range",
-                    value=f"{filters.end_date_from} - {filters.end_date_to}"
-                )
-        
-        # Validar porcentajes
-        if filters.min_allocation_percentage is not None:
-            if filters.min_allocation_percentage < 0 or filters.min_allocation_percentage > 100:
-                raise ValidationError(
-                    message="El porcentaje mínimo de asignación debe estar entre 0 y 100",
-                    field="min_allocation_percentage",
-                    value=filters.min_allocation_percentage
-                )
-        
-        if filters.max_allocation_percentage is not None:
-            if filters.max_allocation_percentage < 0 or filters.max_allocation_percentage > 100:
-                raise ValidationError(
-                    message="El porcentaje máximo de asignación debe estar entre 0 y 100",
-                    field="max_allocation_percentage",
-                    value=filters.max_allocation_percentage
-                )
-        
-        # Validar coherencia de porcentajes
-        if (filters.min_allocation_percentage is not None and 
-            filters.max_allocation_percentage is not None):
-            if filters.min_allocation_percentage > filters.max_allocation_percentage:
-                raise ValidationError(
-                    message="El porcentaje mínimo no puede ser mayor que el máximo",
-                    field="allocation_percentage_range",
-                    value=f"{filters.min_allocation_percentage} - {filters.max_allocation_percentage}"
-                )
-        
-        # Validar horas
-        if filters.min_hours_per_day is not None and filters.min_hours_per_day < 0:
+    async def _validate_search_criteria(self, criteria: Dict[str, Any]) -> None:
+        """Valida los criterios de búsqueda."""
+        if not isinstance(criteria, dict):
             raise ValidationError(
-                message="Las horas mínimas por día no pueden ser negativas",
-                field="min_hours_per_day",
-                value=filters.min_hours_per_day
+                message="Los criterios deben ser un diccionario",
+                field="criteria",
+                value=type(criteria).__name__
             )
         
-        if filters.max_hours_per_day is not None and filters.max_hours_per_day < 0:
-            raise ValidationError(
-                message="Las horas máximas por día no pueden ser negativas",
-                field="max_hours_per_day",
-                value=filters.max_hours_per_day
-            )
+        # Validar IDs si están presentes
+        for id_field in ["employee_id", "project_id"]:
+            if id_field in criteria and criteria[id_field] is not None:
+                if not isinstance(criteria[id_field], int) or criteria[id_field] <= 0:
+                    raise ValidationError(
+                        message=f"El {id_field} debe ser un número entero positivo",
+                        field=id_field,
+                        value=criteria[id_field]
+                    )
+        
+        # Validar fechas si están presentes
+        date_fields = ["start_date_from", "start_date_to", "end_date_from", "end_date_to"]
+        for date_field in date_fields:
+            if date_field in criteria and criteria[date_field] is not None:
+                if not isinstance(criteria[date_field], date):
+                    raise ValidationError(
+                        message=f"El campo {date_field} debe ser una fecha válida",
+                        field=date_field,
+                        value=criteria[date_field]
+                    )
+        
+        # Validar porcentajes si están presentes
+        for pct_field in ["min_percentage", "max_percentage"]:
+            if pct_field in criteria and criteria[pct_field] is not None:
+                value = criteria[pct_field]
+                if not isinstance(value, (int, float)) or value < 0 or value > 100:
+                    raise ValidationError(
+                        message=f"El {pct_field} debe estar entre 0 y 100",
+                        field=pct_field,
+                        value=value
+                    )
     
-    async def _apply_advanced_filters(
+    async def _apply_search_criteria(
         self, 
         assignments: List[ProjectAssignment], 
-        filters: AssignmentAdvancedFilters
+        criteria: Dict[str, Any]
     ) -> List[ProjectAssignment]:
-        """Aplica los filtros avanzados a la lista de asignaciones."""
+        """Aplica los criterios de búsqueda a la lista de asignaciones."""
+        filtered_assignments = assignments.copy()
         
-        filtered = assignments
-        
-        # Filtro por empleado
-        if filters.employee_ids:
-            filtered = [a for a in filtered if a.employee_id in filters.employee_ids]
-        
-        # Filtro por proyecto
-        if filters.project_ids:
-            filtered = [a for a in filtered if a.project_id in filters.project_ids]
-        
-        # Filtro por estado activo
-        if filters.is_active is not None:
-            filtered = [a for a in filtered if a.is_active == filters.is_active]
-        
-        # Filtro por rango de fechas de inicio
-        if filters.start_date_from or filters.start_date_to:
-            filtered = [
-                a for a in filtered 
-                if self._assignment_start_date_in_range(a, filters.start_date_from, filters.start_date_to)
+        # Filtrar por employee_id
+        if criteria.get("employee_id") is not None:
+            filtered_assignments = [
+                a for a in filtered_assignments 
+                if a.employee_id == criteria["employee_id"]
             ]
         
-        # Filtro por rango de fechas de fin
-        if filters.end_date_from or filters.end_date_to:
-            filtered = [
-                a for a in filtered 
-                if self._assignment_end_date_in_range(a, filters.end_date_from, filters.end_date_to)
+        # Filtrar por project_id
+        if criteria.get("project_id") is not None:
+            filtered_assignments = [
+                a for a in filtered_assignments 
+                if a.project_id == criteria["project_id"]
             ]
         
-        # Filtro por roles
-        if filters.roles:
-            filtered = [
-                a for a in filtered 
-                if a.role_in_project and a.role_in_project in filters.roles
+        # Filtrar por rol
+        if criteria.get("role_in_project"):
+            role = criteria["role_in_project"]
+            filtered_assignments = [
+                a for a in filtered_assignments 
+                if self._assignment_matches_role(a, role, exact_match=False)
             ]
         
-        # Filtro por porcentaje de asignación
-        if filters.min_allocation_percentage is not None:
-            filtered = [
-                a for a in filtered 
-                if (a.percentage_allocation or 0) >= filters.min_allocation_percentage
+        # Filtrar por estado activo
+        if criteria.get("is_active") is not None:
+            filtered_assignments = [
+                a for a in filtered_assignments 
+                if a.is_active == criteria["is_active"]
             ]
         
-        if filters.max_allocation_percentage is not None:
-            filtered = [
-                a for a in filtered 
-                if (a.percentage_allocation or 0) <= filters.max_allocation_percentage
+        # Filtrar por fecha de inicio
+        if criteria.get("start_date_from") or criteria.get("start_date_to"):
+            start_from = criteria.get("start_date_from")
+            start_to = criteria.get("start_date_to")
+            filtered_assignments = [
+                a for a in filtered_assignments 
+                if self._assignment_start_date_in_range(a, start_from, start_to)
             ]
         
-        # Filtro por horas por día
-        if filters.min_hours_per_day is not None:
-            filtered = [
-                a for a in filtered 
-                if (a.allocated_hours_per_day or 0) >= filters.min_hours_per_day
+        # Filtrar por fecha de fin
+        if criteria.get("end_date_from") or criteria.get("end_date_to"):
+            end_from = criteria.get("end_date_from")
+            end_to = criteria.get("end_date_to")
+            filtered_assignments = [
+                a for a in filtered_assignments 
+                if self._assignment_end_date_in_range(a, end_from, end_to)
             ]
         
-        if filters.max_hours_per_day is not None:
-            filtered = [
-                a for a in filtered 
-                if (a.allocated_hours_per_day or 0) <= filters.max_hours_per_day
+        # Filtrar por porcentaje mínimo
+        if criteria.get("min_percentage") is not None:
+            min_pct = criteria["min_percentage"]
+            filtered_assignments = [
+                a for a in filtered_assignments 
+                if a.percentage_allocation >= min_pct
             ]
         
-        # Filtro por texto en descripción o notas
-        if filters.include_notes_search:
-            search_text = filters.include_notes_search.lower()
-            filtered = [
-                a for a in filtered 
-                if (a.notes and search_text in a.notes.lower()) or
-                   (a.role_in_project and search_text in a.role_in_project.lower())
+        # Filtrar por porcentaje máximo
+        if criteria.get("max_percentage") is not None:
+            max_pct = criteria["max_percentage"]
+            filtered_assignments = [
+                a for a in filtered_assignments 
+                if a.percentage_allocation <= max_pct
             ]
         
-        return filtered
+        return filtered_assignments
+    
+    def _assignment_start_date_in_range(
+        self, 
+        assignment: ProjectAssignment, 
+        start_date_from: Optional[date], 
+        start_date_to: Optional[date]
+    ) -> bool:
+        """Verifica si la fecha de inicio de la asignación está en el rango."""
+        if start_date_from and assignment.start_date < start_date_from:
+            return False
+        if start_date_to and assignment.start_date > start_date_to:
+            return False
+        return True
+    
+    def _assignment_end_date_in_range(
+        self, 
+        assignment: ProjectAssignment, 
+        end_date_from: Optional[date], 
+        end_date_to: Optional[date]
+    ) -> bool:
+        """Verifica si la fecha de fin de la asignación está en el rango."""
+        if end_date_from and assignment.end_date < end_date_from:
+            return False
+        if end_date_to and assignment.end_date > end_date_to:
+            return False
+        return True
     
     def _assignment_in_date_range(
         self, 
@@ -486,34 +446,16 @@ class SearchOperations(ISearchOperations):
         end_date: Optional[date],
         include_partial_overlap: bool = True
     ) -> bool:
-        """Verifica si una asignación está dentro del rango de fechas."""
-        
-        assignment_start = assignment.start_date
-        assignment_end = assignment.end_date
-        
-        # Si no hay fecha de fin en la asignación, considerar como abierta
-        if assignment_end is None:
-            assignment_end = date.max
-        
-        # Si no se especifica rango, incluir todas
-        if start_date is None and end_date is None:
+        """Verifica si una asignación está en el rango de fechas especificado."""
+        if not start_date or not end_date:
             return True
         
-        # Si solo se especifica fecha de inicio
-        if start_date is not None and end_date is None:
-            return assignment_end >= start_date
-        
-        # Si solo se especifica fecha de fin
-        if start_date is None and end_date is not None:
-            return assignment_start <= end_date
-        
-        # Rango completo especificado
         if include_partial_overlap:
             # Incluir si hay cualquier solapamiento
-            return not (assignment_end < start_date or assignment_start > end_date)
+            return not (assignment.end_date < start_date or assignment.start_date > end_date)
         else:
-            # Incluir solo si está completamente dentro del rango
-            return assignment_start >= start_date and assignment_end <= end_date
+            # Solo incluir si está completamente dentro del rango
+            return assignment.start_date >= start_date and assignment.end_date <= end_date
     
     def _assignment_matches_role(
         self, 
@@ -522,135 +464,53 @@ class SearchOperations(ISearchOperations):
         exact_match: bool = False
     ) -> bool:
         """Verifica si una asignación coincide con el rol especificado."""
-        
-        if not assignment.role_in_project:
-            return False
-        
-        assignment_role = assignment.role_in_project.strip()
-        search_role = role.strip()
+        assignment_role = assignment.role_in_project or ""
         
         if exact_match:
-            return assignment_role.lower() == search_role.lower()
+            return assignment_role.lower() == role.lower()
         else:
-            return search_role.lower() in assignment_role.lower()
-    
-    async def _convert_to_response_schema(
-        self, 
-        assignment: ProjectAssignment
-    ) -> ProjectAssignmentResponseSchema:
-        """Convierte una asignación a esquema de respuesta con información adicional."""
-        
-        # Obtener información adicional del empleado y proyecto
-        employee_info = await self._repository.queries.get_employee_basic_info(assignment.employee_id)
-        project_info = await self._repository.queries.get_project_basic_info(assignment.project_id)
-        
-        return ProjectAssignmentResponseSchema(
-            id=assignment.id,
-            employee_id=assignment.employee_id,
-            employee_name=employee_info.get("name", f"Empleado {assignment.employee_id}"),
-            project_id=assignment.project_id,
-            project_name=project_info.get("name", f"Proyecto {assignment.project_id}"),
-            role_in_project=assignment.role_in_project,
-            start_date=assignment.start_date,
-            end_date=assignment.end_date,
-            percentage_allocation=assignment.percentage_allocation,
-            allocated_hours_per_day=assignment.allocated_hours_per_day,
-            is_active=assignment.is_active,
-            notes=assignment.notes,
-            created_at=assignment.created_at,
-            updated_at=assignment.updated_at
-        )
-    
-    def _sort_assignments(
-        self, 
-        assignments: List[ProjectAssignmentResponseSchema], 
-        sort_by: str,
-        sort_order: str = "asc"
-    ) -> List[ProjectAssignmentResponseSchema]:
-        """Ordena las asignaciones según el criterio especificado."""
-        
-        reverse = sort_order.lower() == "desc"
-        
-        if sort_by == "start_date":
-            return sorted(assignments, key=lambda x: x.start_date, reverse=reverse)
-        elif sort_by == "end_date":
-            return sorted(assignments, key=lambda x: x.end_date or date.max, reverse=reverse)
-        elif sort_by == "employee_name":
-            return sorted(assignments, key=lambda x: x.employee_name, reverse=reverse)
-        elif sort_by == "project_name":
-            return sorted(assignments, key=lambda x: x.project_name, reverse=reverse)
-        elif sort_by == "percentage_allocation":
-            return sorted(assignments, key=lambda x: x.percentage_allocation or 0, reverse=reverse)
-        elif sort_by == "allocated_hours_per_day":
-            return sorted(assignments, key=lambda x: x.allocated_hours_per_day or 0, reverse=reverse)
-        elif sort_by == "role_in_project":
-            return sorted(assignments, key=lambda x: x.role_in_project or "", reverse=reverse)
-        else:
-            # Por defecto, ordenar por ID
-            return sorted(assignments, key=lambda x: x.id, reverse=reverse)
-    
-    def _paginate_assignments(
-        self, 
-        assignments: List[ProjectAssignmentResponseSchema], 
-        limit: Optional[int],
-        offset: int = 0
-    ) -> List[ProjectAssignmentResponseSchema]:
-        """Aplica paginación a la lista de asignaciones."""
-        
-        start_index = offset
-        
-        if limit is not None:
-            end_index = start_index + limit
-            return assignments[start_index:end_index]
-        else:
-            return assignments[start_index:]
-    
-    # ============================================================================
-    # MÉTODOS PRIVADOS PARA DETECCIÓN DE SOLAPAMIENTOS
-    # ============================================================================
+            return role.lower() in assignment_role.lower()
     
     async def _get_assignments_for_overlap_detection(
         self, 
         employee_id: Optional[int], 
         project_id: Optional[int]
     ) -> List[ProjectAssignment]:
-        """Obtiene las asignaciones base para la detección de solapamientos."""
-        
+        """Obtiene las asignaciones relevantes para la detección de solapamientos."""
         if employee_id:
-            # Obtener asignaciones del empleado específico
-            assignments = await self._repository.queries.get_assignments_by_employee(employee_id)
+            return await self._repository.queries.get_assignments_by_employee(
+                employee_id=employee_id,
+                include_inactive=False
+            )
         elif project_id:
-            # Obtener asignaciones del proyecto específico
-            assignments = await self._repository.queries.get_assignments_by_project(project_id)
+            return await self._repository.queries.get_assignments_by_project(
+                project_id=project_id,
+                include_inactive=False
+            )
         else:
             # Obtener todas las asignaciones activas
-            assignments = await self._repository.queries.get_all_assignments(active_only=True)
-        
-        return assignments
+            all_assignments = await self._repository.queries.get_all_assignments()
+            return [a for a in all_assignments if a.is_active]
     
     async def _detect_overlapping_assignments(
         self, 
         assignments: List[ProjectAssignment], 
         threshold_percentage: float
     ) -> List[Dict[str, Any]]:
-        """Detecta grupos de asignaciones que se solapan."""
-        
-        overlapping_groups = []
+        """Detecta solapamientos entre asignaciones."""
+        overlaps = []
         
         # Agrupar por empleado para detectar solapamientos
         employee_assignments = defaultdict(list)
         for assignment in assignments:
             employee_assignments[assignment.employee_id].append(assignment)
         
-        # Detectar solapamientos por empleado
+        # Detectar solapamientos para cada empleado
         for employee_id, emp_assignments in employee_assignments.items():
             if len(emp_assignments) < 2:
                 continue
             
-            # Ordenar por fecha de inicio
-            emp_assignments.sort(key=lambda x: x.start_date)
-            
-            # Buscar solapamientos
+            # Comparar cada par de asignaciones
             for i in range(len(emp_assignments)):
                 for j in range(i + 1, len(emp_assignments)):
                     assignment1 = emp_assignments[i]
@@ -661,51 +521,21 @@ class SearchOperations(ISearchOperations):
                     )
                     
                     if overlap_info["has_overlap"]:
-                        # Buscar si ya existe un grupo con estas asignaciones
-                        existing_group = None
-                        for group in overlapping_groups:
-                            if (assignment1.id in [a["assignment_id"] for a in group["assignments"]] or
-                                assignment2.id in [a["assignment_id"] for a in group["assignments"]]):
-                                existing_group = group
-                                break
-                        
-                        if existing_group:
-                            # Agregar a grupo existente
-                            assignment_ids = [a["assignment_id"] for a in existing_group["assignments"]]
-                            if assignment1.id not in assignment_ids:
-                                existing_group["assignments"].append(
-                                    self._assignment_to_overlap_dict(assignment1)
-                                )
-                            if assignment2.id not in assignment_ids:
-                                existing_group["assignments"].append(
-                                    self._assignment_to_overlap_dict(assignment2)
-                                )
-                            
-                            # Actualizar métricas del grupo
-                            existing_group["total_overlap_percentage"] = max(
-                                existing_group["total_overlap_percentage"],
+                        overlap_detail = {
+                            "employee_id": employee_id,
+                            "assignment1": self._assignment_to_overlap_dict(assignment1),
+                            "assignment2": self._assignment_to_overlap_dict(assignment2),
+                            "overlap_info": overlap_info,
+                            "conflict_severity": self._determine_conflict_severity(
                                 overlap_info["overlap_percentage"]
+                            ),
+                            "recommendations": self._generate_overlap_recommendations(
+                                assignment1, assignment2, overlap_info
                             )
-                        else:
-                            # Crear nuevo grupo
-                            overlapping_groups.append({
-                                "employee_id": employee_id,
-                                "overlap_type": overlap_info["overlap_type"],
-                                "total_overlap_percentage": overlap_info["overlap_percentage"],
-                                "overlap_period": overlap_info["overlap_period"],
-                                "conflict_severity": self._determine_conflict_severity(
-                                    overlap_info["overlap_percentage"]
-                                ),
-                                "assignments": [
-                                    self._assignment_to_overlap_dict(assignment1),
-                                    self._assignment_to_overlap_dict(assignment2)
-                                ],
-                                "recommendations": self._generate_overlap_recommendations(
-                                    assignment1, assignment2, overlap_info
-                                )
-                            })
+                        }
+                        overlaps.append(overlap_detail)
         
-        return overlapping_groups
+        return overlaps
     
     def _calculate_assignment_overlap(
         self, 
@@ -714,48 +544,40 @@ class SearchOperations(ISearchOperations):
         threshold_percentage: float
     ) -> Dict[str, Any]:
         """Calcula el solapamiento entre dos asignaciones."""
+        # Verificar solapamiento temporal
+        overlap_start = max(assignment1.start_date, assignment2.start_date)
+        overlap_end = min(assignment1.end_date, assignment2.end_date)
         
-        # Obtener fechas de las asignaciones
-        start1, end1 = assignment1.start_date, assignment1.end_date or date.max
-        start2, end2 = assignment2.start_date, assignment2.end_date or date.max
-        
-        # Calcular período de solapamiento
-        overlap_start = max(start1, start2)
-        overlap_end = min(end1, end2)
-        
-        # Verificar si hay solapamiento temporal
         has_temporal_overlap = overlap_start <= overlap_end
         
         if not has_temporal_overlap:
             return {
                 "has_overlap": False,
-                "overlap_type": "none",
-                "overlap_percentage": 0.0,
-                "overlap_period": None
+                "temporal_overlap": False,
+                "overlap_days": 0,
+                "overlap_percentage": 0,
+                "total_allocation_percentage": 0
             }
         
-        # Calcular porcentaje de solapamiento de recursos
-        allocation1 = float(assignment1.percentage_allocation or 0)
-        allocation2 = float(assignment2.percentage_allocation or 0)
-        total_allocation = allocation1 + allocation2
+        # Calcular días de solapamiento
+        overlap_days = (overlap_end - overlap_start).days + 1
         
-        # Determinar tipo de solapamiento
-        if total_allocation > threshold_percentage:
-            overlap_type = "resource_conflict"
-        elif assignment1.project_id == assignment2.project_id:
-            overlap_type = "same_project"
-        else:
-            overlap_type = "different_projects"
+        # Calcular porcentaje total de asignación durante el solapamiento
+        total_allocation = assignment1.percentage_allocation + assignment2.percentage_allocation
+        
+        # Determinar si excede el umbral
+        exceeds_threshold = total_allocation > threshold_percentage
         
         return {
-            "has_overlap": total_allocation > threshold_percentage,
-            "overlap_type": overlap_type,
+            "has_overlap": exceeds_threshold,
+            "temporal_overlap": True,
+            "overlap_start": overlap_start,
+            "overlap_end": overlap_end,
+            "overlap_days": overlap_days,
             "overlap_percentage": total_allocation,
-            "overlap_period": {
-                "start_date": overlap_start,
-                "end_date": overlap_end if overlap_end != date.max else None,
-                "duration_days": (overlap_end - overlap_start).days if overlap_end != date.max else None
-            }
+            "total_allocation_percentage": total_allocation,
+            "exceeds_threshold": exceeds_threshold,
+            "threshold_percentage": threshold_percentage
         }
     
     def _assignment_to_overlap_dict(self, assignment: ProjectAssignment) -> Dict[str, Any]:
@@ -766,14 +588,15 @@ class SearchOperations(ISearchOperations):
             "role_in_project": assignment.role_in_project,
             "start_date": assignment.start_date,
             "end_date": assignment.end_date,
-            "percentage_allocation": float(assignment.percentage_allocation or 0),
-            "allocated_hours_per_day": float(assignment.allocated_hours_per_day or 0),
-            "is_active": assignment.is_active
+            "percentage_allocation": assignment.percentage_allocation,
+            "allocated_hours_per_day": assignment.allocated_hours_per_day
         }
     
     def _determine_conflict_severity(self, overlap_percentage: float) -> str:
         """Determina la severidad del conflicto basado en el porcentaje de solapamiento."""
         if overlap_percentage <= 100:
+            return "none"
+        elif overlap_percentage <= 120:
             return "low"
         elif overlap_percentage <= 150:
             return "medium"
@@ -789,27 +612,25 @@ class SearchOperations(ISearchOperations):
         """Genera recomendaciones para resolver solapamientos."""
         recommendations = []
         
-        overlap_percentage = overlap_info["overlap_percentage"]
+        total_percentage = overlap_info["total_allocation_percentage"]
         
-        if overlap_percentage > 100:
+        if total_percentage > 100:
             recommendations.append(
-                f"Reducir la asignación total del empleado en {overlap_percentage - 100:.1f}%"
-            )
-        
-        if assignment1.project_id != assignment2.project_id:
-            recommendations.append(
-                "Considerar reasignar una de las tareas a otro empleado"
-            )
-            recommendations.append(
-                "Evaluar la posibilidad de ajustar las fechas de las asignaciones"
+                f"Reducir asignación total en {total_percentage - 100}% para evitar sobreasignación"
             )
         
-        if overlap_info["overlap_type"] == "resource_conflict":
+        if overlap_info["overlap_days"] > 30:
             recommendations.append(
-                "Revisar la prioridad de los proyectos involucrados"
+                "Considerar ajustar fechas para reducir período de solapamiento"
             )
+        
+        if assignment1.project_id == assignment2.project_id:
             recommendations.append(
-                "Considerar dividir las responsabilidades entre múltiples empleados"
+                "Consolidar roles en el mismo proyecto si es posible"
             )
+        
+        recommendations.append(
+            "Revisar prioridades de proyecto y ajustar asignaciones según importancia"
+        )
         
         return recommendations
