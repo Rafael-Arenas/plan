@@ -1,35 +1,39 @@
 """
-Interfaz para Operaciones de Estadísticas de Horas del Servicio de Dominio Schedule.
+Interfaz para operaciones de estadísticas de horarios.
 
-Define los contratos para cálculos estadísticos, análisis de horas trabajadas,
-reportes de tiempo y métricas de utilización de recursos.
+Este módulo define la interfaz abstracta para las operaciones de estadísticas
+del dominio de horarios, incluyendo cálculos de horas, reportes y análisis.
 """
 
 from abc import ABC, abstractmethod
-from typing import List, Optional, Dict, Any
 from datetime import date
+from typing import Optional
 
-from planificador.schemas.schedule.schedule import Schedule
-from planificador.schemas.response.response_schemas import ScheduleSearchResponse
+from planificador.schemas.schedule.statistics import (
+    EmployeeHoursSummarySchema,
+    ProjectHoursSummarySchema,
+    TeamHoursSummarySchema,
+    OvertimeAnalysisSchema
+)
 
 
 class IScheduleDomainStatisticsOperations(ABC):
     """
-    Interfaz para operaciones de estadísticas de horas del servicio de dominio Schedule.
+    Interfaz abstracta para operaciones de estadísticas de horarios.
     
-    Define los métodos para cálculos estadísticos, análisis de horas
-    y reportes de tiempo con métricas de utilización.
+    Define los métodos que deben implementar las clases concretas para
+    proporcionar funcionalidades de estadísticas y análisis de horarios.
     """
 
     @abstractmethod
-    async def calculate_total_hours_by_employee(
+    async def get_employee_hours_summary(
         self,
         employee_id: int,
         start_date: date,
         end_date: date
-    ) -> ScheduleSearchResponse:
+    ) -> EmployeeHoursSummarySchema:
         """
-        Calcula estadísticas completas de horas trabajadas por empleado.
+        Calcula resumen completo de horas trabajadas por empleado.
         
         Args:
             employee_id: ID del empleado
@@ -37,23 +41,24 @@ class IScheduleDomainStatisticsOperations(ABC):
             end_date: Fecha de fin del período
             
         Returns:
-            ScheduleSearchResponse: Estadísticas detalladas de horas
+            EmployeeHoursSummarySchema: Resumen completo de horas trabajadas
             
         Raises:
             ValidationError: Si los parámetros no son válidos
+            NotFoundError: Si el empleado no existe
             RepositoryError: Si hay error en la consulta
         """
         pass
 
     @abstractmethod
-    async def calculate_total_hours_by_project(
+    async def get_project_hours_summary(
         self,
         project_id: int,
         start_date: date,
         end_date: date
-    ) -> ScheduleSearchResponse:
+    ) -> ProjectHoursSummarySchema:
         """
-        Calcula estadísticas completas de horas asignadas por proyecto.
+        Obtiene resumen de horas invertidas en un proyecto específico.
         
         Args:
             project_id: ID del proyecto
@@ -61,100 +66,60 @@ class IScheduleDomainStatisticsOperations(ABC):
             end_date: Fecha de fin del período
             
         Returns:
-            ScheduleSearchResponse: Estadísticas detalladas de horas del proyecto
+            ProjectHoursSummarySchema: Resumen de horas del proyecto
             
         Raises:
             ValidationError: Si los parámetros no son válidos
+            NotFoundError: Si el proyecto no existe
             RepositoryError: Si hay error en la consulta
         """
         pass
 
     @abstractmethod
-    async def generate_weekly_hours_report(
+    async def get_team_hours_summary(
         self,
-        week_start_date: date,
-        employee_ids: Optional[List[int]] = None
-    ) -> ScheduleSearchResponse:
+        team_id: int,
+        start_date: date,
+        end_date: date
+    ) -> TeamHoursSummarySchema:
         """
-        Genera reporte semanal de horas con análisis comparativo.
+        Calcula distribución de horas trabajadas por equipo.
         
         Args:
-            week_start_date: Fecha de inicio de la semana
-            employee_ids: IDs de empleados a incluir (opcional, todos si es None)
+            team_id: ID del equipo
+            start_date: Fecha de inicio del período
+            end_date: Fecha de fin del período
             
         Returns:
-            ScheduleSearchResponse: Reporte semanal completo
-            
-        Raises:
-            ValidationError: Si la fecha no es válida
-            RepositoryError: Si hay error en la consulta
-        """
-        pass
-
-    @abstractmethod
-    async def generate_monthly_hours_report(
-        self,
-        year: int,
-        month: int,
-        include_breakdown: bool = True
-    ) -> ScheduleSearchResponse:
-        """
-        Genera reporte mensual de horas con desglose detallado.
-        
-        Args:
-            year: Año del reporte
-            month: Mes del reporte (1-12)
-            include_breakdown: Si incluir desglose por empleado/proyecto
-            
-        Returns:
-            ScheduleSearchResponse: Reporte mensual completo
-            
-        Raises:
-            ValidationError: Si el año/mes no son válidos
-            RepositoryError: Si hay error en la consulta
-        """
-        pass
-
-    @abstractmethod
-    async def analyze_employee_hours_distribution(
-        self,
-        employee_id: int,
-        analysis_period_months: int = 3
-    ) -> ScheduleSearchResponse:
-        """
-        Analiza la distribución de horas de un empleado en un período.
-        
-        Args:
-            employee_id: ID del empleado
-            analysis_period_months: Número de meses hacia atrás a analizar
-            
-        Returns:
-            ScheduleSearchResponse: Análisis de distribución de horas
+            TeamHoursSummarySchema: Distribución de horas del equipo
             
         Raises:
             ValidationError: Si los parámetros no son válidos
+            NotFoundError: Si el equipo no existe
             RepositoryError: Si hay error en la consulta
         """
         pass
 
     @abstractmethod
-    async def get_project_hours_distribution(
+    async def get_overtime_analysis(
         self,
-        project_id: int,
-        include_team_breakdown: bool = True
-    ) -> ScheduleSearchResponse:
+        start_date: date,
+        end_date: date,
+        employee_id: Optional[int] = None
+    ) -> OvertimeAnalysisSchema:
         """
-        Obtiene la distribución de horas por proyecto con desglose de equipo.
+        Analiza patrones de horas extra y sobrecarga laboral.
         
         Args:
-            project_id: ID del proyecto
-            include_team_breakdown: Si incluir desglose por miembros del equipo
+            start_date: Fecha de inicio del análisis
+            end_date: Fecha de fin del análisis
+            employee_id: ID del empleado para filtrar (opcional)
             
         Returns:
-            ScheduleSearchResponse: Distribución de horas del proyecto
+            OvertimeAnalysisSchema: Análisis de horas extra y sobrecarga
             
         Raises:
-            ValidationError: Si el project_id no es válido
+            ValidationError: Si los parámetros no son válidos
             RepositoryError: Si hay error en la consulta
         """
         pass

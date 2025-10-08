@@ -8,8 +8,13 @@ de aprobación y seguimiento de estados de confirmación.
 from typing import List, Optional
 from loguru import logger
 
-from planificador.schemas.schedule.schedule import Schedule
-from planificador.schemas.response.response_schemas import ScheduleListResponse, ScheduleSearchResponse
+from planificador.schemas.schedule.schedule_response import ScheduleResponseSchema
+from planificador.schemas.schedule.schedule_confirmation import (
+    ScheduleConfirmationSchema,
+    BulkConfirmationSchema,
+    BulkConfirmationResultSchema,
+    PendingConfirmationSchema
+)
 from planificador.services.domain.schedule.interfaces.confirmation_operations import (
     IScheduleDomainConfirmationOperations
 )
@@ -39,18 +44,29 @@ class ScheduleDomainConfirmationOperations(IScheduleDomainConfirmationOperations
     async def confirm_schedule(
         self,
         schedule_id: int,
-        confirmed_by: int,
-        confirmation_notes: Optional[str] = None
-    ) -> Schedule:
+        confirmation_data: ScheduleConfirmationSchema
+    ) -> ScheduleResponseSchema:
         """
-        Confirma un horario específico con información del confirmador.
+        Confirma un horario específico con datos adicionales de validación.
+        
+        Args:
+            schedule_id: ID del horario a confirmar
+            confirmation_data: Datos de confirmación con validaciones adicionales
+            
+        Returns:
+            ScheduleResponseSchema: Horario confirmado con detalles actualizados
+            
+        Raises:
+            ValidationError: Si los datos de confirmación no son válidos
+            NotFoundError: Si el horario no existe
+            RepositoryError: Si hay error en la persistencia
         """
         try:
-            logger.info(f"Confirmando horario {schedule_id} por usuario {confirmed_by}")
+            logger.info(f"Confirmando horario {schedule_id} con datos de validación")
             
             # TODO: Implementar lógica de confirmación
             # - Validar que el horario existe
-            # - Validar permisos del confirmador
+            # - Validar datos de confirmación usando ScheduleConfirmationSchema
             # - Verificar que el horario no esté ya confirmado
             # - Actualizar estado de confirmación
             # - Registrar información de auditoría
@@ -62,50 +78,76 @@ class ScheduleDomainConfirmationOperations(IScheduleDomainConfirmationOperations
             logger.error(f"Error al confirmar horario {schedule_id}: {str(e)}")
             raise
 
+    async def bulk_confirm_schedules(
+        self,
+        schedule_ids: List[int],
+        confirmation_data: BulkConfirmationSchema
+    ) -> BulkConfirmationResultSchema:
+        """
+        Confirma múltiples horarios en una operación transaccional.
+        
+        Args:
+            schedule_ids: Lista de IDs de horarios a confirmar
+            confirmation_data: Datos de confirmación masiva
+            
+        Returns:
+            BulkConfirmationResultSchema: Resultado de la confirmación masiva
+            
+        Raises:
+            ValidationError: Si los datos de confirmación no son válidos
+            RepositoryError: Si hay error en la operación transaccional
+        """
+        try:
+            logger.info(f"Confirmando {len(schedule_ids)} horarios en operación masiva")
+            
+            # TODO: Implementar lógica de confirmación masiva
+            # - Validar que todos los horarios existen
+            # - Validar datos de confirmación masiva
+            # - Iniciar transacción para operación atómica
+            # - Confirmar cada horario individualmente
+            # - Recopilar resultados y errores
+            # - Confirmar o revertir transacción según resultados
+            # - Generar reporte de confirmación masiva
+            
+            raise NotImplementedError("Implementación pendiente")
+            
+        except Exception as e:
+            logger.error(f"Error en confirmación masiva de horarios: {str(e)}")
+            raise
+
     async def get_pending_confirmations(
         self,
         employee_id: Optional[int] = None,
-        project_id: Optional[int] = None,
-        limit: Optional[int] = None
-    ) -> List[ScheduleListResponse]:
+        days_ahead: int = 7
+    ) -> List[PendingConfirmationSchema]:
         """
-        Obtiene lista de horarios pendientes de confirmación con filtros opcionales.
+        Obtiene horarios pendientes de confirmación con alertas de vencimiento.
+        
+        Args:
+            employee_id: ID del empleado para filtrar (opcional)
+            days_ahead: Días hacia adelante para buscar confirmaciones pendientes
+            
+        Returns:
+            List[PendingConfirmationSchema]: Lista de horarios pendientes con alertas
+            
+        Raises:
+            ValidationError: Si los parámetros no son válidos
+            RepositoryError: Si hay error en la consulta
         """
         try:
-            logger.info("Obteniendo horarios pendientes de confirmación")
+            logger.info(f"Obteniendo confirmaciones pendientes para {days_ahead} días")
             
             # TODO: Implementar lógica de consulta de pendientes
-            # - Aplicar filtros de empleado si se proporciona
-            # - Aplicar filtros de proyecto si se proporciona
-            # - Aplicar límite si se proporciona
+            # - Validar parámetros de entrada
+            # - Calcular rango de fechas basado en days_ahead
+            # - Aplicar filtro de empleado si se proporciona
             # - Obtener horarios con estado pendiente
+            # - Calcular alertas de vencimiento
             # - Incluir información de contexto relevante
+            # - Ordenar por prioridad de vencimiento
             
             raise NotImplementedError("Implementación pendiente")
             
         except Exception as e:
             logger.error(f"Error al obtener confirmaciones pendientes: {str(e)}")
-            raise
-
-    async def get_confirmation_workflow_status(
-        self,
-        schedule_id: int
-    ) -> ScheduleSearchResponse:
-        """
-        Obtiene el estado completo del flujo de trabajo de confirmación.
-        """
-        try:
-            logger.info(f"Obteniendo estado del flujo de confirmación para horario {schedule_id}")
-            
-            # TODO: Implementar lógica de estado del flujo
-            # - Validar que el horario existe
-            # - Obtener historial de confirmaciones
-            # - Determinar estado actual del flujo
-            # - Identificar próximos pasos requeridos
-            # - Generar información de seguimiento
-            
-            raise NotImplementedError("Implementación pendiente")
-            
-        except Exception as e:
-            logger.error(f"Error al obtener estado del flujo de confirmación: {str(e)}")
             raise

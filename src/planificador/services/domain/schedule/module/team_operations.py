@@ -9,8 +9,8 @@ from typing import List, Optional
 from datetime import date
 from loguru import logger
 
-from planificador.schemas.schedule.schedule import Schedule
-from planificador.schemas.response.response_schemas import ScheduleListResponse, ScheduleSearchResponse
+from planificador.schemas.schedule.schedule_response import ScheduleResponseSchema
+from planificador.schemas.schedule.team_schedule_coordination import TeamScheduleCoordinationSchema
 from planificador.services.domain.schedule.interfaces.team_operations import (
     IScheduleDomainTeamOperations
 )
@@ -42,9 +42,21 @@ class ScheduleDomainTeamOperations(IScheduleDomainTeamOperations):
         team_id: int,
         start_date: Optional[date] = None,
         end_date: Optional[date] = None
-    ) -> List[ScheduleListResponse]:
+    ) -> List[ScheduleResponseSchema]:
         """
-        Obtiene todos los horarios de los miembros de un equipo específico.
+        Obtiene horarios de todos los miembros de un equipo.
+        
+        Args:
+            team_id: ID del equipo
+            start_date: Fecha de inicio opcional para filtrar
+            end_date: Fecha de fin opcional para filtrar
+            
+        Returns:
+            Lista de horarios del equipo
+            
+        Raises:
+            ValidationError: Si los parámetros son inválidos
+            RepositoryError: Si hay error en la consulta
         """
         try:
             logger.info(f"Obteniendo horarios para equipo {team_id}")
@@ -65,13 +77,24 @@ class ScheduleDomainTeamOperations(IScheduleDomainTeamOperations):
     async def get_team_schedule_coordination(
         self,
         team_id: int,
-        coordination_date: date
-    ) -> ScheduleSearchResponse:
+        target_date: date
+    ) -> TeamScheduleCoordinationSchema:
         """
-        Analiza la coordinación de horarios del equipo para una fecha específica.
+        Analiza la coordinación y disponibilidad del equipo para una fecha específica.
+        
+        Args:
+            team_id: ID del equipo
+            target_date: Fecha específica para analizar coordinación
+            
+        Returns:
+            Análisis de coordinación del equipo
+            
+        Raises:
+            ValidationError: Si los parámetros son inválidos
+            RepositoryError: Si hay error en la consulta
         """
         try:
-            logger.info(f"Analizando coordinación del equipo {team_id} para fecha {coordination_date}")
+            logger.info(f"Analizando coordinación del equipo {team_id} para fecha {target_date}")
             
             # TODO: Implementar lógica de coordinación
             # - Validar parámetros de entrada
@@ -84,32 +107,4 @@ class ScheduleDomainTeamOperations(IScheduleDomainTeamOperations):
             
         except Exception as e:
             logger.error(f"Error al analizar coordinación del equipo {team_id}: {str(e)}")
-            raise
-
-    async def get_team_availability_analysis(
-        self,
-        team_id: int,
-        analysis_period_start: date,
-        analysis_period_end: date
-    ) -> ScheduleListResponse:
-        """
-        Realiza análisis completo de disponibilidad del equipo en un período.
-        """
-        try:
-            logger.info(
-                f"Analizando disponibilidad del equipo {team_id} "
-                f"del {analysis_period_start} al {analysis_period_end}"
-            )
-            
-            # TODO: Implementar lógica de análisis de disponibilidad
-            # - Validar parámetros de entrada
-            # - Obtener horarios del equipo en el período
-            # - Calcular disponibilidad individual y grupal
-            # - Identificar patrones de disponibilidad
-            # - Generar recomendaciones de optimización
-            
-            raise NotImplementedError("Implementación pendiente")
-            
-        except Exception as e:
-            logger.error(f"Error al analizar disponibilidad del equipo {team_id}: {str(e)}")
             raise

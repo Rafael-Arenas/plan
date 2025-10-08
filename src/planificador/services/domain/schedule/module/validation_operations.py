@@ -9,11 +9,11 @@ from typing import List, Optional, Dict, Any
 from datetime import date, time
 from loguru import logger
 
-from planificador.schemas.schedule import (
-    ScheduleValidationResultSchema,
-    EmployeeAvailabilitySchema,
-    ProjectCapacitySchema,
-    ScheduleIntegrityReportSchema
+from planificador.schemas.schedule.schedule import (
+    ValidationResultSchema,
+    ConflictValidationSchema,
+    TeamCoordinationValidationSchema,
+    WorkloadValidationSchema
 )
 from planificador.schemas.response_schemas import ScheduleSearchResponse
 from planificador.services.domain.schedule.interfaces.validation_operations import (
@@ -44,10 +44,22 @@ class ScheduleDomainValidationOperations(IScheduleDomainValidationOperations):
 
     async def validate_schedule_business_rules(
         self,
-        schedule_data: Dict[str, Any]
-    ) -> ScheduleValidationResultSchema:
+        schedule_data: Dict[str, Any],
+        exclude_id: Optional[int] = None
+    ) -> ValidationResultSchema:
         """
-        Valida que un horario cumple con todas las reglas de negocio.
+        Valida todas las reglas de negocio para horarios.
+        
+        Args:
+            schedule_data: Datos del horario a validar
+            exclude_id: ID de horario a excluir de validación (para actualizaciones)
+            
+        Returns:
+            ValidationResultSchema: Resultado detallado de la validación
+            
+        Raises:
+            ValidationError: Si los parámetros básicos no son válidos
+            RepositoryError: Si hay error en la consulta
         """
         try:
             logger.info("Validando reglas de negocio para horario")
@@ -66,19 +78,33 @@ class ScheduleDomainValidationOperations(IScheduleDomainValidationOperations):
             logger.error(f"Error al validar reglas de negocio: {str(e)}")
             raise
 
-    async def check_schedule_conflicts(
+    async def validate_schedule_conflicts(
         self,
         employee_id: int,
-        proposed_start_time: time,
-        proposed_end_time: time,
-        proposed_date: date,
+        schedule_date: date,
+        start_time: time,
+        end_time: time,
         exclude_schedule_id: Optional[int] = None
-    ) -> List[ScheduleSearchResponse]:
+    ) -> ConflictValidationSchema:
         """
-        Detecta conflictos de horarios para un empleado en una fecha específica.
+        Detecta y valida conflictos de horarios con análisis detallado.
+        
+        Args:
+            employee_id: ID del empleado
+            schedule_date: Fecha del horario
+            start_time: Hora de inicio
+            end_time: Hora de fin
+            exclude_schedule_id: ID de horario a excluir de validación (para actualizaciones)
+            
+        Returns:
+            ConflictValidationSchema: Resultado detallado de detección de conflictos
+            
+        Raises:
+            ValidationError: Si los parámetros básicos no son válidos
+            RepositoryError: Si hay error en la consulta
         """
         try:
-            logger.info(f"Verificando conflictos para empleado {employee_id} en {proposed_date}")
+            logger.info(f"Validando conflictos para empleado {employee_id} en {schedule_date}")
             
             # TODO: Implementar lógica de detección de conflictos
             # - Obtener horarios existentes del empleado para la fecha
@@ -86,115 +112,85 @@ class ScheduleDomainValidationOperations(IScheduleDomainValidationOperations):
             # - Detectar solapamientos de tiempo
             # - Verificar períodos de descanso obligatorios
             # - Identificar conflictos de ubicación si aplica
-            # - Generar detalles de cada conflicto encontrado
+            # - Generar análisis de severidad e impacto
+            # - Proporcionar sugerencias de resolución
             
             raise NotImplementedError("Implementación pendiente")
             
         except Exception as e:
-            logger.error(f"Error al verificar conflictos: {str(e)}")
+            logger.error(f"Error al validar conflictos: {str(e)}")
             raise
 
-    async def validate_employee_availability(
+    async def validate_team_schedule_coordination(
+        self,
+        team_id: int,
+        target_date: date
+    ) -> TeamCoordinationValidationSchema:
+        """
+        Valida la coordinación de horarios del equipo para proyectos colaborativos.
+        
+        Args:
+            team_id: ID del equipo
+            target_date: Fecha objetivo para validar coordinación
+            
+        Returns:
+            TeamCoordinationValidationSchema: Resultado de validación de coordinación
+            
+        Raises:
+            ValidationError: Si los parámetros básicos no son válidos
+            RepositoryError: Si hay error en la consulta
+        """
+        try:
+            logger.info(f"Validando coordinación del equipo {team_id} para {target_date}")
+            
+            # TODO: Implementar lógica de validación de coordinación
+            # - Obtener miembros del equipo y sus horarios
+            # - Analizar solapamientos y disponibilidad conjunta
+            # - Verificar proyectos colaborativos activos
+            # - Calcular métricas de coordinación
+            # - Identificar ventanas óptimas de reunión
+            # - Generar recomendaciones de coordinación
+            
+            raise NotImplementedError("Implementación pendiente")
+            
+        except Exception as e:
+            logger.error(f"Error al validar coordinación del equipo {team_id}: {str(e)}")
+            raise
+
+    async def validate_workload_distribution(
         self,
         employee_id: int,
-        check_date: date,
-        required_hours: Optional[float] = None
-    ) -> EmployeeAvailabilitySchema:
+        start_date: date,
+        end_date: date
+    ) -> WorkloadValidationSchema:
         """
-        Valida la disponibilidad de un empleado para una fecha específica.
+        Valida que la distribución de carga de trabajo sea equilibrada y sostenible.
+        
+        Args:
+            employee_id: ID del empleado
+            start_date: Fecha de inicio del período
+            end_date: Fecha de fin del período
+            
+        Returns:
+            WorkloadValidationSchema: Resultado de validación de carga de trabajo
+            
+        Raises:
+            ValidationError: Si los parámetros básicos no son válidos
+            RepositoryError: Si hay error en la consulta
         """
         try:
-            logger.info(f"Validando disponibilidad del empleado {employee_id} para {check_date}")
+            logger.info(f"Validando distribución de carga para empleado {employee_id}")
             
-            # TODO: Implementar lógica de validación de disponibilidad
-            # - Verificar horarios existentes del empleado
-            # - Calcular horas disponibles restantes
-            # - Verificar restricciones de horario laboral
-            # - Validar días de descanso y vacaciones
-            # - Comprobar límites de horas diarias/semanales
-            # - Generar reporte de disponibilidad
+            # TODO: Implementar lógica de validación de carga de trabajo
+            # - Obtener horarios del empleado en el período
+            # - Calcular métricas de carga diaria y semanal
+            # - Analizar patrones de distribución temporal
+            # - Evaluar sostenibilidad y riesgo de burnout
+            # - Comparar con promedios del equipo e históricos
+            # - Generar recomendaciones de equilibrio
             
             raise NotImplementedError("Implementación pendiente")
             
         except Exception as e:
-            logger.error(f"Error al validar disponibilidad del empleado {employee_id}: {str(e)}")
-            raise
-
-    async def validate_project_capacity(
-        self,
-        project_id: int,
-        validation_date: date,
-        required_hours: Optional[float] = None
-    ) -> ProjectCapacitySchema:
-        """
-        Valida la capacidad disponible de un proyecto para una fecha.
-        """
-        try:
-            logger.info(f"Validando capacidad del proyecto {project_id} para {validation_date}")
-            
-            # TODO: Implementar lógica de validación de capacidad
-            # - Obtener límites de capacidad del proyecto
-            # - Calcular horas ya asignadas para la fecha
-            # - Verificar disponibilidad de recursos
-            # - Validar restricciones presupuestarias
-            # - Comprobar fechas límite del proyecto
-            # - Generar reporte de capacidad
-            
-            raise NotImplementedError("Implementación pendiente")
-            
-        except Exception as e:
-            logger.error(f"Error al validar capacidad del proyecto {project_id}: {str(e)}")
-            raise
-
-    async def validate_schedule_time_constraints(
-        self,
-        start_time: time,
-        end_time: time,
-        schedule_date: date,
-        employee_id: Optional[int] = None
-    ) -> ScheduleValidationResultSchema:
-        """
-        Valida restricciones de tiempo para un horario propuesto.
-        """
-        try:
-            logger.info(f"Validando restricciones de tiempo para {schedule_date}")
-            
-            # TODO: Implementar lógica de validación de restricciones de tiempo
-            # - Validar que end_time > start_time
-            # - Verificar duración mínima y máxima permitida
-            # - Validar horarios laborales permitidos
-            # - Comprobar restricciones de empleado si se proporciona
-            # - Verificar días laborales válidos
-            # - Generar reporte de validación
-            
-            raise NotImplementedError("Implementación pendiente")
-            
-        except Exception as e:
-            logger.error(f"Error al validar restricciones de tiempo: {str(e)}")
-            raise
-
-    async def perform_schedule_integrity_check(
-        self,
-        check_scope: str,
-        scope_id: Optional[int] = None,
-        check_date_range: Optional[tuple] = None
-    ) -> ScheduleIntegrityReportSchema:
-        """
-        Realiza verificación completa de integridad de horarios.
-        """
-        try:
-            logger.info(f"Ejecutando verificación de integridad para {check_scope}")
-            
-            # TODO: Implementar lógica de verificación de integridad
-            # - Definir alcance de la verificación
-            # - Detectar inconsistencias en los datos
-            # - Verificar referencias a entidades relacionadas
-            # - Validar cálculos de horas y totales
-            # - Identificar horarios huérfanos o duplicados
-            # - Generar reporte completo de integridad
-            
-            raise NotImplementedError("Implementación pendiente")
-            
-        except Exception as e:
-            logger.error(f"Error en verificación de integridad: {str(e)}")
+            logger.error(f"Error al validar carga de trabajo del empleado {employee_id}: {str(e)}")
             raise

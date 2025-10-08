@@ -1,49 +1,77 @@
 """
-Interfaz para Operaciones de Validación y Reglas de Negocio del Servicio de Dominio Schedule.
+Interfaz para operaciones de validación de horarios.
 
-Define los contratos para validaciones complejas, verificación de reglas de negocio,
-detección de conflictos y validación de integridad de datos.
+Este módulo define la interfaz abstracta para las operaciones de validación
+de horarios, incluyendo validación de reglas de negocio, detección de conflictos,
+coordinación de equipos y distribución de carga de trabajo.
 """
 
 from abc import ABC, abstractmethod
-from typing import List, Optional, Dict, Any, Tuple
 from datetime import date, time
+from typing import Dict, Any, Optional
 
-from planificador.schemas.schedule.schedule import Schedule
-from planificador.schemas.response.response_schemas import ScheduleSearchResponse
+from planificador.schemas.schedule.schedule import (
+    ValidationResultSchema,
+    ConflictValidationSchema,
+    TeamCoordinationValidationSchema,
+    WorkloadValidationSchema
+)
+from planificador.exceptions.validation import ValidationError
+from planificador.exceptions.repository import RepositoryError
 
 
-class IScheduleDomainValidationOperations(ABC):
+class ValidationOperationsInterface(ABC):
     """
-    Interfaz para operaciones de validación y reglas de negocio del servicio de dominio Schedule.
+    Interfaz abstracta para operaciones de validación de horarios.
     
-    Define los métodos para validaciones complejas, verificación de reglas
-    de negocio y detección de conflictos con integridad de datos.
+    Define los métodos necesarios para validar reglas de negocio,
+    detectar conflictos, coordinar equipos y analizar distribución
+    de carga de trabajo en el sistema de horarios.
     """
 
     @abstractmethod
     async def validate_schedule_business_rules(
         self,
+        schedule_data: Dict[str, Any],
+        exclude_id: Optional[int] = None
+    ) -> ValidationResultSchema:
+        """
+        Valida todas las reglas de negocio para horarios.
+        
+        Args:
+            schedule_data: Datos del horario a validar
+            exclude_id: ID de horario a excluir de validación (para actualizaciones)
+            
+        Returns:
+            ValidationResultSchema: Resultado detallado de la validación
+            
+        Raises:
+            ValidationError: Si los parámetros básicos no son válidos
+            RepositoryError: Si hay error en la consulta
+        """
+        pass
+
+    @abstractmethod
+    async def validate_schedule_conflicts(
+        self,
         employee_id: int,
-        project_id: int,
         schedule_date: date,
         start_time: time,
         end_time: time,
         exclude_schedule_id: Optional[int] = None
-    ) -> ScheduleSearchResponse:
+    ) -> ConflictValidationSchema:
         """
-        Valida que un horario cumple todas las reglas de negocio establecidas.
+        Detecta y valida conflictos de horarios con análisis detallado.
         
         Args:
             employee_id: ID del empleado
-            project_id: ID del proyecto
             schedule_date: Fecha del horario
             start_time: Hora de inicio
             end_time: Hora de fin
             exclude_schedule_id: ID de horario a excluir de validación (para actualizaciones)
             
         Returns:
-            ScheduleSearchResponse: Resultado de validación con detalles
+            ConflictValidationSchema: Resultado detallado de detección de conflictos
             
         Raises:
             ValidationError: Si los parámetros básicos no son válidos
@@ -52,124 +80,47 @@ class IScheduleDomainValidationOperations(ABC):
         pass
 
     @abstractmethod
-    async def check_schedule_conflicts(
+    async def validate_team_schedule_coordination(
         self,
-        employee_id: int,
-        schedule_date: date,
-        start_time: time,
-        end_time: time,
-        exclude_schedule_id: Optional[int] = None
-    ) -> ScheduleSearchResponse:
+        team_id: int,
+        target_date: date
+    ) -> TeamCoordinationValidationSchema:
         """
-        Detecta conflictos de horarios para un empleado en una fecha específica.
+        Valida la coordinación de horarios del equipo para proyectos colaborativos.
         
         Args:
-            employee_id: ID del empleado
-            schedule_date: Fecha a verificar
-            start_time: Hora de inicio propuesta
-            end_time: Hora de fin propuesta
-            exclude_schedule_id: ID de horario a excluir (para actualizaciones)
+            team_id: ID del equipo
+            target_date: Fecha objetivo para validar coordinación
             
         Returns:
-            ScheduleSearchResponse: Resultado de detección de conflictos
-            
-        Raises:
-            ValidationError: Si los parámetros no son válidos
-            RepositoryError: Si hay error en la consulta
-        """
-        pass
-
-    @abstractmethod
-    async def validate_employee_availability(
-        self,
-        employee_id: int,
-        target_date: date,
-        required_hours: float
-    ) -> ScheduleSearchResponse:
-        """
-        Valida la disponibilidad de un empleado para horas adicionales.
-        
-        Args:
-            employee_id: ID del empleado
-            target_date: Fecha objetivo
-            required_hours: Horas requeridas adicionales
-            
-        Returns:
-            ScheduleSearchResponse: Resultado de validación de disponibilidad
-            
-        Raises:
-            ValidationError: Si los parámetros no son válidos
-            RepositoryError: Si hay error en la consulta
-        """
-        pass
-
-    @abstractmethod
-    async def validate_project_capacity(
-        self,
-        project_id: int,
-        target_date: date,
-        additional_hours: float
-    ) -> ScheduleSearchResponse:
-        """
-        Valida la capacidad de un proyecto para horas adicionales.
-        
-        Args:
-            project_id: ID del proyecto
-            target_date: Fecha objetivo
-            additional_hours: Horas adicionales propuestas
-            
-        Returns:
-            ScheduleSearchResponse: Resultado de validación de capacidad
-            
-        Raises:
-            ValidationError: Si los parámetros no son válidos
-            RepositoryError: Si hay error en la consulta
-        """
-        pass
-
-    @abstractmethod
-    async def validate_schedule_time_constraints(
-        self,
-        start_time: time,
-        end_time: time,
-        schedule_date: date
-    ) -> Tuple[bool, List[str]]:
-        """
-        Valida restricciones de tiempo para horarios (horarios laborales, duración mínima/máxima).
-        
-        Args:
-            start_time: Hora de inicio
-            end_time: Hora de fin
-            schedule_date: Fecha del horario
-            
-        Returns:
-            Tuple[bool, List[str]]: (Es válido, Lista de errores si los hay)
+            TeamCoordinationValidationSchema: Resultado de validación de coordinación
             
         Raises:
             ValidationError: Si los parámetros básicos no son válidos
+            RepositoryError: Si hay error en la consulta
         """
         pass
 
     @abstractmethod
-    async def perform_schedule_integrity_check(
+    async def validate_workload_distribution(
         self,
-        check_scope: str,  # 'employee', 'project', 'team', 'all'
-        scope_id: Optional[int] = None,
-        check_date_range: Optional[Tuple[date, date]] = None
-    ) -> ScheduleSearchResponse:
+        employee_id: int,
+        start_date: date,
+        end_date: date
+    ) -> WorkloadValidationSchema:
         """
-        Realiza verificación de integridad de datos de horarios en un alcance específico.
+        Valida que la distribución de carga de trabajo sea equilibrada y sostenible.
         
         Args:
-            check_scope: Alcance de la verificación ('employee', 'project', 'team', 'all')
-            scope_id: ID del alcance (requerido si no es 'all')
-            check_date_range: Rango de fechas para verificar (opcional)
+            employee_id: ID del empleado
+            start_date: Fecha de inicio del período
+            end_date: Fecha de fin del período
             
         Returns:
-            ScheduleSearchResponse: Resultado de verificación de integridad
+            WorkloadValidationSchema: Resultado de validación de carga de trabajo
             
         Raises:
-            ValidationError: Si los parámetros no son válidos
+            ValidationError: Si los parámetros básicos no son válidos
             RepositoryError: Si hay error en la consulta
         """
         pass

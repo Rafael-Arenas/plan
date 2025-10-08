@@ -5,13 +5,12 @@ Implementa búsquedas avanzadas, filtrado por múltiples criterios
 y consultas complejas con paginación y ordenamiento.
 """
 
-from typing import List, Optional, Dict, Any
-from datetime import date, time
+from typing import List, Optional
+from datetime import date
 from loguru import logger
 
-from planificador.schemas.schedule.schedule import Schedule
-from planificador.schemas.response.response_schemas import ScheduleSearchResponse
-from planificador.schemas.common_schemas import PaginationSchema
+from planificador.schemas.response.response_schemas import ScheduleResponseSchema
+from planificador.schemas.schedule.schedule_advanced_filters import ScheduleAdvancedFilters
 from planificador.services.domain.schedule.interfaces.search_operations import (
     IScheduleDomainSearchOperations
 )
@@ -38,98 +37,108 @@ class ScheduleDomainSearchOperations(IScheduleDomainSearchOperations):
         self._repository = repository_facade
         logger.debug("ScheduleDomainSearchOperations inicializado")
 
-    async def search_schedules_by_criteria(
+    async def get_schedules_by_date(
         self,
-        criteria: ScheduleFilterCriteriaSchema,
-        pagination: Optional[PaginationSchema] = None
-    ) -> ScheduleSearchResultSchema:
+        target_date: date,
+        employee_id: Optional[int] = None
+    ) -> List[ScheduleResponseSchema]:
         """
-        Busca horarios usando criterios múltiples con paginación y ordenamiento.
+        Obtiene horarios para una fecha específica con filtro opcional por empleado.
+        
+        Args:
+            target_date: Fecha objetivo para buscar horarios
+            employee_id: ID del empleado para filtrar (opcional)
+            
+        Returns:
+            Lista de horarios para la fecha especificada
+            
+        Raises:
+            ValidationError: Si los parámetros son inválidos
+            RepositoryError: Si hay errores en el acceso a datos
         """
         try:
-            logger.info("Ejecutando búsqueda de horarios por criterios múltiples")
+            logger.info(f"Obteniendo horarios para fecha {target_date}")
+            if employee_id:
+                logger.debug(f"Filtrando por empleado ID: {employee_id}")
             
-            # TODO: Implementar lógica de búsqueda por criterios
-            # - Validar criterios de búsqueda
-            # - Construir consulta dinámica basada en criterios
-            # - Aplicar paginación si se proporciona
-            # - Ejecutar búsqueda en el repositorio
-            # - Generar metadatos de resultado
-            
-            raise NotImplementedError("Implementación pendiente")
-            
-        except Exception as e:
-            logger.error(f"Error en búsqueda por criterios: {str(e)}")
-            raise
-
-    async def find_schedules_by_date_range(
-        self,
-        start_date: date,
-        end_date: date,
-        employee_ids: Optional[List[int]] = None,
-        project_ids: Optional[List[int]] = None
-    ) -> List[ScheduleSearchResponse]:
-        """
-        Encuentra horarios en un rango de fechas con filtros opcionales.
-        """
-        try:
-            logger.info(f"Buscando horarios del {start_date} al {end_date}")
-            
-            # TODO: Implementar lógica de búsqueda por rango de fechas
-            # - Validar rango de fechas
-            # - Aplicar filtros de empleados si se proporcionan
-            # - Aplicar filtros de proyectos si se proporcionan
+            # TODO: Implementar lógica de búsqueda por fecha
+            # - Validar fecha objetivo
+            # - Aplicar filtro de empleado si se proporciona
             # - Obtener horarios del repositorio
             # - Transformar a esquemas de respuesta
             
             raise NotImplementedError("Implementación pendiente")
             
         except Exception as e:
-            logger.error(f"Error en búsqueda por rango de fechas: {str(e)}")
+            logger.error(f"Error obteniendo horarios por fecha: {str(e)}")
             raise
 
-    async def find_schedules_by_time_range(
+    async def get_confirmed_schedules(
         self,
-        start_time: time,
-        end_time: time,
-        target_date: Optional[date] = None
-    ) -> List[ScheduleSearchResponse]:
+        start_date: date,
+        end_date: date,
+        employee_id: Optional[int] = None
+    ) -> List[ScheduleResponseSchema]:
         """
-        Encuentra horarios que se superponen con un rango de tiempo específico.
+        Obtiene solo horarios confirmados en un rango de fechas.
+        
+        Args:
+            start_date: Fecha de inicio del rango
+            end_date: Fecha de fin del rango
+            employee_id: ID del empleado para filtrar (opcional)
+            
+        Returns:
+            Lista de horarios confirmados en el rango especificado
+            
+        Raises:
+            ValidationError: Si el rango de fechas es inválido
+            RepositoryError: Si hay errores en el acceso a datos
         """
         try:
-            logger.info(f"Buscando horarios en rango de tiempo {start_time} - {end_time}")
+            logger.info(f"Obteniendo horarios confirmados del {start_date} al {end_date}")
+            if employee_id:
+                logger.debug(f"Filtrando por empleado ID: {employee_id}")
             
-            # TODO: Implementar lógica de búsqueda por rango de tiempo
-            # - Validar rango de tiempo
-            # - Usar fecha actual si no se proporciona target_date
-            # - Buscar horarios que se superponen con el rango
+            # TODO: Implementar lógica de búsqueda de horarios confirmados
+            # - Validar rango de fechas
+            # - Aplicar filtro de empleado si se proporciona
+            # - Filtrar solo horarios con estado confirmado
+            # - Obtener horarios del repositorio
             # - Transformar a esquemas de respuesta
             
             raise NotImplementedError("Implementación pendiente")
             
         except Exception as e:
-            logger.error(f"Error en búsqueda por rango de tiempo: {str(e)}")
+            logger.error(f"Error obteniendo horarios confirmados: {str(e)}")
             raise
 
-    async def search_schedules_with_advanced_filters(
+    async def search_schedules_advanced(
         self,
-        filters: Dict[str, Any],
-        sort_by: Optional[str] = None,
-        sort_order: Optional[str] = "asc"
-    ) -> List[ScheduleSearchResponse]:
+        filters: ScheduleAdvancedFilters
+    ) -> List[ScheduleResponseSchema]:
         """
-        Realiza búsqueda avanzada con filtros dinámicos y ordenamiento personalizado.
+        Búsqueda avanzada con múltiples filtros complejos y criterios personalizados.
+        
+        Args:
+            filters: Filtros avanzados para la búsqueda
+            
+        Returns:
+            Lista de horarios que cumplen con los criterios de búsqueda
+            
+        Raises:
+            ValidationError: Si los filtros son inválidos
+            RepositoryError: Si hay errores en el acceso a datos
         """
         try:
-            logger.info("Ejecutando búsqueda avanzada con filtros dinámicos")
+            logger.info("Ejecutando búsqueda avanzada de horarios")
+            logger.debug(f"Filtros aplicados: {filters}")
             
             # TODO: Implementar lógica de búsqueda avanzada
-            # - Validar filtros dinámicos
-            # - Validar criterios de ordenamiento
-            # - Construir consulta dinámica
-            # - Aplicar ordenamiento
+            # - Validar filtros avanzados
+            # - Construir consulta dinámica basada en filtros
+            # - Aplicar criterios personalizados
             # - Ejecutar búsqueda en el repositorio
+            # - Transformar a esquemas de respuesta
             
             raise NotImplementedError("Implementación pendiente")
             

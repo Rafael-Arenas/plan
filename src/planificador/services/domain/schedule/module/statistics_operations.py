@@ -10,11 +10,10 @@ from datetime import date
 from loguru import logger
 
 from planificador.schemas.schedule import (
-    EmployeeHoursStatsSchema,
-    ProjectHoursStatsSchema,
-    WeeklyHoursReportSchema,
-    MonthlyHoursReportSchema,
-    HoursDistributionSchema
+    EmployeeHoursSummarySchema,
+    ProjectHoursSummarySchema,
+    TeamHoursSummarySchema,
+    OvertimeAnalysisSchema
 )
 from planificador.services.domain.schedule.interfaces.statistics_operations import (
     IScheduleDomainStatisticsOperations
@@ -42,153 +41,161 @@ class ScheduleDomainStatisticsOperations(IScheduleDomainStatisticsOperations):
         self._repository = repository_facade
         logger.debug("ScheduleDomainStatisticsOperations inicializado")
 
-    async def calculate_total_hours_by_employee(
+    async def get_employee_hours_summary(
         self,
         employee_id: int,
         start_date: date,
         end_date: date
-    ) -> EmployeeHoursStatsSchema:
+    ) -> EmployeeHoursSummarySchema:
         """
-        Calcula el total de horas trabajadas por un empleado en un período.
+        Calcula resumen completo de horas trabajadas por empleado.
+        
+        Args:
+            employee_id: ID del empleado
+            start_date: Fecha de inicio del período
+            end_date: Fecha de fin del período
+            
+        Returns:
+            EmployeeHoursSummarySchema: Resumen completo de horas trabajadas
+            
+        Raises:
+            ValidationError: Si los parámetros no son válidos
+            NotFoundError: Si el empleado no existe
+            RepositoryError: Si hay error en la consulta
         """
         try:
-            logger.info(f"Calculando horas totales para empleado {employee_id}")
+            logger.info(f"Calculando resumen de horas para empleado {employee_id}")
             
-            # TODO: Implementar lógica de cálculo de horas por empleado
-            # - Validar parámetros de entrada
+            # TODO: Implementar lógica de resumen de horas por empleado
+            # - Validar que el empleado existe
+            # - Validar rango de fechas
             # - Obtener horarios del empleado en el período
             # - Calcular horas totales, regulares y extras
-            # - Generar estadísticas detalladas
-            # - Incluir métricas de productividad
+            # - Generar estadísticas de productividad
+            # - Incluir métricas de eficiencia temporal
+            # - Calcular promedios y tendencias
             
             raise NotImplementedError("Implementación pendiente")
             
         except Exception as e:
-            logger.error(f"Error al calcular horas del empleado {employee_id}: {str(e)}")
+            logger.error(f"Error al calcular resumen de horas del empleado {employee_id}: {str(e)}")
             raise
 
-    async def calculate_total_hours_by_project(
+    async def get_project_hours_summary(
         self,
         project_id: int,
         start_date: date,
         end_date: date
-    ) -> ProjectHoursStatsSchema:
+    ) -> ProjectHoursSummarySchema:
         """
-        Calcula el total de horas asignadas a un proyecto en un período.
+        Obtiene resumen de horas invertidas en un proyecto específico.
+        
+        Args:
+            project_id: ID del proyecto
+            start_date: Fecha de inicio del período
+            end_date: Fecha de fin del período
+            
+        Returns:
+            ProjectHoursSummarySchema: Resumen de horas del proyecto
+            
+        Raises:
+            ValidationError: Si los parámetros no son válidos
+            NotFoundError: Si el proyecto no existe
+            RepositoryError: Si hay error en la consulta
         """
         try:
-            logger.info(f"Calculando horas totales para proyecto {project_id}")
+            logger.info(f"Obteniendo resumen de horas para proyecto {project_id}")
             
-            # TODO: Implementar lógica de cálculo de horas por proyecto
-            # - Validar parámetros de entrada
+            # TODO: Implementar lógica de resumen de horas por proyecto
+            # - Validar que el proyecto existe
+            # - Validar rango de fechas
             # - Obtener horarios del proyecto en el período
             # - Calcular horas por empleado y totales
             # - Generar estadísticas de progreso
-            # - Incluir métricas de eficiencia
+            # - Incluir métricas de eficiencia del equipo
+            # - Calcular distribución de carga de trabajo
             
             raise NotImplementedError("Implementación pendiente")
             
         except Exception as e:
-            logger.error(f"Error al calcular horas del proyecto {project_id}: {str(e)}")
+            logger.error(f"Error al obtener resumen de horas del proyecto {project_id}: {str(e)}")
             raise
 
-    async def generate_weekly_hours_report(
+    async def get_team_hours_summary(
         self,
-        week_start_date: date,
-        employee_ids: Optional[List[int]] = None
-    ) -> WeeklyHoursReportSchema:
+        team_id: int,
+        start_date: date,
+        end_date: date
+    ) -> TeamHoursSummarySchema:
         """
-        Genera reporte semanal de horas con desglose por empleado y proyecto.
+        Calcula distribución de horas trabajadas por equipo.
+        
+        Args:
+            team_id: ID del equipo
+            start_date: Fecha de inicio del período
+            end_date: Fecha de fin del período
+            
+        Returns:
+            TeamHoursSummarySchema: Distribución de horas del equipo
+            
+        Raises:
+            ValidationError: Si los parámetros no son válidos
+            NotFoundError: Si el equipo no existe
+            RepositoryError: Si hay error en la consulta
         """
         try:
-            logger.info(f"Generando reporte semanal para semana del {week_start_date}")
+            logger.info(f"Calculando distribución de horas para equipo {team_id}")
             
-            # TODO: Implementar lógica de reporte semanal
-            # - Validar fecha de inicio de semana
-            # - Calcular fecha de fin de semana
-            # - Aplicar filtros de empleados si se proporcionan
-            # - Obtener datos de horarios de la semana
-            # - Generar estadísticas agregadas
-            # - Crear visualizaciones de datos
+            # TODO: Implementar lógica de distribución de horas por equipo
+            # - Validar que el equipo existe
+            # - Validar rango de fechas
+            # - Obtener miembros del equipo
+            # - Obtener horarios de todos los miembros
+            # - Calcular distribución por miembro
+            # - Generar métricas de colaboración
+            # - Incluir análisis de balance de carga
             
             raise NotImplementedError("Implementación pendiente")
             
         except Exception as e:
-            logger.error(f"Error al generar reporte semanal: {str(e)}")
+            logger.error(f"Error al calcular distribución del equipo {team_id}: {str(e)}")
             raise
 
-    async def generate_monthly_hours_report(
+    async def get_overtime_analysis(
         self,
-        year: int,
-        month: int,
-        department_id: Optional[int] = None
-    ) -> MonthlyHoursReportSchema:
+        start_date: date,
+        end_date: date,
+        employee_id: Optional[int] = None
+    ) -> OvertimeAnalysisSchema:
         """
-        Genera reporte mensual de horas con análisis de tendencias.
+        Analiza patrones de horas extra y sobrecarga laboral.
+        
+        Args:
+            start_date: Fecha de inicio del análisis
+            end_date: Fecha de fin del análisis
+            employee_id: ID del empleado para filtrar (opcional)
+            
+        Returns:
+            OvertimeAnalysisSchema: Análisis de horas extra y sobrecarga
+            
+        Raises:
+            ValidationError: Si los parámetros no son válidos
+            RepositoryError: Si hay error en la consulta
         """
         try:
-            logger.info(f"Generando reporte mensual para {month}/{year}")
+            logger.info(f"Analizando horas extra para período {start_date} - {end_date}")
             
-            # TODO: Implementar lógica de reporte mensual
-            # - Validar año y mes
-            # - Aplicar filtros de departamento si se proporcionan
-            # - Obtener datos de horarios del mes
-            # - Calcular tendencias y comparaciones
-            # - Generar métricas de performance
-            # - Crear análisis de variaciones
+            # TODO: Implementar lógica de análisis de horas extra
+            # - Validar rango de fechas
+            # - Aplicar filtro de empleado si se proporciona
+            # - Obtener horarios en el período
+            # - Identificar horas extra por empleado
+            # - Calcular patrones de sobrecarga
+            # - Generar alertas de burnout
+            # - Incluir recomendaciones de balance
             
             raise NotImplementedError("Implementación pendiente")
             
         except Exception as e:
-            logger.error(f"Error al generar reporte mensual: {str(e)}")
-            raise
-
-    async def analyze_employee_hours_distribution(
-        self,
-        employee_id: int,
-        analysis_period_start: date,
-        analysis_period_end: date
-    ) -> HoursDistributionSchema:
-        """
-        Analiza la distribución de horas de un empleado entre proyectos.
-        """
-        try:
-            logger.info(f"Analizando distribución de horas para empleado {employee_id}")
-            
-            # TODO: Implementar lógica de análisis de distribución
-            # - Validar parámetros de entrada
-            # - Obtener horarios del empleado en el período
-            # - Calcular distribución por proyecto
-            # - Generar métricas de diversificación
-            # - Identificar patrones de asignación
-            
-            raise NotImplementedError("Implementación pendiente")
-            
-        except Exception as e:
-            logger.error(f"Error al analizar distribución del empleado {employee_id}: {str(e)}")
-            raise
-
-    async def get_project_hours_distribution(
-        self,
-        project_id: int,
-        distribution_period_start: date,
-        distribution_period_end: date
-    ) -> Dict[str, Any]:
-        """
-        Obtiene la distribución de horas de un proyecto entre empleados.
-        """
-        try:
-            logger.info(f"Obteniendo distribución de horas para proyecto {project_id}")
-            
-            # TODO: Implementar lógica de distribución por proyecto
-            # - Validar parámetros de entrada
-            # - Obtener horarios del proyecto en el período
-            # - Calcular distribución por empleado
-            # - Generar métricas de participación
-            # - Identificar contribuciones principales
-            
-            raise NotImplementedError("Implementación pendiente")
-            
-        except Exception as e:
-            logger.error(f"Error al obtener distribución del proyecto {project_id}: {str(e)}")
+            logger.error(f"Error al analizar horas extra: {str(e)}")
             raise
