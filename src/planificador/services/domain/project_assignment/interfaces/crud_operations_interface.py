@@ -8,7 +8,7 @@ tanto básicas como especializadas para asignaciones de proyecto.
 """
 
 from abc import ABC, abstractmethod
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 from datetime import datetime
 
 from planificador.schemas import (
@@ -54,17 +54,17 @@ class ICrudOperations(ABC):
     async def update_assignment(
         self, 
         assignment_id: int, 
-        assignment_data: ProjectAssignmentUpdate
-    ) -> Optional[ProjectAssignment]:
+        update_data: ProjectAssignmentUpdate
+    ) -> ProjectAssignment:
         """
         Actualiza una asignación existente con validaciones de solapamiento.
         
         Args:
             assignment_id: ID de la asignación a actualizar
-            assignment_data: Datos de actualización
+            update_data: Datos de actualización
             
         Returns:
-            Optional[ProjectAssignment]: Asignación actualizada o None si no existe
+            ProjectAssignment: Asignación actualizada
             
         Raises:
             ValidationError: Si la actualización genera conflictos
@@ -132,15 +132,15 @@ class ICrudOperations(ABC):
     @abstractmethod
     async def duplicate_assignment(
         self, 
-        assignment_id: int, 
-        new_assignment_data: dict
+        source_assignment_id: int, 
+        modifications: Optional[dict] = None
     ) -> ProjectAssignment:
         """
         Duplica una asignación existente con nuevos parámetros.
         
         Args:
-            assignment_id: ID de la asignación a duplicar
-            new_assignment_data: Datos específicos para la nueva asignación
+            source_assignment_id: ID de la asignación a duplicar
+            modifications: Modificaciones opcionales para la nueva asignación
             
         Returns:
             ProjectAssignment: Nueva asignación duplicada
@@ -153,20 +153,15 @@ class ICrudOperations(ABC):
         pass
     
     @abstractmethod
-    async def archive_assignment(
-        self, 
-        assignment_id: int, 
-        archive_reason: str
-    ) -> Optional[ProjectAssignment]:
+    async def archive_assignment(self, assignment_id: int) -> ProjectAssignment:
         """
         Archiva una asignación manteniendo el historial para auditoría.
         
         Args:
             assignment_id: ID de la asignación a archivar
-            archive_reason: Razón del archivado
             
         Returns:
-            Optional[ProjectAssignment]: Asignación archivada o None si no existe
+            ProjectAssignment: Asignación archivada
             
         Raises:
             ValidationError: Si la asignación no puede ser archivada

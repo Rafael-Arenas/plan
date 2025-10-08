@@ -27,29 +27,31 @@ class ISearchOperations(ABC):
     # ============================================================================
     
     @abstractmethod
-    async def get_assignments_with_filters(self, filters: Dict[str, Any]) -> List[ProjectAssignment]:
+    async def search_assignments_by_criteria(
+        self, 
+        criteria: Dict[str, Any]
+    ) -> List[ProjectAssignment]:
         """
-        Búsqueda avanzada con múltiples filtros complejos.
+        Busca asignaciones aplicando criterios múltiples de filtrado.
         
         Args:
-            filters: Diccionario con criterios de filtrado que puede incluir:
-                - employee_ids: Lista de IDs de empleados
-                - project_ids: Lista de IDs de proyectos
-                - roles: Lista de roles a filtrar
-                - start_date_from: Fecha de inicio desde
-                - start_date_to: Fecha de inicio hasta
-                - end_date_from: Fecha de fin desde
-                - end_date_to: Fecha de fin hasta
-                - is_active: Estado activo/inactivo
-                - min_allocation: Asignación mínima en porcentaje
-                - max_allocation: Asignación máxima en porcentaje
-                - has_notes: Filtrar por presencia de notas
+            criteria: Diccionario con criterios de búsqueda
+                - employee_id: ID del empleado (opcional)
+                - project_id: ID del proyecto (opcional)
+                - role_in_project: Rol en el proyecto (opcional)
+                - is_active: Estado activo (opcional)
+                - start_date_from: Fecha inicio desde (opcional)
+                - start_date_to: Fecha inicio hasta (opcional)
+                - end_date_from: Fecha fin desde (opcional)
+                - end_date_to: Fecha fin hasta (opcional)
+                - min_percentage: Porcentaje mínimo de asignación (opcional)
+                - max_percentage: Porcentaje máximo de asignación (opcional)
                 
         Returns:
-            List[ProjectAssignment]: Lista de asignaciones que cumplen los filtros
+            List[ProjectAssignment]: Lista de asignaciones que cumplen los criterios
             
         Raises:
-            ValidationError: Si los filtros no son válidos
+            ValidationError: Si los criterios no son válidos
             RepositoryError: Si hay errores en la consulta
         """
         pass
@@ -58,36 +60,44 @@ class ISearchOperations(ABC):
     async def get_assignments_by_date_range(
         self, 
         start_date: date, 
-        end_date: date
+        end_date: date,
+        include_partial_overlap: bool = True
     ) -> List[ProjectAssignment]:
         """
-        Obtiene asignaciones que se superponen con un rango de fechas.
+        Obtiene asignaciones que se encuentran en un rango de fechas específico.
         
         Args:
             start_date: Fecha de inicio del rango
             end_date: Fecha de fin del rango
+            include_partial_overlap: Si incluir asignaciones con solapamiento parcial
             
         Returns:
-            List[ProjectAssignment]: Asignaciones que se superponen con el rango
+            List[ProjectAssignment]: Lista de asignaciones en el rango
             
         Raises:
-            ValidationError: Si el rango de fechas no es válido
+            ValidationError: Si las fechas no son válidas
             RepositoryError: Si hay errores en la consulta
         """
         pass
     
     @abstractmethod
-    async def get_assignments_by_role(self, role: str) -> List[ProjectAssignment]:
+    async def get_assignments_by_role(
+        self, 
+        role: str,
+        exact_match: bool = False
+    ) -> List[ProjectAssignment]:
         """
-        Obtiene asignaciones filtradas por rol específico.
+        Busca asignaciones por rol específico en el proyecto.
         
         Args:
-            role: Rol a filtrar (ej: "Developer", "Project Manager", "Analyst")
+            role: Rol a buscar
+            exact_match: Si realizar coincidencia exacta o parcial
             
         Returns:
-            List[ProjectAssignment]: Asignaciones con el rol especificado
+            List[ProjectAssignment]: Lista de asignaciones con el rol especificado
             
         Raises:
+            ValidationError: Si el rol no es válido
             RepositoryError: Si hay errores en la consulta
         """
         pass
@@ -95,25 +105,23 @@ class ISearchOperations(ABC):
     @abstractmethod
     async def get_overlapping_assignments(
         self, 
-        employee_id: int, 
-        start_date: date, 
-        end_date: date, 
-        exclude_id: Optional[int] = None
-    ) -> List[ProjectAssignment]:
+        employee_id: Optional[int] = None,
+        project_id: Optional[int] = None,
+        threshold_percentage: float = 100.0
+    ) -> List[Dict[str, Any]]:
         """
-        Detecta asignaciones superpuestas para validación de conflictos.
+        Detecta solapamientos entre asignaciones que pueden causar conflictos.
         
         Args:
-            employee_id: ID del empleado a verificar
-            start_date: Fecha de inicio del período a verificar
-            end_date: Fecha de fin del período a verificar
-            exclude_id: ID de asignación a excluir de la búsqueda (útil para actualizaciones)
+            employee_id: ID del empleado para filtrar (opcional)
+            project_id: ID del proyecto para filtrar (opcional)
+            threshold_percentage: Umbral de porcentaje para considerar solapamiento
             
         Returns:
-            List[ProjectAssignment]: Asignaciones que se superponen con el período
+            List[Dict[str, Any]]: Lista de solapamientos detectados con detalles
             
         Raises:
             ValidationError: Si los parámetros no son válidos
-            RepositoryError: Si hay errores en la consulta
+            RepositoryError: Si hay errores en la detección
         """
         pass

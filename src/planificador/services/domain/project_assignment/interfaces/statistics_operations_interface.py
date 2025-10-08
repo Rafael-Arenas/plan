@@ -22,207 +22,145 @@ class IStatisticsOperations(ABC):
     análisis de tendencias y métricas de rendimiento.
     """
     
-    # ============================================================================
+    # ==========================================
     # ESTADÍSTICAS BÁSICAS (4 métodos)
-    # ============================================================================
+    # ==========================================
     
     @abstractmethod
-    async def get_assignment_count_by_status(self) -> Dict[str, int]:
+    async def get_total_assignments_count(
+        self, 
+        start_date: Optional[date] = None, 
+        end_date: Optional[date] = None
+    ) -> int:
         """
-        Cuenta asignaciones agrupadas por estado (activo/inactivo).
+        Obtiene el conteo total de asignaciones en un rango de fechas.
         
+        Args:
+            start_date: Fecha de inicio del rango (opcional)
+            end_date: Fecha de fin del rango (opcional)
+            
         Returns:
-            Dict con conteos por estado:
-            - active: Número de asignaciones activas
-            - inactive: Número de asignaciones inactivas
-            - total: Total de asignaciones
-            - active_percentage: Porcentaje de asignaciones activas
-            - inactive_percentage: Porcentaje de asignaciones inactivas
+            int: Número total de asignaciones
             
         Raises:
-            RepositoryError: Si hay errores en la consulta
+            RepositoryError: Error al acceder a los datos
+            ValidationError: Fechas inválidas
         """
         pass
     
     @abstractmethod
-    async def get_assignment_distribution_by_role(self) -> Dict[str, Any]:
+    async def get_active_assignments_count(
+        self, 
+        reference_date: Optional[date] = None
+    ) -> int:
         """
-        Analiza la distribución de asignaciones por rol.
+        Obtiene el conteo de asignaciones activas en una fecha específica.
         
+        Args:
+            reference_date: Fecha de referencia (por defecto hoy)
+            
         Returns:
-            Dict con distribución por rol:
-            - role_counts: Conteo de asignaciones por rol
-            - role_percentages: Porcentajes por rol
-            - most_common_role: Rol más común
-            - least_common_role: Rol menos común
-            - role_diversity_index: Índice de diversidad de roles (0.0-1.0)
-            - total_roles: Número total de roles únicos
-            - total_assignments: Total de asignaciones analizadas
+            int: Número de asignaciones activas
             
         Raises:
-            RepositoryError: Si hay errores en la consulta
+            RepositoryError: Error al acceder a los datos
         """
         pass
     
     @abstractmethod
-    async def get_average_allocation_metrics(self) -> Dict[str, float]:
+    async def get_assignments_by_status_count(self) -> Dict[str, int]:
         """
-        Calcula métricas promedio de asignación de recursos.
+        Obtiene el conteo de asignaciones agrupadas por estado.
         
         Returns:
-            Dict con métricas promedio:
-            - average_percentage_allocation: Asignación promedio en porcentaje
-            - average_hours_per_day: Horas promedio por día
-            - median_percentage_allocation: Mediana de asignación en porcentaje
-            - median_hours_per_day: Mediana de horas por día
-            - std_dev_percentage: Desviación estándar de porcentajes
-            - std_dev_hours: Desviación estándar de horas
-            - min_allocation: Asignación mínima
-            - max_allocation: Asignación máxima
-            - allocation_range: Rango de asignaciones
+            Dict[str, int]: Diccionario con estado como clave y conteo como valor
             
         Raises:
-            RepositoryError: Si hay errores en la consulta
+            RepositoryError: Error al acceder a los datos
         """
         pass
     
     @abstractmethod
-    async def get_assignment_duration_statistics(self) -> Dict[str, Any]:
+    async def get_assignments_by_allocation_category_count(self) -> Dict[str, int]:
         """
-        Analiza estadísticas de duración de asignaciones.
+        Obtiene el conteo de asignaciones agrupadas por categoría de asignación.
         
         Returns:
-            Dict con estadísticas de duración:
-            - average_duration_days: Duración promedio en días
-            - median_duration_days: Mediana de duración en días
-            - shortest_assignment_days: Asignación más corta
-            - longest_assignment_days: Asignación más larga
-            - duration_std_dev: Desviación estándar de duraciones
-            - duration_distribution: Distribución de duraciones por rangos
-            - assignments_by_duration_category: Categorización por duración
-            - duration_trends: Tendencias de duración a lo largo del tiempo
+            Dict[str, int]: Diccionario con categoría y conteo
             
         Raises:
-            RepositoryError: Si hay errores en la consulta
+            RepositoryError: Error al acceder a los datos
         """
         pass
     
-    # ============================================================================
+    # ==========================================
     # ESTADÍSTICAS AVANZADAS (4 métodos)
-    # ============================================================================
+    # ==========================================
     
     @abstractmethod
-    async def get_temporal_assignment_trends(
+    async def get_assignment_duration_analytics(
         self, 
-        start_date: date, 
-        end_date: date, 
-        granularity: str = "monthly"
+        start_date: Optional[date] = None, 
+        end_date: Optional[date] = None
     ) -> Dict[str, Any]:
         """
-        Analiza tendencias temporales de asignaciones en un período.
+        Obtiene análisis avanzados de duración de asignaciones.
         
         Args:
-            start_date: Fecha de inicio del análisis
-            end_date: Fecha de fin del análisis
-            granularity: Granularidad del análisis ("daily", "weekly", "monthly", "quarterly")
+            start_date: Fecha de inicio del análisis (opcional)
+            end_date: Fecha de fin del análisis (opcional)
             
         Returns:
-            Dict con análisis temporal:
-            - period_analyzed: Período analizado
-            - granularity: Granularidad utilizada
-            - assignment_trends: Tendencias de asignaciones por período
-            - creation_trends: Tendencias de creación de asignaciones
-            - completion_trends: Tendencias de finalización
-            - peak_periods: Períodos de mayor actividad
-            - low_activity_periods: Períodos de menor actividad
-            - seasonal_patterns: Patrones estacionales identificados
-            - trend_analysis: Análisis de tendencias (creciente/decreciente)
-            - forecast_indicators: Indicadores para pronósticos
+            Dict[str, Any]: Análisis de duración con métricas estadísticas
             
         Raises:
-            ValidationError: Si los parámetros no son válidos
-            RepositoryError: Si hay errores en la consulta
+            RepositoryError: Error al acceder a los datos
+            ValidationError: Fechas inválidas
         """
         pass
     
     @abstractmethod
-    async def get_resource_utilization_analysis(
-        self, 
-        analysis_period_days: int = 90
-    ) -> Dict[str, Any]:
+    async def get_workload_distribution_analytics(self) -> Dict[str, Any]:
         """
-        Análisis avanzado de utilización de recursos en el período especificado.
+        Obtiene análisis avanzados de distribución de carga de trabajo.
         
-        Args:
-            analysis_period_days: Días hacia atrás para el análisis (default: 90)
-            
         Returns:
-            Dict con análisis de utilización:
-            - analysis_period: Período analizado
-            - overall_utilization_rate: Tasa general de utilización
-            - utilization_by_employee: Utilización detallada por empleado
-            - utilization_by_project: Utilización por proyecto
-            - utilization_by_role: Utilización por rol
-            - peak_utilization_periods: Períodos de máxima utilización
-            - underutilization_analysis: Análisis de subutilización
-            - overallocation_risks: Riesgos de sobreasignación
-            - utilization_efficiency_score: Puntuación de eficiencia (0.0-1.0)
-            - optimization_opportunities: Oportunidades de optimización
+            Dict[str, Any]: Análisis de distribución de carga de trabajo
             
         Raises:
-            ValidationError: Si el período no es válido
-            RepositoryError: Si hay errores en la consulta
+            RepositoryError: Error al acceder a los datos
         """
         pass
     
     @abstractmethod
-    async def get_project_assignment_performance_metrics(
+    async def get_assignment_trends(
         self, 
-        project_id: Optional[int] = None
+        months_back: int = 12
     ) -> Dict[str, Any]:
         """
-        Métricas avanzadas de rendimiento de asignaciones por proyecto.
+        Obtiene análisis de tendencias de asignaciones en el tiempo.
         
         Args:
-            project_id: ID del proyecto específico (None para todos los proyectos)
+            months_back: Número de meses hacia atrás para el análisis
             
         Returns:
-            Dict con métricas de rendimiento:
-            - scope: Alcance del análisis (proyecto específico o global)
-            - assignment_efficiency_score: Puntuación de eficiencia de asignaciones
-            - team_stability_index: Índice de estabilidad del equipo
-            - resource_allocation_balance: Balance de asignación de recursos
-            - assignment_completion_rate: Tasa de finalización de asignaciones
-            - average_assignment_lifecycle: Ciclo de vida promedio
-            - role_distribution_effectiveness: Efectividad de distribución de roles
-            - workload_balance_score: Puntuación de balance de carga
-            - assignment_quality_indicators: Indicadores de calidad
-            - performance_benchmarks: Benchmarks de rendimiento
+            Dict[str, Any]: Análisis de tendencias temporales
             
         Raises:
-            RepositoryError: Si hay errores en la consulta
+            RepositoryError: Error al acceder a los datos
+            ValidationError: Parámetros inválidos
         """
         pass
     
     @abstractmethod
-    async def get_predictive_assignment_insights(self) -> Dict[str, Any]:
+    async def get_comprehensive_dashboard_metrics(self) -> Dict[str, Any]:
         """
-        Insights predictivos basados en patrones históricos de asignaciones.
+        Obtiene métricas completas para dashboard ejecutivo.
         
         Returns:
-            Dict con insights predictivos:
-            - historical_patterns: Patrones históricos identificados
-            - seasonal_predictions: Predicciones estacionales
-            - resource_demand_forecast: Pronóstico de demanda de recursos
-            - capacity_planning_insights: Insights para planificación de capacidad
-            - risk_indicators: Indicadores de riesgo identificados
-            - optimization_recommendations: Recomendaciones de optimización
-            - trend_predictions: Predicciones de tendencias futuras
-            - workload_projections: Proyecciones de carga de trabajo
-            - assignment_lifecycle_predictions: Predicciones de ciclo de vida
-            - strategic_insights: Insights estratégicos para toma de decisiones
+            Dict[str, Any]: Métricas completas del dashboard
             
         Raises:
-            RepositoryError: Si hay errores en la consulta
+            RepositoryError: Error al acceder a los datos
         """
         pass

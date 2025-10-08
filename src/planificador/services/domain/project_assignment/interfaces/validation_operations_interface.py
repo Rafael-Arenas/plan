@@ -22,159 +22,121 @@ class IValidationOperations(ABC):
     de negocio y mantener la integridad de los datos.
     """
     
-    # ============================================================================
+    # ==========================================
     # OPERACIONES DE VALIDACIÓN Y REGLAS DE NEGOCIO (5 métodos)
-    # ============================================================================
+    # ==========================================
     
     @abstractmethod
     async def validate_assignment_business_rules(
         self, 
-        assignment_data: ProjectAssignmentCreate
+        assignment_data: Dict[str, Any], 
+        exclude_id: Optional[int] = None
     ) -> Dict[str, Any]:
         """
-        Valida reglas de negocio complejas para una nueva asignación.
+        Valida todas las reglas de negocio para asignaciones.
         
         Args:
             assignment_data: Datos de la asignación a validar
+            exclude_id: ID de asignación a excluir de validaciones (para actualizaciones)
             
         Returns:
-            Dict con resultado de validación:
-            - is_valid: Booleano indicando si la asignación es válida
-            - validation_score: Puntuación de validación (0.0-1.0)
-            - passed_rules: Lista de reglas que pasaron la validación
-            - failed_rules: Lista de reglas que fallaron
-            - warnings: Lista de advertencias no críticas
-            - errors: Lista de errores críticos
-            - business_rule_violations: Violaciones específicas de reglas de negocio
-            - recommendations: Recomendaciones para corregir problemas
-            - validation_details: Detalles específicos de cada validación
+            Dict con resultado de validación y detalles de errores si los hay
             
         Raises:
-            ValidationError: Si los datos de entrada no son válidos
+            ValidationError: Si los datos no cumplen las reglas de negocio
+            RepositoryError: Si hay errores de acceso a datos
         """
         pass
     
     @abstractmethod
-    async def check_workload_constraints(
+    async def validate_no_overlapping_assignments(
         self, 
         employee_id: int, 
-        new_assignment: ProjectAssignmentCreate
-    ) -> Dict[str, Any]:
+        start_date: date, 
+        end_date: date, 
+        exclude_id: Optional[int] = None
+    ) -> bool:
         """
-        Verifica restricciones de carga de trabajo para un empleado.
+        Valida que no existan solapamientos de asignaciones.
         
         Args:
             employee_id: ID del empleado
-            new_assignment: Nueva asignación propuesta
+            start_date: Fecha de inicio del período
+            end_date: Fecha de fin del período
+            exclude_id: ID de asignación a excluir de la validación
             
         Returns:
-            Dict con análisis de restricciones:
-            - employee_id: ID del empleado analizado
-            - current_workload: Carga de trabajo actual
-            - proposed_additional_load: Carga adicional propuesta
-            - total_projected_load: Carga total proyectada
-            - workload_limit_exceeded: Booleano si se excede el límite
-            - available_capacity: Capacidad disponible
-            - workload_percentage: Porcentaje de carga de trabajo
-            - constraint_violations: Violaciones de restricciones específicas
-            - workload_recommendations: Recomendaciones de carga
-            - alternative_allocations: Asignaciones alternativas sugeridas
+            True si no hay solapamientos, False si los hay
             
         Raises:
-            ValidationError: Si los parámetros no son válidos
-            RepositoryError: Si hay errores en la consulta
+            ValidationError: Si hay errores en la validación
+            RepositoryError: Si hay errores de acceso a datos
         """
         pass
     
     @abstractmethod
-    async def validate_date_consistency(
+    async def validate_workload_limits(
         self, 
-        assignment_data: ProjectAssignmentCreate
-    ) -> Dict[str, Any]:
+        employee_id: int, 
+        start_date: date, 
+        end_date: date, 
+        allocation_percentage: float
+    ) -> bool:
         """
-        Valida consistencia temporal y lógica de fechas de asignación.
+        Valida que la carga de trabajo no exceda límites establecidos.
         
         Args:
-            assignment_data: Datos de asignación con fechas a validar
+            employee_id: ID del empleado
+            start_date: Fecha de inicio del período
+            end_date: Fecha de fin del período
+            allocation_percentage: Porcentaje de asignación a validar
             
         Returns:
-            Dict con validación de fechas:
-            - dates_are_valid: Booleano de validez general
-            - start_date_validation: Validación de fecha de inicio
-            - end_date_validation: Validación de fecha de fin
-            - date_range_validation: Validación del rango de fechas
-            - project_date_alignment: Alineación con fechas del proyecto
-            - business_day_validation: Validación de días laborables
-            - holiday_conflicts: Conflictos con días festivos
-            - weekend_assignments: Asignaciones en fines de semana
-            - date_logic_errors: Errores de lógica temporal
-            - recommended_date_adjustments: Ajustes recomendados
+            True si la carga está dentro de límites, False si los excede
             
         Raises:
-            ValidationError: Si los datos de fecha no son válidos
+            ValidationError: Si hay errores en la validación
+            RepositoryError: Si hay errores de acceso a datos
         """
         pass
     
     @abstractmethod
-    async def check_assignment_conflicts(
-        self, 
-        assignment_data: ProjectAssignmentCreate, 
-        exclude_assignment_id: Optional[int] = None
-    ) -> Dict[str, Any]:
+    async def validate_assignment_deletion(self, assignment_id: int) -> Dict[str, Any]:
         """
-        Detecta y analiza conflictos potenciales con asignaciones existentes.
+        Valida si una asignación puede ser eliminada sin impacto crítico.
         
         Args:
-            assignment_data: Datos de la nueva asignación
-            exclude_assignment_id: ID de asignación a excluir del análisis
+            assignment_id: ID de la asignación a validar para eliminación
             
         Returns:
-            Dict con análisis de conflictos:
-            - has_conflicts: Booleano indicando presencia de conflictos
-            - conflict_severity: Severidad de conflictos ("low", "medium", "high", "critical")
-            - temporal_conflicts: Conflictos de superposición temporal
-            - resource_conflicts: Conflictos de recursos/capacidad
-            - role_conflicts: Conflictos de roles en el mismo proyecto
-            - workload_conflicts: Conflictos de sobrecarga de trabajo
-            - project_conflicts: Conflictos entre proyectos
-            - conflicting_assignments: Lista de asignaciones en conflicto
-            - conflict_resolution_suggestions: Sugerencias de resolución
-            - impact_assessment: Evaluación del impacto de los conflictos
+            Dict con resultado de validación y detalles del impacto
             
         Raises:
-            ValidationError: Si los datos no son válidos
-            RepositoryError: Si hay errores en la consulta
+            ValidationError: Si hay errores en la validación
+            RepositoryError: Si hay errores de acceso a datos
         """
         pass
     
     @abstractmethod
-    async def validate_assignment_update_integrity(
+    async def validate_employee_availability(
         self, 
-        assignment_id: int, 
-        update_data: ProjectAssignmentUpdate
+        employee_id: int, 
+        start_date: date, 
+        end_date: date
     ) -> Dict[str, Any]:
         """
-        Valida integridad y consistencia de actualizaciones de asignación.
+        Valida la disponibilidad del empleado para nuevas asignaciones.
         
         Args:
-            assignment_id: ID de la asignación a actualizar
-            update_data: Datos de actualización
+            employee_id: ID del empleado
+            start_date: Fecha de inicio del período
+            end_date: Fecha de fin del período
             
         Returns:
-            Dict con validación de integridad:
-            - update_is_valid: Booleano de validez de la actualización
-            - integrity_score: Puntuación de integridad (0.0-1.0)
-            - field_validations: Validaciones por campo específico
-            - consistency_checks: Verificaciones de consistencia
-            - business_rule_compliance: Cumplimiento de reglas de negocio
-            - impact_analysis: Análisis de impacto de los cambios
-            - dependency_validations: Validaciones de dependencias
-            - rollback_safety: Seguridad para rollback si es necesario
-            - update_recommendations: Recomendaciones para la actualización
-            - validation_warnings: Advertencias de validación
+            Dict con información de disponibilidad y capacidad restante
             
         Raises:
-            ValidationError: Si los datos de actualización no son válidos
-            RepositoryError: Si hay errores en la consulta
+            ValidationError: Si hay errores en la validación
+            RepositoryError: Si hay errores de acceso a datos
         """
         pass

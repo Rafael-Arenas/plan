@@ -8,7 +8,7 @@ incluyendo capacidades, optimización y balanceado de cargas.
 """
 
 from abc import ABC, abstractmethod
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from datetime import date
 
 from planificador.schemas import ProjectAssignment
@@ -18,8 +18,8 @@ class IResourceManagement(ABC):
     """
     Interfaz para gestión de recursos en asignaciones de proyecto.
     
-    Proporciona métodos para optimizar la distribución de recursos,
-    gestionar capacidades y balancear cargas de trabajo.
+    Proporciona métodos para asignación de empleados, reasignación
+    y cálculo de utilización según la documentación oficial.
     """
     
     # ============================================================================
@@ -27,103 +27,82 @@ class IResourceManagement(ABC):
     # ============================================================================
     
     @abstractmethod
-    async def optimize_resource_allocation(
-        self, 
-        project_id: int, 
-        optimization_criteria: Dict[str, Any]
-    ) -> Dict[str, Any]:
+    async def assign_employee_to_project(
+        self,
+        employee_id: int,
+        project_id: int,
+        assignment_data: Dict[str, Any]
+    ) -> ProjectAssignment:
         """
-        Optimiza la asignación de recursos para un proyecto específico.
+        Asigna un empleado a un proyecto específico.
         
         Args:
-            project_id: ID del proyecto a optimizar
-            optimization_criteria: Criterios de optimización que pueden incluir:
-                - target_utilization: Utilización objetivo (0.0-1.0)
-                - balance_workload: Balancear carga entre empleados
-                - minimize_conflicts: Minimizar conflictos de horarios
-                - prioritize_skills: Priorizar asignación por habilidades
-                - max_allocation_per_employee: Máxima asignación por empleado
-                - preferred_team_size: Tamaño preferido del equipo
-                
+            employee_id: ID del empleado a asignar
+            project_id: ID del proyecto de destino
+            assignment_data: Datos de la asignación (rol, fechas, etc.)
+            
         Returns:
-            Dict con recomendaciones de optimización:
-            - project_id: ID del proyecto
-            - current_allocation: Asignación actual de recursos
-            - optimized_allocation: Asignación optimizada propuesta
-            - optimization_score: Puntuación de mejora (0.0-1.0)
-            - recommendations: Lista de recomendaciones específicas
-            - resource_adjustments: Ajustes sugeridos por empleado
-            - expected_benefits: Beneficios esperados de la optimización
-            - implementation_complexity: Complejidad de implementación
+            ProjectAssignment: La asignación creada
             
         Raises:
-            ValidationError: Si los criterios de optimización no son válidos
-            RepositoryError: Si hay errores en la consulta
+            RepositoryError: Error al acceder a los datos
+            ValidationError: Parámetros de entrada inválidos
+            BusinessLogicError: Error en la lógica de asignación
         """
         pass
     
     @abstractmethod
-    async def calculate_team_capacity(
-        self, 
-        employee_ids: List[int], 
-        start_date: date, 
-        end_date: date
-    ) -> Dict[str, Any]:
+    async def reassign_employee(
+        self,
+        assignment_id: int,
+        new_project_id: int,
+        reassignment_data: Optional[Dict[str, Any]] = None
+    ) -> ProjectAssignment:
         """
-        Calcula la capacidad disponible de un equipo en un período.
+        Reasigna un empleado de un proyecto a otro.
         
         Args:
-            employee_ids: Lista de IDs de empleados del equipo
-            start_date: Fecha de inicio del período
-            end_date: Fecha de fin del período
+            assignment_id: ID de la asignación actual
+            new_project_id: ID del nuevo proyecto
+            reassignment_data: Datos opcionales para la reasignación
             
         Returns:
-            Dict con análisis de capacidad:
-            - team_size: Número de miembros del equipo
-            - period_days: Días en el período analizado
-            - total_theoretical_capacity: Capacidad teórica total (horas)
-            - current_allocation: Asignación actual total (horas)
-            - available_capacity: Capacidad disponible (horas)
-            - utilization_rate: Tasa de utilización actual (0.0-1.0)
-            - capacity_by_employee: Capacidad detallada por empleado
-            - peak_utilization_periods: Períodos de mayor utilización
-            - underutilized_periods: Períodos de baja utilización
-            - capacity_recommendations: Recomendaciones de capacidad
+            ProjectAssignment: La asignación actualizada
             
         Raises:
-            ValidationError: Si los parámetros no son válidos
-            RepositoryError: Si hay errores en la consulta
+            RepositoryError: Error al acceder a los datos
+            ValidationError: Parámetros de entrada inválidos
+            BusinessLogicError: Error en la lógica de reasignación
         """
         pass
     
     @abstractmethod
-    async def balance_workload_across_team(
-        self, 
-        project_id: int, 
-        target_balance_score: float = 0.8
+    async def calculate_employee_utilization(
+        self,
+        employee_id: int,
+        date_range: Optional[Dict[str, date]] = None
     ) -> Dict[str, Any]:
         """
-        Analiza y propone balanceado de carga de trabajo en el equipo.
+        Calcula la utilización de un empleado en un rango de fechas.
         
         Args:
-            project_id: ID del proyecto a balancear
-            target_balance_score: Puntuación objetivo de balance (0.0-1.0)
+            employee_id: ID del empleado
+            date_range: Rango de fechas opcional (start_date, end_date)
             
         Returns:
-            Dict con análisis de balanceado:
-            - project_id: ID del proyecto
-            - current_balance_score: Puntuación actual de balance (0.0-1.0)
-            - target_balance_score: Puntuación objetivo
-            - workload_distribution: Distribución actual de carga por empleado
-            - imbalance_indicators: Indicadores de desbalance
-            - rebalancing_suggestions: Sugerencias de rebalanceado
-            - workload_adjustments: Ajustes específicos por empleado
-            - expected_balance_improvement: Mejora esperada en balance
-            - implementation_steps: Pasos para implementar el balanceado
-            - risk_assessment: Evaluación de riesgos del rebalanceado
+            Dict con métricas de utilización del empleado:
+            - employee_id: ID del empleado
+            - period: Período analizado
+            - total_assignments: Número total de asignaciones
+            - active_assignments: Número de asignaciones activas
+            - total_allocation_percentage: Porcentaje total de asignación
+            - utilization_status: Estado de utilización (underutilized, optimal, overallocated)
+            - assignments_detail: Detalle de asignaciones por proyecto
+            - recommendations: Recomendaciones basadas en utilización
             
         Raises:
-            ValidationError: Si los parámetros no son válidos
-            RepositoryError: Si hay errores en la consulta
+            RepositoryError: Error al acceder a los datos
+            ValidationError: Parámetros de entrada inválidos
+            BusinessLogicError: Error en el cálculo de utilización
         """
         pass

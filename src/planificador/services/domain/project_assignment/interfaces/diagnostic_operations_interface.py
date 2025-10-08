@@ -8,7 +8,7 @@ de salud y análisis de integridad del sistema de asignaciones.
 """
 
 from abc import ABC, abstractmethod
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 
 
 class IDiagnosticOperations(ABC):
@@ -24,9 +24,17 @@ class IDiagnosticOperations(ABC):
     # ============================================================================
     
     @abstractmethod
-    async def get_system_health_status(self) -> Dict[str, Any]:
+    async def get_system_health_status(
+        self, 
+        include_performance_metrics: bool = True,
+        include_data_quality_checks: bool = True
+    ) -> Dict[str, Any]:
         """
         Diagnóstico completo de salud del sistema de asignaciones.
+        
+        Args:
+            include_performance_metrics: Si incluir métricas de rendimiento
+            include_data_quality_checks: Si incluir verificaciones de calidad de datos
         
         Returns:
             Dict con estado de salud del sistema:
@@ -51,9 +59,17 @@ class IDiagnosticOperations(ABC):
         pass
     
     @abstractmethod
-    async def run_data_integrity_audit(self) -> Dict[str, Any]:
+    async def run_data_integrity_audit(
+        self, 
+        fix_issues: bool = False,
+        audit_scope: Optional[str] = None
+    ) -> Dict[str, Any]:
         """
         Auditoría completa de integridad de datos de asignaciones.
+        
+        Args:
+            fix_issues: Si intentar corregir automáticamente los problemas encontrados
+            audit_scope: Alcance de la auditoría ('full', 'assignments', 'relationships')
         
         Returns:
             Dict con resultado de auditoría:

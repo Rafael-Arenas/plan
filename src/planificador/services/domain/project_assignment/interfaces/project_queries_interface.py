@@ -91,12 +91,17 @@ class IProjectQueries(ABC):
         pass
     
     @abstractmethod
-    async def get_project_assignment_timeline(self, project_id: int) -> Dict[str, Any]:
+    async def get_project_assignment_timeline(
+        self, 
+        project_id: int,
+        include_milestones: bool = True
+    ) -> Dict[str, Any]:
         """
         Genera una línea de tiempo visual de las asignaciones del proyecto.
         
         Args:
             project_id: ID del proyecto
+            include_milestones: Si incluir hitos en la línea de tiempo
             
         Returns:
             Dict con línea de tiempo:
