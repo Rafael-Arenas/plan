@@ -1,30 +1,19 @@
-# src/planificador/services/domain/project_assignment/modules/project_queries.py
-
 """
-Módulo de Consultas de Proyectos para Asignaciones de Proyecto
+Módulo de consultas de proyectos para asignaciones de proyecto.
 
-Implementa consultas especializadas centradas en proyectos,
-incluyendo análisis de equipos, distribución de recursos,
-líneas de tiempo y métricas de proyecto.
+Este módulo implementa la interfaz IProjectQueries proporcionando
+funcionalidades para consultas centradas en proyectos, incluyendo
+análisis de equipos, recursos y planificación temporal.
 """
 
-from typing import List, Optional, Dict, Any
-from datetime import date
-from decimal import Decimal
-from loguru import logger
-from collections import defaultdict
-import statistics
+from typing import Dict, List, Any, Optional
 import pendulum
+from loguru import logger
 
-from planificador.schemas.assignment.assignment import ProjectAssignment
-from planificador.schemas.assignment.advanced_schemas import (
-    ProjectTeamSummarySchema,
-    ProjectResourceAllocationSchema,
-    ProjectTimelineSchema
-)
+from ..interfaces.project_queries_interface import IProjectQueries
 from planificador.repositories.project_assignment import ProjectAssignmentRepositoryFacade
-from planificador.exceptions import RepositoryError, ValidationError, NotFoundError
-from ..interfaces import IProjectQueries
+from planificador.models.project_assignment import ProjectAssignment
+from planificador.exceptions import RepositoryError, ValidationError
 
 
 class ProjectQueries(IProjectQueries):
@@ -38,60 +27,54 @@ class ProjectQueries(IProjectQueries):
     
     def __init__(self, repository_facade: ProjectAssignmentRepositoryFacade):
         """
-        Inicializa el módulo de consultas de proyectos.
+        Inicializa las consultas de proyectos.
         
         Args:
-            repository_facade: Facade del repositorio de asignaciones
+            repository_facade: Fachada del repositorio para acceso a datos
         """
         self._repository = repository_facade
-        self._logger = logger.bind(module="project_assignment_project_queries")
+        self._logger = logger.bind(module="project_queries")
     
-    async def get_assignments_by_project(
-        self, 
-        project_id: int, 
-        include_inactive: bool = True
-    ) -> List[ProjectAssignment]:
+    async def get_assignments_by_project(self, project_id: int) -> List[ProjectAssignment]:
         """
         Obtiene todas las asignaciones de un proyecto específico.
         
         Args:
             project_id: ID del proyecto
-            include_inactive: Si incluir asignaciones inactivas
             
         Returns:
-            List[ProjectAssignment]: Lista de asignaciones del proyecto
+            Lista de asignaciones del proyecto
             
         Raises:
-            RepositoryError: Si hay errores en la base de datos
-            ValidationError: Si el ID del proyecto es inválido
+            ValidationError: Si el project_id es inválido
+            RepositoryError: Si hay error al acceder a los datos
         """
-        self._logger.debug(f"Obteniendo asignaciones para proyecto {project_id}")
-        
-        # Validar entrada
-        self._validate_project_id(project_id)
-        
         try:
-            # Obtener asignaciones del proyecto
-            assignments = await self._repository.get_assignments_by_project(
-                project_id=project_id
-            )
+            # Validar parámetros
+            if not isinstance(project_id, int) or project_id <= 0:
+                raise ValidationError(
+                    message="ID de proyecto inválido",
+                    field="project_id",
+                    value=project_id
+                )
             
-            # Filtrar por estado si es necesario
-            if not include_inactive:
-                assignments = [a for a in assignments if a.is_active]
+            self._logger.info(f"Obteniendo asignaciones para proyecto {project_id}")
+            
+            # Obtener asignaciones del proyecto
+            assignments = await self._repository.get_assignments_by_project(project_id)
             
             self._logger.info(
-                f"Obtenidas {len(assignments)} asignaciones para proyecto {project_id}"
+                f"Encontradas {len(assignments)} asignaciones para proyecto {project_id}"
             )
             
             return assignments
             
+        except ValidationError:
+            raise
         except Exception as e:
-            self._logger.error(f"Error obteniendo asignaciones del proyecto {project_id}: {e}")
-            if isinstance(e, (RepositoryError, ValidationError)):
-                raise
+            self._logger.error(f"Error al obtener asignaciones del proyecto {project_id}: {e}")
             raise RepositoryError(
-                message=f"Error inesperado obteniendo asignaciones del proyecto: {e}",
+                message=f"Error al obtener asignaciones del proyecto: {e}",
                 operation="get_assignments_by_project",
                 entity_type="ProjectAssignment",
                 entity_id=project_id,
@@ -106,67 +89,75 @@ class ProjectQueries(IProjectQueries):
             project_id: ID del proyecto
             
         Returns:
-            Dict[str, Any]: Resumen del equipo del proyecto
+            Diccionario con resumen del equipo del proyecto
             
         Raises:
-            NotFoundError: Si el proyecto no existe
-            RepositoryError: Si hay errores en la base de datos
+            ValidationError: Si el project_id es inválido
+            RepositoryError: Si hay error al acceder a los datos
         """
-        self._logger.debug(f"Generando resumen del equipo para proyecto {project_id}")
-        
         try:
-            # Obtener asignaciones activas del proyecto
-            assignments = await self._repository.get_assignments_by_project(
-                project_id=project_id,
-                active_only=True
-            )
+            # Validar parámetros
+            if not isinstance(project_id, int) or project_id <= 0:
+                raise ValidationError(
+                    message="ID de proyecto inválido",
+                    field="project_id",
+                    value=project_id
+                )
+            
+            self._logger.info(f"Generando resumen de equipo para proyecto {project_id}")
+            
+            # Obtener asignaciones del proyecto
+            assignments = await self._repository.get_assignments_by_project(project_id)
             
             if not assignments:
-                # Verificar si el proyecto existe
-                project_exists = await self._repository.project_exists(project_id)
-                if not project_exists:
-                    raise NotFoundError(
-                        entity_type="Project",
-                        entity_id=project_id,
-                        message=f"Proyecto con ID {project_id} no encontrado"
-                    )
-            
-            # Obtener información del proyecto
-            project_info = await self._repository.get_project_basic_info(project_id)
-            project_name = project_info.get("name", f"Proyecto {project_id}")
+                return {
+                    "project_id": project_id,
+                    "team_size": 0,
+                    "active_members": 0,
+                    "roles_distribution": {},
+                    "allocation_summary": {
+                        "total_allocation": 0.0,
+                        "average_allocation": 0.0,
+                        "max_allocation": 0.0,
+                        "min_allocation": 0.0
+                    },
+                    "timeline": {
+                        "earliest_start": None,
+                        "latest_end": None,
+                        "project_duration_days": 0
+                    },
+                    "team_members": []
+                }
             
             # Calcular métricas del equipo
-            team_summary = await self._calculate_team_metrics(assignments, project_id, project_name)
+            team_metrics = await self._calculate_team_metrics(assignments)
             
-            # Convertir a diccionario para cumplir con la interfaz
-            result = {
-                "project_id": team_summary.project_id,
-                "project_name": team_summary.project_name,
-                "total_members": team_summary.total_team_members,
-                "active_assignments": team_summary.active_assignments,
-                "total_allocation": float(team_summary.total_allocation_percentage),
-                "average_allocation": float(team_summary.average_allocation_per_member),
-                "roles_distribution": team_summary.roles_distribution,
-                "team_capacity_status": team_summary.team_capacity_status,
-                "team_composition": team_summary.team_members,
-                "project_timeline": team_summary.project_timeline
+            # Generar resumen completo
+            team_summary = {
+                "project_id": project_id,
+                "team_size": len(assignments),
+                "active_members": len([a for a in assignments if a.is_active]),
+                "roles_distribution": team_metrics["roles_distribution"],
+                "allocation_summary": team_metrics["allocation_summary"],
+                "timeline": team_metrics["timeline"],
+                "team_members": team_metrics["team_members"]
             }
             
             self._logger.info(
-                f"Resumen del equipo generado para proyecto {project_id}: "
-                f"{result['total_members']} miembros"
+                f"Resumen de equipo generado para proyecto {project_id} - "
+                f"Tamaño: {team_summary['team_size']}, Activos: {team_summary['active_members']}"
             )
             
-            return result
+            return team_summary
             
+        except ValidationError:
+            raise
         except Exception as e:
-            self._logger.error(f"Error generando resumen del equipo para proyecto {project_id}: {e}")
-            if isinstance(e, (RepositoryError, ValidationError, NotFoundError)):
-                raise
+            self._logger.error(f"Error al generar resumen de equipo para proyecto {project_id}: {e}")
             raise RepositoryError(
-                message=f"Error inesperado generando resumen del equipo: {e}",
+                message=f"Error al generar resumen de equipo: {e}",
                 operation="get_project_team_summary",
-                entity_type="Project",
+                entity_type="ProjectTeam",
                 entity_id=project_id,
                 original_error=e
             )
@@ -179,670 +170,392 @@ class ProjectQueries(IProjectQueries):
             project_id: ID del proyecto
             
         Returns:
-            Dict[str, Any]: Distribución de recursos del proyecto con las siguientes claves:
-                - project_id: ID del proyecto
-                - total_resources: Número total de recursos asignados
-                - allocation_by_role: Distribución de horas por rol
-                - allocation_by_period: Distribución temporal de recursos
-                - resource_utilization: Utilización de recursos por empleado
-                - peak_allocation_periods: Períodos de mayor asignación
-                - resource_gaps: Períodos con baja asignación de recursos
+            Diccionario con distribución de recursos del proyecto
             
         Raises:
-            NotFoundError: Si el proyecto no existe
-            RepositoryError: Si hay errores en la base de datos
+            ValidationError: Si el project_id es inválido
+            RepositoryError: Si hay error al acceder a los datos
         """
-        self._logger.debug(f"Calculando distribución de recursos para proyecto {project_id}")
-        
         try:
-            # Obtener todas las asignaciones del proyecto (activas e inactivas)
-            assignments = await self._repository.get_assignments_by_project(
-                project_id=project_id,
-                include_inactive=True
-            )
+            # Validar parámetros
+            if not isinstance(project_id, int) or project_id <= 0:
+                raise ValidationError(
+                    message="ID de proyecto inválido",
+                    field="project_id",
+                    value=project_id
+                )
+            
+            self._logger.info(f"Calculando distribución de recursos para proyecto {project_id}")
+            
+            # Obtener asignaciones del proyecto
+            assignments = await self._repository.get_assignments_by_project(project_id)
             
             if not assignments:
-                # Verificar si el proyecto existe
-                project_exists = await self._repository.project_exists(project_id)
-                if not project_exists:
-                    raise NotFoundError(
-                        entity_type="Project",
-                        entity_id=project_id,
-                        message=f"Proyecto con ID {project_id} no encontrado"
-                    )
-            
-            # Obtener información del proyecto
-            project_info = await self._repository.get_project_basic_info(project_id)
-            project_name = project_info.get("name", f"Proyecto {project_id}")
+                return {
+                    "project_id": project_id,
+                    "total_resources": 0,
+                    "resource_distribution": {
+                        "by_role": {},
+                        "by_allocation_level": {},
+                        "by_time_period": {}
+                    },
+                    "utilization_metrics": {
+                        "total_allocated_percentage": 0.0,
+                        "average_allocation_per_member": 0.0,
+                        "peak_utilization_period": None,
+                        "resource_efficiency_score": 0.0
+                    },
+                    "recommendations": []
+                }
             
             # Calcular distribución de recursos
-            resource_allocation = await self._calculate_resource_distribution(
-                assignments, project_id, project_name
-            )
+            resource_distribution = await self._calculate_resource_distribution(assignments)
             
-            self._logger.info(
-                f"Distribución de recursos calculada para proyecto {project_id}: "
-                f"{resource_allocation.total_allocated_hours_per_day} horas/día totales"
-            )
-            
-            # Convertir el schema a diccionario según la interfaz
-            return {
-                "project_id": resource_allocation.project_id,
-                "project_name": resource_allocation.project_name,
+            # Generar análisis completo
+            resource_allocation = {
+                "project_id": project_id,
                 "total_resources": len(assignments),
-                "total_allocation": float(resource_allocation.total_allocation_percentage),
-                "resource_distribution": resource_allocation.resource_distribution_by_role,
-                "allocation_by_role": resource_allocation.resource_distribution_by_role,
-                "allocation_by_period": resource_allocation.resource_distribution_by_time,
-                "resource_utilization": resource_allocation.capacity_analysis,
-                "peak_allocation_periods": resource_allocation.resource_distribution_by_time,
-                "resource_gaps": [],  # Se puede calcular basado en períodos de baja asignación
-                "efficiency_metrics": resource_allocation.efficiency_metrics,
-                "total_allocated_hours_per_day": float(resource_allocation.total_allocated_hours_per_day)
+                "resource_distribution": resource_distribution["distribution"],
+                "utilization_metrics": resource_distribution["utilization_metrics"],
+                "recommendations": resource_distribution["recommendations"]
             }
             
+            self._logger.info(
+                f"Distribución de recursos calculada para proyecto {project_id} - "
+                f"Total recursos: {resource_allocation['total_resources']}"
+            )
+            
+            return resource_allocation
+            
+        except ValidationError:
+            raise
         except Exception as e:
-            self._logger.error(f"Error calculando distribución de recursos para proyecto {project_id}: {e}")
-            if isinstance(e, (RepositoryError, ValidationError, NotFoundError)):
-                raise
+            self._logger.error(f"Error al calcular distribución de recursos para proyecto {project_id}: {e}")
             raise RepositoryError(
-                message=f"Error inesperado calculando distribución de recursos: {e}",
+                message=f"Error al calcular distribución de recursos: {e}",
                 operation="get_project_resource_allocation",
-                entity_type="Project",
+                entity_type="ProjectResourceAllocation",
                 entity_id=project_id,
                 original_error=e
             )
     
     async def get_project_assignment_timeline(
         self, 
-        project_id: int, 
-        start_date: Optional[pendulum.Date] = None,
-        end_date: Optional[pendulum.Date] = None
+        project_id: int,
+        include_milestones: bool = True
     ) -> Dict[str, Any]:
         """
         Genera una línea de tiempo visual de las asignaciones del proyecto.
         
         Args:
             project_id: ID del proyecto
-            start_date: Fecha de inicio opcional para filtrar asignaciones
-            end_date: Fecha de fin opcional para filtrar asignaciones
+            include_milestones: Si incluir hitos importantes en la línea de tiempo
             
         Returns:
-            Dict[str, Any]: Diccionario con línea de tiempo del proyecto conteniendo:
-                - project_id: ID del proyecto
-                - project_start_date: Fecha de inicio del proyecto
-                - project_end_date: Fecha de fin del proyecto
-                - timeline_events: Lista de eventos de asignación ordenados
-                - concurrent_assignments: Asignaciones concurrentes por período
-                - resource_peaks: Picos de recursos en la línea de tiempo
-                - milestone_assignments: Asignaciones asociadas a hitos
-                - timeline_visualization_data: Datos para visualización gráfica
+            Diccionario con línea de tiempo del proyecto
             
         Raises:
-            NotFoundError: Si el proyecto no existe
-            RepositoryError: Si hay errores en la base de datos
-            ValidationError: Si el rango de fechas es inválido
+            ValidationError: Si el project_id es inválido
+            RepositoryError: Si hay error al acceder a los datos
         """
-        self._logger.debug(f"Generando línea de tiempo para proyecto {project_id}")
-        
-        # Validar rango de fechas si se proporcionan ambas
-        if start_date and end_date:
-            self._validate_date_range(start_date, end_date)
-        
         try:
-            # Obtener todas las asignaciones del proyecto
-            assignments = await self._repository.get_assignments_by_project(
-                project_id=project_id,
-                include_inactive=True
-            )
+            # Validar parámetros
+            if not isinstance(project_id, int) or project_id <= 0:
+                raise ValidationError(
+                    message="ID de proyecto inválido",
+                    field="project_id",
+                    value=project_id
+                )
+            
+            self._logger.info(f"Generando línea de tiempo para proyecto {project_id}")
+            
+            # Obtener asignaciones del proyecto
+            assignments = await self._repository.get_assignments_by_project(project_id)
             
             if not assignments:
-                # Verificar si el proyecto existe
-                project_exists = await self._repository.project_exists(project_id)
-                if not project_exists:
-                    raise NotFoundError(
-                        entity_type="Project",
-                        entity_id=project_id,
-                        message=f"Proyecto con ID {project_id} no encontrado"
-                    )
-            
-            # Obtener información del proyecto
-            project_info = await self._repository.get_project_basic_info(project_id)
-            project_name = project_info.get("name", f"Proyecto {project_id}")
+                return {
+                    "project_id": project_id,
+                    "timeline_data": [],
+                    "project_span": {
+                        "start_date": None,
+                        "end_date": None,
+                        "duration_days": 0
+                    },
+                    "milestones": [],
+                    "resource_peaks": [],
+                    "timeline_visualization": {
+                        "gantt_data": [],
+                        "resource_chart_data": []
+                    }
+                }
             
             # Generar línea de tiempo
-            timeline = await self._generate_project_timeline(
-                assignments, project_id, project_name
-            )
+            timeline_data = await self._generate_project_timeline(assignments, include_milestones)
             
             self._logger.info(
-                f"Línea de tiempo generada para proyecto {project_id}: "
-                f"{len(timeline.timeline_events)} eventos"
+                f"Línea de tiempo generada para proyecto {project_id} - "
+                f"Duración: {timeline_data['project_span']['duration_days']} días"
             )
             
-            # Convertir el esquema a diccionario para cumplir con la interfaz
-            return {
-                "project_id": timeline.project_id,
-                "project_name": timeline.project_name,
-                "project_start_date": timeline.project_start_date,
-                "project_end_date": timeline.project_end_date,
-                "timeline_events": timeline.timeline_events,
-                "phases": timeline.phases,
-                "milestones": timeline.milestones,
-                "resource_timeline": timeline.resource_timeline,
-                "critical_path": timeline.critical_path,
-                # Campos adicionales requeridos por la interfaz
-                "concurrent_assignments": [],  # Se puede implementar más adelante
-                "resource_peaks": [],  # Se puede implementar más adelante
-                "milestone_assignments": [],  # Se puede implementar más adelante
-                "timeline_visualization_data": {}  # Se puede implementar más adelante
-            }
+            return timeline_data
             
+        except ValidationError:
+            raise
         except Exception as e:
-            self._logger.error(f"Error generando línea de tiempo para proyecto {project_id}: {e}")
-            if isinstance(e, (RepositoryError, ValidationError, NotFoundError)):
-                raise
+            self._logger.error(f"Error al generar línea de tiempo para proyecto {project_id}: {e}")
             raise RepositoryError(
-                message=f"Error inesperado generando línea de tiempo: {e}",
+                message=f"Error al generar línea de tiempo: {e}",
                 operation="get_project_assignment_timeline",
-                entity_type="Project",
+                entity_type="ProjectTimeline",
                 entity_id=project_id,
                 original_error=e
             )
     
     # ============================================================================
-    # MÉTODOS PRIVADOS DE CÁLCULO
+    # MÉTODOS PRIVADOS DE APOYO
     # ============================================================================
     
-    async def _calculate_team_metrics(
-        self, 
-        assignments: List[ProjectAssignment], 
-        project_id: int, 
-        project_name: str
-    ) -> ProjectTeamSummarySchema:
-        """Calcula las métricas del equipo del proyecto."""
-        
-        # Agrupar por empleado
-        employees = {}
-        roles_count = defaultdict(int)
-        total_allocation = Decimal('0')
-        
-        for assignment in assignments:
-            employee_id = assignment.employee_id
-            
-            if employee_id not in employees:
-                # Obtener información del empleado
-                employee_info = await self._repository.get_employee_basic_info(employee_id)
-                employees[employee_id] = {
-                    "employee_id": employee_id,
-                    "employee_name": employee_info.get("name", f"Empleado {employee_id}"),
-                    "assignments": [],
-                    "total_allocation": Decimal('0'),
-                    "total_hours": Decimal('0'),
-                    "roles": set()
-                }
-            
-            employees[employee_id]["assignments"].append({
-                "assignment_id": assignment.id,
-                "role": assignment.role_in_project,
-                "allocation_percentage": assignment.percentage_allocation or Decimal('0'),
-                "hours_per_day": assignment.allocated_hours_per_day or Decimal('0'),
-                "start_date": assignment.start_date,
-                "end_date": assignment.end_date,
-                "is_active": assignment.is_active
-            })
-            
-            employees[employee_id]["total_allocation"] += assignment.percentage_allocation or Decimal('0')
-            employees[employee_id]["total_hours"] += assignment.allocated_hours_per_day or Decimal('0')
-            
-            if assignment.role_in_project:
-                employees[employee_id]["roles"].add(assignment.role_in_project)
-                roles_count[assignment.role_in_project] += 1
-            
-            total_allocation += assignment.percentage_allocation or Decimal('0')
-        
-        # Convertir sets a listas para serialización
+    async def _calculate_team_metrics(self, assignments: List[ProjectAssignment]) -> Dict[str, Any]:
+        """Calcula métricas del equipo del proyecto."""
+        roles_distribution = {}
+        allocations = []
+        start_dates = []
+        end_dates = []
         team_members = []
-        for emp_data in employees.values():
-            emp_data["roles"] = list(emp_data["roles"])
-            team_members.append(emp_data)
-        
-        # Determinar estado de capacidad del equipo
-        avg_allocation = total_allocation / len(employees) if employees else Decimal('0')
-        if avg_allocation < 60:
-            capacity_status = "underutilized"
-        elif avg_allocation > 90:
-            capacity_status = "overallocated"
-        else:
-            capacity_status = "optimal"
-        
-        # Calcular fechas del proyecto
-        project_dates = self._calculate_project_dates(assignments)
-        
-        return ProjectTeamSummarySchema(
-            project_id=project_id,
-            project_name=project_name,
-            total_team_members=len(employees),
-            active_assignments=len([a for a in assignments if a.is_active]),
-            total_allocation_percentage=total_allocation,
-            average_allocation_per_member=avg_allocation,
-            roles_distribution=dict(roles_count),
-            team_capacity_status=capacity_status,
-            team_members=team_members,
-            project_timeline=project_dates
-        )
-    
-    async def _calculate_resource_distribution(
-        self, 
-        assignments: List[ProjectAssignment], 
-        project_id: int, 
-        project_name: str
-    ) -> ProjectResourceAllocationSchema:
-        """Calcula la distribución de recursos del proyecto."""
-        
-        total_hours = Decimal('0')
-        total_percentage = Decimal('0')
-        
-        # Distribución por rol
-        role_distribution = defaultdict(lambda: {
-            "count": 0,
-            "total_hours": Decimal('0'),
-            "total_percentage": Decimal('0'),
-            "employees": []
-        })
-        
-        # Distribución temporal
-        time_distribution = []
         
         for assignment in assignments:
-            hours = assignment.allocated_hours_per_day or Decimal('0')
-            percentage = assignment.percentage_allocation or Decimal('0')
+            # Distribución por roles
+            role = assignment.role or "Sin rol"
+            roles_distribution[role] = roles_distribution.get(role, 0) + 1
             
-            total_hours += hours
-            total_percentage += percentage
+            # Recopilar asignaciones para cálculos
+            if assignment.allocation_percentage:
+                allocations.append(assignment.allocation_percentage)
             
-            # Por rol
-            role = assignment.role_in_project or "Sin rol definido"
-            role_distribution[role]["count"] += 1
-            role_distribution[role]["total_hours"] += hours
-            role_distribution[role]["total_percentage"] += percentage
-            role_distribution[role]["employees"].append({
-                "employee_id": assignment.employee_id,
-                "assignment_id": assignment.id,
-                "hours": float(hours),
-                "percentage": float(percentage)
-            })
+            # Fechas para timeline
+            if assignment.start_date:
+                start_dates.append(assignment.start_date)
+            if assignment.end_date:
+                end_dates.append(assignment.end_date)
             
-            # Distribución temporal
-            time_distribution.append({
+            # Información de miembros del equipo
+            team_members.append({
                 "assignment_id": assignment.id,
                 "employee_id": assignment.employee_id,
-                "role": role,
-                "start_date": assignment.start_date,
-                "end_date": assignment.end_date,
-                "hours_per_day": float(hours),
-                "percentage": float(percentage),
+                "role": assignment.role,
+                "allocation_percentage": assignment.allocation_percentage,
+                "start_date": assignment.start_date.isoformat() if assignment.start_date else None,
+                "end_date": assignment.end_date.isoformat() if assignment.end_date else None,
                 "is_active": assignment.is_active
             })
         
-        # Convertir defaultdict a dict regular
-        role_dist_dict = {}
-        for role, data in role_distribution.items():
-            role_dist_dict[role] = {
-                "count": data["count"],
-                "total_hours": float(data["total_hours"]),
-                "total_percentage": float(data["total_percentage"]),
-                "average_hours_per_employee": float(data["total_hours"] / data["count"]) if data["count"] > 0 else 0,
-                "employees": data["employees"]
-            }
-        
-        # Análisis de capacidad
-        capacity_analysis = {
-            "total_assignments": len(assignments),
-            "active_assignments": len([a for a in assignments if a.is_active]),
-            "unique_employees": len(set(a.employee_id for a in assignments)),
-            "unique_roles": len(role_distribution),
-            "average_allocation_per_assignment": float(total_percentage / len(assignments)) if assignments else 0,
-            "resource_utilization_score": min(100, float(total_percentage / len(assignments)) * 1.2) if assignments else 0
+        # Calcular métricas de asignación
+        allocation_summary = {
+            "total_allocation": sum(allocations),
+            "average_allocation": sum(allocations) / len(allocations) if allocations else 0.0,
+            "max_allocation": max(allocations) if allocations else 0.0,
+            "min_allocation": min(allocations) if allocations else 0.0
         }
         
-        # Métricas de eficiencia
-        efficiency_metrics = {
-            "role_diversity_index": len(role_distribution) / len(assignments) if assignments else 0,
-            "allocation_balance_score": self._calculate_allocation_balance(assignments),
-            "resource_optimization_score": self._calculate_resource_optimization(role_dist_dict)
+        # Calcular timeline
+        timeline = {
+            "earliest_start": min(start_dates).isoformat() if start_dates else None,
+            "latest_end": max(end_dates).isoformat() if end_dates else None,
+            "project_duration_days": 0
         }
         
-        return ProjectResourceAllocationSchema(
-            project_id=project_id,
-            project_name=project_name,
-            total_allocated_hours_per_day=total_hours,
-            total_allocation_percentage=total_percentage,
-            resource_distribution_by_role=role_dist_dict,
-            resource_distribution_by_time=time_distribution,
-            capacity_analysis=capacity_analysis,
-            efficiency_metrics=efficiency_metrics
-        )
+        if start_dates and end_dates:
+            duration = max(end_dates) - min(start_dates)
+            timeline["project_duration_days"] = duration.days
+        
+        return {
+            "roles_distribution": roles_distribution,
+            "allocation_summary": allocation_summary,
+            "timeline": timeline,
+            "team_members": team_members
+        }
+    
+    async def _calculate_resource_distribution(self, assignments: List[ProjectAssignment]) -> Dict[str, Any]:
+        """Calcula la distribución de recursos del proyecto."""
+        # Distribución por rol
+        by_role = {}
+        by_allocation_level = {"Low (0-50%)": 0, "Medium (51-80%)": 0, "High (81-100%)": 0}
+        by_time_period = {}
+        
+        total_allocation = 0.0
+        allocations = []
+        
+        for assignment in assignments:
+            # Por rol
+            role = assignment.role or "Sin rol"
+            if role not in by_role:
+                by_role[role] = {"count": 0, "total_allocation": 0.0}
+            by_role[role]["count"] += 1
+            by_role[role]["total_allocation"] += assignment.allocation_percentage or 0.0
+            
+            # Por nivel de asignación
+            allocation = assignment.allocation_percentage or 0.0
+            allocations.append(allocation)
+            total_allocation += allocation
+            
+            if allocation <= 50:
+                by_allocation_level["Low (0-50%)"] += 1
+            elif allocation <= 80:
+                by_allocation_level["Medium (51-80%)"] += 1
+            else:
+                by_allocation_level["High (81-100%)"] += 1
+            
+            # Por período de tiempo (agrupado por mes)
+            if assignment.start_date:
+                month_key = assignment.start_date.strftime("%Y-%m")
+                by_time_period[month_key] = by_time_period.get(month_key, 0) + 1
+        
+        # Métricas de utilización
+        utilization_metrics = {
+            "total_allocated_percentage": total_allocation,
+            "average_allocation_per_member": total_allocation / len(assignments) if assignments else 0.0,
+            "peak_utilization_period": max(by_time_period.items(), key=lambda x: x[1])[0] if by_time_period else None,
+            "resource_efficiency_score": min(100.0, (total_allocation / (len(assignments) * 100)) * 100) if assignments else 0.0
+        }
+        
+        # Recomendaciones
+        recommendations = []
+        if utilization_metrics["average_allocation_per_member"] > 90:
+            recommendations.append("Considerar redistribuir carga de trabajo - alta utilización promedio")
+        if by_allocation_level["High (81-100%)"] > len(assignments) * 0.7:
+            recommendations.append("Muchos recursos con alta asignación - riesgo de sobrecarga")
+        if len(by_role) == 1:
+            recommendations.append("Considerar diversificar roles en el equipo")
+        
+        return {
+            "distribution": {
+                "by_role": by_role,
+                "by_allocation_level": by_allocation_level,
+                "by_time_period": by_time_period
+            },
+            "utilization_metrics": utilization_metrics,
+            "recommendations": recommendations
+        }
     
     async def _generate_project_timeline(
         self, 
         assignments: List[ProjectAssignment], 
-        project_id: int, 
-        project_name: str
-    ) -> ProjectTimelineSchema:
+        include_milestones: bool
+    ) -> Dict[str, Any]:
         """Genera la línea de tiempo del proyecto."""
+        timeline_data = []
+        milestones = []
+        resource_peaks = []
         
-        # Calcular fechas del proyecto
-        project_dates = self._calculate_project_dates(assignments)
+        # Ordenar asignaciones por fecha de inicio
+        sorted_assignments = sorted(
+            [a for a in assignments if a.start_date], 
+            key=lambda x: x.start_date
+        )
         
-        # Generar eventos de la línea de tiempo
-        timeline_events = []
-        for assignment in assignments:
-            # Evento de inicio
-            timeline_events.append({
-                "event_type": "assignment_start",
-                "date": assignment.start_date,
-                "employee_id": assignment.employee_id,
+        if not sorted_assignments:
+            return {
+                "project_id": assignments[0].project_id if assignments else None,
+                "timeline_data": [],
+                "project_span": {
+                    "start_date": None,
+                    "end_date": None,
+                    "duration_days": 0
+                },
+                "milestones": [],
+                "resource_peaks": [],
+                "timeline_visualization": {
+                    "gantt_data": [],
+                    "resource_chart_data": []
+                }
+            }
+        
+        # Calcular span del proyecto
+        project_start = min(a.start_date for a in sorted_assignments if a.start_date)
+        project_end = max(a.end_date for a in sorted_assignments if a.end_date)
+        
+        project_span = {
+            "start_date": project_start.isoformat(),
+            "end_date": project_end.isoformat() if project_end else None,
+            "duration_days": (project_end - project_start).days if project_end else 0
+        }
+        
+        # Generar datos de timeline
+        for assignment in sorted_assignments:
+            timeline_entry = {
                 "assignment_id": assignment.id,
-                "role": assignment.role_in_project,
-                "description": f"Inicio de asignación - {assignment.role_in_project or 'Sin rol'}",
-                "allocation_percentage": float(assignment.percentage_allocation or 0),
-                "hours_per_day": float(assignment.allocated_hours_per_day or 0)
-            })
+                "employee_id": assignment.employee_id,
+                "role": assignment.role,
+                "start_date": assignment.start_date.isoformat(),
+                "end_date": assignment.end_date.isoformat() if assignment.end_date else None,
+                "allocation_percentage": assignment.allocation_percentage,
+                "duration_days": (assignment.end_date - assignment.start_date).days if assignment.end_date else 0
+            }
+            timeline_data.append(timeline_entry)
+        
+        # Generar hitos si está habilitado
+        if include_milestones:
+            milestones = [
+                {
+                    "type": "project_start",
+                    "date": project_start.isoformat(),
+                    "description": "Inicio del proyecto"
+                }
+            ]
             
-            # Evento de fin (si existe)
-            if assignment.end_date:
-                timeline_events.append({
-                    "event_type": "assignment_end",
-                    "date": assignment.end_date,
-                    "employee_id": assignment.employee_id,
-                    "assignment_id": assignment.id,
-                    "role": assignment.role_in_project,
-                    "description": f"Fin de asignación - {assignment.role_in_project or 'Sin rol'}",
-                    "allocation_percentage": float(assignment.percentage_allocation or 0),
-                    "hours_per_day": float(assignment.allocated_hours_per_day or 0)
+            if project_end:
+                milestones.append({
+                    "type": "project_end",
+                    "date": project_end.isoformat(),
+                    "description": "Fin del proyecto"
+                })
+            
+            # Hito de pico de recursos (mes con más asignaciones activas)
+            monthly_counts = {}
+            for assignment in sorted_assignments:
+                month_key = assignment.start_date.strftime("%Y-%m")
+                monthly_counts[month_key] = monthly_counts.get(month_key, 0) + 1
+            
+            if monthly_counts:
+                peak_month = max(monthly_counts.items(), key=lambda x: x[1])
+                milestones.append({
+                    "type": "resource_peak",
+                    "date": f"{peak_month[0]}-01",
+                    "description": f"Pico de recursos ({peak_month[1]} asignaciones)"
                 })
         
-        # Ordenar eventos por fecha
-        timeline_events.sort(key=lambda x: x["date"])
+        # Datos para visualización
+        gantt_data = [
+            {
+                "task": f"Empleado {a.employee_id} - {a.role or 'Sin rol'}",
+                "start": a.start_date.isoformat(),
+                "end": a.end_date.isoformat() if a.end_date else project_end.isoformat(),
+                "allocation": a.allocation_percentage
+            }
+            for a in sorted_assignments
+        ]
         
-        # Generar fases del proyecto
-        phases = self._generate_project_phases(assignments)
-        
-        # Generar hitos
-        milestones = self._generate_project_milestones(assignments)
-        
-        # Generar línea de tiempo de recursos
-        resource_timeline = self._generate_resource_timeline(assignments)
-        
-        # Generar ruta crítica
-        critical_path = self._generate_critical_path(assignments)
-        
-        return ProjectTimelineSchema(
-            project_id=project_id,
-            project_name=project_name,
-            project_start_date=project_dates.get("start_date"),
-            project_end_date=project_dates.get("end_date"),
-            timeline_events=timeline_events,
-            phases=phases,
-            milestones=milestones,
-            resource_timeline=resource_timeline,
-            critical_path=critical_path
-        )
-    
-    def _calculate_project_dates(self, assignments: List[ProjectAssignment]) -> Dict[str, Any]:
-        """Calcula las fechas del proyecto basadas en las asignaciones."""
-        if not assignments:
-            return {"start_date": None, "end_date": None, "duration_days": 0}
-        
-        start_dates = [a.start_date for a in assignments]
-        end_dates = [a.end_date for a in assignments if a.end_date]
-        
-        project_start = min(start_dates)
-        project_end = max(end_dates) if end_dates else None
-        
-        duration = (project_end - project_start).days if project_end else None
+        resource_chart_data = []
+        current_date = project_start
+        while current_date <= (project_end or project_start):
+            active_count = sum(
+                1 for a in sorted_assignments 
+                if a.start_date <= current_date and (not a.end_date or a.end_date >= current_date)
+            )
+            resource_chart_data.append({
+                "date": current_date.isoformat(),
+                "active_resources": active_count
+            })
+            current_date = current_date.add(days=7)  # Datos semanales
         
         return {
-            "start_date": project_start,
-            "end_date": project_end,
-            "duration_days": duration,
-            "has_open_assignments": len(end_dates) < len(assignments)
+            "project_id": assignments[0].project_id,
+            "timeline_data": timeline_data,
+            "project_span": project_span,
+            "milestones": milestones,
+            "resource_peaks": resource_peaks,
+            "timeline_visualization": {
+                "gantt_data": gantt_data,
+                "resource_chart_data": resource_chart_data
+            }
         }
-    
-    def _calculate_allocation_balance(self, assignments: List[ProjectAssignment]) -> float:
-        """Calcula el balance de asignación del proyecto."""
-        if not assignments:
-            return 0.0
-        
-        allocations = [float(a.percentage_allocation or 0) for a in assignments]
-        if not allocations:
-            return 0.0
-        
-        # Calcular desviación estándar como medida de balance
-        mean_allocation = statistics.mean(allocations)
-        if len(allocations) > 1:
-            std_dev = statistics.stdev(allocations)
-            # Convertir a score (menor desviación = mejor balance)
-            balance_score = max(0, 100 - (std_dev / mean_allocation * 100)) if mean_allocation > 0 else 0
-        else:
-            balance_score = 100.0
-        
-        return balance_score
-    
-    def _calculate_resource_optimization(self, role_distribution: Dict[str, Any]) -> float:
-        """Calcula el score de optimización de recursos."""
-        if not role_distribution:
-            return 0.0
-        
-        # Factores de optimización
-        role_count = len(role_distribution)
-        total_assignments = sum(data["count"] for data in role_distribution.values())
-        
-        # Score basado en diversidad de roles y distribución
-        diversity_score = min(100, role_count * 20)  # Máximo 5 roles diferentes
-        
-        # Score de distribución equilibrada
-        role_counts = [data["count"] for data in role_distribution.values()]
-        if len(role_counts) > 1:
-            distribution_score = self._calculate_allocation_balance(
-                [type('obj', (object,), {'percentage_allocation': count * 100 / total_assignments})() 
-                 for count in role_counts]
-            )
-        else:
-            distribution_score = 100.0
-        
-        return (diversity_score + distribution_score) / 2
-    
-    def _generate_project_phases(self, assignments: List[ProjectAssignment]) -> List[Dict[str, Any]]:
-        """Genera las fases del proyecto basadas en las asignaciones."""
-        # Agrupar asignaciones por períodos temporales
-        phases = []
-        
-        if not assignments:
-            return phases
-        
-        # Ordenar por fecha de inicio
-        sorted_assignments = sorted(assignments, key=lambda x: x.start_date)
-        
-        # Crear fases basadas en cambios significativos en el equipo
-        current_phase = {
-            "phase_name": "Fase Inicial",
-            "start_date": sorted_assignments[0].start_date,
-            "end_date": None,
-            "team_size": 0,
-            "assignments": []
-        }
-        
-        for assignment in sorted_assignments:
-            current_phase["assignments"].append({
-                "assignment_id": assignment.id,
-                "employee_id": assignment.employee_id,
-                "role": assignment.role_in_project
-            })
-        
-        # Simplificación: crear una fase única por ahora
-        if sorted_assignments:
-            end_dates = [a.end_date for a in sorted_assignments if a.end_date]
-            current_phase["end_date"] = max(end_dates) if end_dates else None
-            current_phase["team_size"] = len(set(a.employee_id for a in sorted_assignments))
-        
-        phases.append(current_phase)
-        
-        return phases
-    
-    def _generate_project_milestones(self, assignments: List[ProjectAssignment]) -> List[Dict[str, Any]]:
-        """Genera hitos del proyecto."""
-        milestones = []
-        
-        if not assignments:
-            return milestones
-        
-        # Hito de inicio del proyecto
-        start_date = min(a.start_date for a in assignments)
-        milestones.append({
-            "milestone_name": "Inicio del Proyecto",
-            "date": start_date,
-            "description": "Inicio de las primeras asignaciones del proyecto",
-            "milestone_type": "start"
-        })
-        
-        # Hito de máxima capacidad
-        active_assignments = [a for a in assignments if a.is_active]
-        if active_assignments:
-            milestones.append({
-                "milestone_name": "Máxima Capacidad",
-                "date": start_date,  # Simplificación
-                "description": f"Proyecto con {len(active_assignments)} asignaciones activas",
-                "milestone_type": "peak"
-            })
-        
-        # Hito de finalización (si hay fechas de fin)
-        end_dates = [a.end_date for a in assignments if a.end_date]
-        if end_dates:
-            end_date = max(end_dates)
-            milestones.append({
-                "milestone_name": "Finalización Planificada",
-                "date": end_date,
-                "description": "Finalización de las últimas asignaciones",
-                "milestone_type": "end"
-            })
-        
-        return milestones
-    
-    def _generate_resource_timeline(self, assignments: List[ProjectAssignment]) -> List[Dict[str, Any]]:
-        """Genera la línea de tiempo de recursos."""
-        resource_timeline = []
-        
-        # Agrupar por empleado y crear entradas de timeline
-        employee_assignments = defaultdict(list)
-        for assignment in assignments:
-            employee_assignments[assignment.employee_id].append(assignment)
-        
-        for employee_id, emp_assignments in employee_assignments.items():
-            for assignment in emp_assignments:
-                resource_timeline.append({
-                    "employee_id": employee_id,
-                    "assignment_id": assignment.id,
-                    "start_date": assignment.start_date,
-                    "end_date": assignment.end_date,
-                    "role": assignment.role_in_project,
-                    "allocation_percentage": float(assignment.percentage_allocation or 0),
-                    "hours_per_day": float(assignment.allocated_hours_per_day or 0),
-                    "is_active": assignment.is_active
-                })
-        
-        # Ordenar por fecha de inicio
-        resource_timeline.sort(key=lambda x: x["start_date"])
-        
-        return resource_timeline
-    
-    def _generate_critical_path(self, assignments: List[ProjectAssignment]) -> List[Dict[str, Any]]:
-        """Genera la ruta crítica del proyecto."""
-        critical_path = []
-        
-        if not assignments:
-            return critical_path
-        
-        # Simplificación: identificar asignaciones críticas por duración y rol
-        for assignment in assignments:
-            # Considerar críticas las asignaciones de larga duración o roles clave
-            duration = None
-            if assignment.end_date:
-                duration = (assignment.end_date - assignment.start_date).days
-            
-            is_critical = (
-                duration and duration > 30 or  # Asignaciones largas
-                assignment.percentage_allocation and assignment.percentage_allocation > 80 or  # Alta dedicación
-                assignment.role_in_project and any(keyword in assignment.role_in_project.lower() 
-                                                 for keyword in ['lead', 'manager', 'architect', 'senior'])
-            )
-            
-            if is_critical:
-                critical_path.append({
-                    "assignment_id": assignment.id,
-                    "employee_id": assignment.employee_id,
-                    "role": assignment.role_in_project,
-                    "start_date": assignment.start_date,
-                    "end_date": assignment.end_date,
-                    "duration_days": duration,
-                    "allocation_percentage": float(assignment.percentage_allocation or 0),
-                    "criticality_reason": self._determine_criticality_reason(assignment, duration)
-                })
-        
-        # Ordenar por fecha de inicio
-        critical_path.sort(key=lambda x: x["start_date"])
-        
-        return critical_path
-    
-    def _determine_criticality_reason(self, assignment: ProjectAssignment, duration: Optional[int]) -> str:
-        """Determina la razón de criticidad de una asignación."""
-        reasons = []
-        
-        if duration and duration > 30:
-            reasons.append("Larga duración")
-        
-        if assignment.percentage_allocation and assignment.percentage_allocation > 80:
-            reasons.append("Alta dedicación")
-        
-        if assignment.role_in_project:
-            role_lower = assignment.role_in_project.lower()
-            if any(keyword in role_lower for keyword in ['lead', 'manager', 'architect', 'senior']):
-                reasons.append("Rol clave")
-        
-        return ", ".join(reasons) if reasons else "Asignación crítica"
-    
-    def _validate_project_id(self, project_id: int) -> None:
-        """
-        Valida que el ID del proyecto sea válido.
-        
-        Args:
-            project_id: ID del proyecto a validar
-            
-        Raises:
-            ValidationError: Si el ID no es válido
-        """
-        if not isinstance(project_id, int) or project_id <= 0:
-            raise ValidationError(
-                message="ID de proyecto debe ser positivo",
-                field="project_id",
-                value=project_id
-            )
-    
-    def _validate_date_range(self, start_date, end_date) -> None:
-        """
-        Valida que el rango de fechas sea válido.
-        
-        Args:
-            start_date: Fecha de inicio
-            end_date: Fecha de fin
-            
-        Raises:
-            ValidationError: Si el rango de fechas no es válido
-        """
-        if start_date and end_date and start_date > end_date:
-            raise ValidationError(
-                message="La fecha de fin debe ser posterior a la fecha de inicio",
-                field="date_range",
-                value=f"{start_date} - {end_date}"
-            )
