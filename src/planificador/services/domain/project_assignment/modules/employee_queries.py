@@ -1,11 +1,18 @@
 # src/planificador/services/domain/project_assignment/modules/employee_queries.py
 
 """
-Módulo de Consultas de Empleados para Asignaciones de Proyecto
+Módulo de consultas centradas en empleados para el dominio de asignaciones de proyecto.
 
-Implementa consultas especializadas centradas en empleados,
-incluyendo análisis de carga de trabajo, historial de asignaciones
-y métricas de asignación actuales.
+Este módulo implementa las operaciones de consulta específicas para empleados,
+proporcionando funcionalidades para obtener información detallada sobre las
+asignaciones de empleados, su carga de trabajo, historial y asignación actual.
+
+Métodos implementados según PROJECT_ASSIGNMENT_DOMAIN_SERVICE_METHODS.md:
+- get_assignments_by_employee: Obtiene todas las asignaciones de un empleado
+- get_active_assignments_by_employee: Obtiene asignaciones activas de un empleado
+- get_employee_workload_summary: Genera resumen de carga de trabajo
+- get_employee_assignment_history: Obtiene historial cronológico de asignaciones
+- get_employee_current_allocation: Obtiene asignación actual detallada
 """
 
 from typing import List, Optional, Dict, Any
@@ -20,24 +27,22 @@ from ..interfaces import IEmployeeQueries
 
 class EmployeeQueries(IEmployeeQueries):
     """
-    Implementación de consultas centradas en empleados para asignaciones de proyecto.
+    Implementa operaciones de consulta centradas en empleados.
     
-    Proporciona métodos especializados para analizar la información
-    de asignaciones desde la perspectiva del empleado, incluyendo
-    carga de trabajo, historial y estado actual.
+    Esta clase proporciona métodos especializados para consultar información
+    relacionada con empleados y sus asignaciones de proyecto.
     """
     
     def __init__(self, repository_facade: ProjectAssignmentRepositoryFacade):
-        """
-        Inicializa el módulo de consultas de empleados.
-        
-        Args:
-            repository_facade: Facade del repositorio de asignaciones
-        """
+        """Inicializa el módulo de consultas de empleados."""
         self._repository = repository_facade
-        self._logger = logger.bind(module="project_assignment_employee_queries")
+        self._logger = logger.bind(module="employee_queries")
     
-    async def get_all_employee_assignments(
+    # ============================================================================
+    # MÉTODOS DOCUMENTADOS OFICIALMENTE
+    # ============================================================================
+    
+    async def get_assignments_by_employee(
         self, 
         employee_id: int, 
         include_inactive: bool = False
@@ -58,7 +63,7 @@ class EmployeeQueries(IEmployeeQueries):
         """
         try:
             self._logger.info(
-                f"Obteniendo todas las asignaciones del empleado {employee_id} "
+                f"Obteniendo asignaciones del empleado {employee_id} "
                 f"(incluir inactivas: {include_inactive})"
             )
             
@@ -89,13 +94,13 @@ class EmployeeQueries(IEmployeeQueries):
             )
             raise RepositoryError(
                 message=f"Error al obtener asignaciones del empleado: {e}",
-                operation="get_all_employee_assignments",
+                operation="get_assignments_by_employee",
                 entity_type="ProjectAssignment",
                 entity_id=employee_id,
                 original_error=e
             )
     
-    async def get_active_employee_assignments(
+    async def get_active_assignments_by_employee(
         self, 
         employee_id: int, 
         reference_date: Optional[date] = None
@@ -152,7 +157,7 @@ class EmployeeQueries(IEmployeeQueries):
             )
             raise RepositoryError(
                 message=f"Error al obtener asignaciones activas del empleado: {e}",
-                operation="get_active_employee_assignments",
+                operation="get_active_assignments_by_employee",
                 entity_type="ProjectAssignment",
                 entity_id=employee_id,
                 original_error=e
@@ -370,7 +375,7 @@ class EmployeeQueries(IEmployeeQueries):
                 )
             
             # Obtener asignaciones activas actuales
-            current_assignments = await self.get_active_employee_assignments(
+            current_assignments = await self.get_active_assignments_by_employee(
                 employee_id=employee_id,
                 reference_date=current_date
             )
