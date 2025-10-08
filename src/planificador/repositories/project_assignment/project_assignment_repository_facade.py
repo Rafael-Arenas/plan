@@ -433,7 +433,7 @@ class ProjectAssignmentRepositoryFacade:
         Obtiene el número total de asignaciones.
 
         Returns:
-            Número total de asignaciones.
+            El número total de asignaciones en el sistema.
 
         Raises:
             RepositoryError: Si ocurre un error en la base de datos.
@@ -445,7 +445,7 @@ class ProjectAssignmentRepositoryFacade:
         Obtiene el número de asignaciones activas.
 
         Returns:
-            Número de asignaciones activas.
+            El número de asignaciones activas.
 
         Raises:
             RepositoryError: Si ocurre un error en la base de datos.
@@ -457,24 +457,24 @@ class ProjectAssignmentRepositoryFacade:
         Obtiene el conteo de asignaciones por estado.
 
         Returns:
-            Diccionario con el conteo por estado.
+            Diccionario con el conteo de asignaciones por estado.
 
         Raises:
             RepositoryError: Si ocurre un error en la base de datos.
         """
-        return await self._statistics_operations.get_assignments_by_status_count()
+        return await self._statistics_operations.get_assignments_by_status()
 
     async def get_assignments_by_allocation_category_count(self) -> dict[str, int]:
         """
         Obtiene el conteo de asignaciones por categoría de asignación.
 
         Returns:
-            Diccionario con el conteo por categoría.
+            Diccionario con el conteo de asignaciones por categoría.
 
         Raises:
             RepositoryError: Si ocurre un error en la base de datos.
         """
-        return await self._statistics_operations.get_assignments_by_allocation_category_count()
+        return await self._statistics_operations.get_assignments_by_allocation_category()
 
     async def get_employee_assignment_stats(self, employee_id: int) -> dict[str, Any]:
         """
@@ -484,7 +484,7 @@ class ProjectAssignmentRepositoryFacade:
             employee_id: ID del empleado.
 
         Returns:
-            Diccionario con las estadísticas del empleado.
+            Diccionario con estadísticas del empleado.
 
         Raises:
             RepositoryError: Si ocurre un error en la base de datos.
@@ -499,7 +499,7 @@ class ProjectAssignmentRepositoryFacade:
             project_id: ID del proyecto.
 
         Returns:
-            Diccionario con las estadísticas del proyecto.
+            Diccionario con estadísticas del proyecto.
 
         Raises:
             RepositoryError: Si ocurre un error en la base de datos.
@@ -523,12 +523,12 @@ class ProjectAssignmentRepositoryFacade:
         Obtiene estadísticas de distribución de carga de trabajo.
 
         Returns:
-            Diccionario con estadísticas de distribución.
+            Diccionario con estadísticas de distribución de carga.
 
         Raises:
             RepositoryError: Si ocurre un error en la base de datos.
         """
-        return await self._statistics_operations.get_workload_distribution_stats()
+        return await self._statistics_operations.get_workload_distribution()
 
     async def get_assignment_trends(self, days: int = 30) -> list[dict[str, Any]]:
         """
@@ -543,7 +543,11 @@ class ProjectAssignmentRepositoryFacade:
         Raises:
             RepositoryError: Si ocurre un error en la base de datos.
         """
-        return await self._statistics_operations.get_assignment_trends(days)
+        trends_data = await self._statistics_operations.get_assignment_trends(days)
+        # Convertir el resultado a lista si es necesario
+        if isinstance(trends_data, dict):
+            return [trends_data]
+        return trends_data
 
     async def get_overlap_statistics(self) -> dict[str, Any]:
         """
@@ -562,19 +566,19 @@ class ProjectAssignmentRepositoryFacade:
         Obtiene estadísticas de distribución por roles.
 
         Returns:
-            Diccionario con la distribución por roles.
+            Diccionario con distribución por roles.
 
         Raises:
             RepositoryError: Si ocurre un error en la base de datos.
         """
-        return await self._statistics_operations.get_role_distribution_stats()
+        return await self._statistics_operations.get_role_distribution()
 
     async def get_comprehensive_dashboard_metrics(self) -> dict[str, Any]:
         """
         Obtiene métricas completas para el dashboard.
 
         Returns:
-            Diccionario con métricas completas.
+            Diccionario con métricas completas del dashboard.
 
         Raises:
             RepositoryError: Si ocurre un error en la base de datos.
