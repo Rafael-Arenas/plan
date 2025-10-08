@@ -10,6 +10,7 @@ import pendulum
 from loguru import logger
 
 from ....repositories.project_assignment.project_assignment_repository_facade import ProjectAssignmentRepositoryFacade
+from .interfaces import IProjectAssignmentDomainService
 from .modules import (
     CrudOperations,
     EmployeeQueries,
@@ -29,7 +30,7 @@ from planificador.schemas import (
 from planificador.schemas.assignment.advanced_schemas import AssignmentAdvancedFilters
 
 
-class ProjectAssignmentDomainService:
+class ProjectAssignmentDomainService(IProjectAssignmentDomainService):
     """
     Servicio de Dominio Principal para Asignaciones de Proyecto.
     
@@ -65,7 +66,7 @@ class ProjectAssignmentDomainService:
         self._diagnostic_ops = DiagnosticOperations(repository_facade)
         
         self._logger.info("Servicio de dominio de asignaciones de proyecto inicializado")
-    
+
     # ==========================================
     # OPERACIONES CRUD PRINCIPALES
     # ==========================================
@@ -548,3 +549,123 @@ class ProjectAssignmentDomainService:
             self._logger.error(f"Error durante la limpieza de recursos: {e}")
         
         return cleanup_results
+
+    # ==========================================
+    # MÉTODOS DE LA INTERFAZ PRINCIPAL
+    # ==========================================
+    
+    async def initialize_service(self) -> None:
+        """
+        Inicializa el servicio de dominio y sus dependencias.
+        
+        Este método debe ser llamado antes de usar cualquier funcionalidad
+        del servicio para garantizar que todas las dependencias estén
+        correctamente configuradas.
+        
+        Note:
+            Este método utiliza validate_service_integrity() para realizar
+            las validaciones y evitar duplicación de lógica de verificación.
+        """
+        try:
+            # Usar validate_service_integrity() que ya contiene toda la lógica de validación
+            validation_result = await self.validate_service_integrity()
+            
+            # Verificar el resultado de la validación
+            if validation_result["service_status"] == "error":
+                issues = ", ".join(validation_result["issues_found"])
+                raise ValidationError(f"Falló la inicialización del servicio: {issues}")
+            
+            elif validation_result["service_status"] == "degraded":
+                issues = ", ".join(validation_result["issues_found"])
+                self._logger.warning(f"Servicio inicializado con advertencias: {issues}")
+            
+            # Verificación adicional específica para inicialización
+            if not self._repository:
+                raise ValidationError("Repository facade no está configurado")
+            
+            self._logger.info("Servicio de dominio inicializado correctamente")
+            
+        except ValidationError:
+            # Re-lanzar errores de validación tal como están
+            raise
+        except Exception as e:
+            self._logger.error(f"Error inesperado al inicializar el servicio de dominio: {e}")
+            raise ValidationError(f"Error durante la inicialización: {str(e)}")
+    
+    async def cleanup_service(self) -> None:
+        """
+        Limpia recursos y conexiones del servicio.
+        
+        Este método debe ser llamado al finalizar el uso del servicio
+        para liberar recursos y cerrar conexiones de manera adecuada.
+        
+        Note:
+            Este método delega completamente a cleanup_resources() que ya
+            contiene toda la lógica de limpieza implementada y validada.
+        """
+        try:
+            # Delegar completamente a cleanup_resources que ya maneja todos los casos
+            await self.cleanup_resources()
+            self._logger.info("Servicio de dominio limpiado correctamente")
+            
+        except Exception as e:
+            # cleanup_resources ya maneja el logging de errores específicos
+            # Solo agregamos el contexto del servicio de dominio
+            self._logger.error(f"Error al limpiar el servicio de dominio: {e}")
+            raise
+    
+    def get_service_info(self) -> Dict[str, Any]:
+        """
+        Obtiene información general del servicio.
+        
+        Returns:
+            Dict con información del servicio incluyendo versión,
+            configuración y estado de las dependencias.
+            
+        Note:
+            Este método delega a get_service_statistics() para evitar duplicación
+            y proporciona una vista simplificada de la información del servicio.
+        """
+        # Delegar a get_service_statistics() que ya tiene la lógica completa
+        try:
+            # Obtener estadísticas completas (método asíncrono)
+            import asyncio
+            if asyncio.iscoroutinefunction(self.get_service_statistics):
+                # Si estamos en contexto asíncrono, usar await
+                try:
+                    loop = asyncio.get_event_loop()
+                    if loop.is_running():
+                        # Si ya hay un loop corriendo, crear una tarea
+                        stats = asyncio.create_task(self.get_service_statistics()).result()
+                    else:
+                        stats = loop.run_until_complete(self.get_service_statistics())
+                except RuntimeError:
+                    # Fallback: crear nuevo loop
+                    stats = asyncio.run(self.get_service_statistics())
+            else:
+                stats = self.get_service_statistics()
+            
+            # Simplificar la información para cumplir con el contrato de la interfaz
+            return {
+                "service_name": stats.get("service_name", "ProjectAssignmentDomainService"),
+                "version": stats.get("version", "1.0.0"),
+                "description": "Servicio de dominio principal para asignaciones de proyecto",
+                "status": "active",
+                "modules": list(stats.get("modules_loaded", {}).keys()),
+                "interface_compliance": "IProjectAssignmentDomainService",
+                "total_methods": stats.get("total_methods", 0),
+                "initialization_timestamp": pendulum.now().isoformat()
+            }
+        except Exception as e:
+            # Fallback en caso de error
+            self._logger.warning(f"Error al obtener estadísticas completas: {e}")
+            return {
+                "service_name": "ProjectAssignmentDomainService",
+                "version": "1.0.0",
+                "description": "Servicio de dominio principal para asignaciones de proyecto",
+                "status": "active",
+                "error": f"Error al obtener información completa: {str(e)}",
+                "interface_compliance": "IProjectAssignmentDomainService",
+                "initialization_timestamp": pendulum.now().isoformat()
+            }
+    
