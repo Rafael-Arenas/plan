@@ -37,6 +37,18 @@ class ProjectAssignmentDomainService(IProjectAssignmentDomainService):
     Implementa el patrón Facade proporcionando una interfaz unificada
     para todas las operaciones del dominio de asignaciones de proyecto.
     
+    Organización modular según documentación oficial:
+    1. Operaciones CRUD Principales (4 métodos)
+    2. Operaciones CRUD Especializadas (3 métodos)  
+    3. Operaciones de Consulta por Empleado (5 métodos)
+    4. Operaciones de Consulta por Proyecto (4 métodos)
+    5. Operaciones de Búsqueda y Filtrado (4 métodos)
+    6. Operaciones de Gestión de Recursos (3 métodos)
+    7. Operaciones de Estadísticas Básicas (4 métodos)
+    8. Operaciones de Estadísticas Avanzadas (4 métodos)
+    9. Operaciones de Validación y Reglas de Negocio (5 métodos)
+    10. Operaciones de Diagnóstico y Salud (2 métodos)
+    
     Características principales:
     - Punto de acceso único para todas las operaciones
     - Encapsulación de la complejidad interna
@@ -68,14 +80,14 @@ class ProjectAssignmentDomainService(IProjectAssignmentDomainService):
         self._logger.info("Servicio de dominio de asignaciones de proyecto inicializado")
 
     # ==========================================
-    # OPERACIONES CRUD PRINCIPALES
+    # 1. OPERACIONES CRUD PRINCIPALES (4 métodos)
     # ==========================================
     
     async def create_assignment(
         self, 
         assignment_data: ProjectAssignmentCreate
     ) -> ProjectAssignment:
-        # Crea una nueva asignación de proyecto
+        """Crea una nueva asignación con validaciones completas de negocio."""
         self._logger.info(f"Creando asignación para empleado {assignment_data.employee_id}")
         return await self._crud_ops.create_assignment(assignment_data)
     
@@ -84,24 +96,28 @@ class ProjectAssignmentDomainService(IProjectAssignmentDomainService):
         assignment_id: int, 
         update_data: ProjectAssignmentUpdate
     ) -> ProjectAssignment:
-        # Actualiza una asignación existente
+        """Actualiza una asignación existente con validaciones de solapamiento."""
         self._logger.info(f"Actualizando asignación {assignment_id}")
         return await self._crud_ops.update_assignment(assignment_id, update_data)
     
     async def delete_assignment(self, assignment_id: int) -> bool:
-        # Elimina una asignación
+        """Elimina una asignación después de validar dependencias y impacto."""
         self._logger.info(f"Eliminando asignación {assignment_id}")
         return await self._crud_ops.delete_assignment(assignment_id)
     
     async def get_assignment_by_id(self, assignment_id: int) -> Optional[ProjectAssignment]:
-        # Obtiene una asignación por su ID
+        """Obtiene una asignación por su ID único con datos relacionados."""
         return await self._crud_ops.get_assignment_by_id(assignment_id)
+    
+    # ==========================================
+    # 2. OPERACIONES CRUD ESPECIALIZADAS (3 métodos)
+    # ==========================================
     
     async def bulk_create_assignments(
         self, 
         assignments_data: List[ProjectAssignmentCreate]
     ) -> List[ProjectAssignment]:
-        # Crea múltiples asignaciones en lote
+        """Crea múltiples asignaciones en una operación transaccional con validaciones cruzadas."""
         self._logger.info(f"Creando {len(assignments_data)} asignaciones en lote")
         return await self._crud_ops.bulk_create_assignments(assignments_data)
     
@@ -110,256 +126,295 @@ class ProjectAssignmentDomainService(IProjectAssignmentDomainService):
         assignment_id: int, 
         modifications: Optional[Dict[str, Any]] = None
     ) -> ProjectAssignment:
-        # Duplica una asignación existente
+        """Duplica una asignación existente con nuevos parámetros."""
         self._logger.info(f"Duplicando asignación {assignment_id}")
         return await self._crud_ops.duplicate_assignment(assignment_id, modifications)
     
     async def archive_assignment(self, assignment_id: int) -> ProjectAssignment:
-        # Archiva una asignación
+        """Archiva una asignación manteniendo el historial para auditoría."""
         self._logger.info(f"Archivando asignación {assignment_id}")
         return await self._crud_ops.archive_assignment(assignment_id)
     
     # ==========================================
-    # CONSULTAS CENTRADAS EN EMPLEADOS
+    # 3. OPERACIONES DE CONSULTA POR EMPLEADO (5 métodos)
     # ==========================================
     
-    async def get_all_employee_assignments(
+    async def get_assignments_by_employee(
         self, 
-        employee_id: int,
-        include_archived: bool = False
+        employee_id: int, 
+        include_inactive: bool = False
     ) -> List[ProjectAssignment]:
-        # Obtiene todas las asignaciones de un empleado
-        return await self._employee_queries.get_all_employee_assignments(
-            employee_id, include_archived
+        """Obtiene todas las asignaciones de un empleado específico."""
+        self._logger.info(f"Obteniendo asignaciones del empleado {employee_id}")
+        return await self._employee_queries.get_assignments_by_employee(
+            employee_id, include_inactive
         )
     
-    async def get_active_employee_assignments(
+    async def get_active_assignments_by_employee(
         self, 
-        employee_id: int
+        employee_id: int, 
+        reference_date: Optional[pendulum.Date] = None
     ) -> List[ProjectAssignment]:
-        # Obtiene las asignaciones activas de un empleado
-        return await self._employee_queries.get_active_employee_assignments(employee_id)
+        """Obtiene las asignaciones activas de un empleado en una fecha específica."""
+        self._logger.info(f"Obteniendo asignaciones activas del empleado {employee_id}")
+        return await self._employee_queries.get_active_assignments_by_employee(
+            employee_id, reference_date
+        )
     
     async def get_employee_workload_summary(
         self, 
-        employee_id: int,
-        analysis_period: Optional[tuple] = None
+        employee_id: int, 
+        start_date: pendulum.Date, 
+        end_date: pendulum.Date
     ) -> Dict[str, Any]:
-        # Obtiene un resumen de la carga de trabajo de un empleado
+        """Genera un resumen completo de la carga de trabajo de un empleado."""
+        self._logger.info(f"Generando resumen de carga de trabajo para empleado {employee_id}")
         return await self._employee_queries.get_employee_workload_summary(
-            employee_id, analysis_period
+            employee_id, start_date, end_date
         )
     
     async def get_employee_assignment_history(
         self, 
-        employee_id: int,
+        employee_id: int, 
         limit: Optional[int] = None
     ) -> List[Dict[str, Any]]:
-        # Obtiene el historial de asignaciones de un empleado
-        return await self._employee_queries.get_employee_assignment_history(employee_id, limit)
+        """Obtiene el historial cronológico de asignaciones de un empleado."""
+        self._logger.info(f"Obteniendo historial de asignaciones del empleado {employee_id}")
+        return await self._employee_queries.get_employee_assignment_history(
+            employee_id, limit
+        )
     
     async def get_employee_current_allocation(self, employee_id: int) -> Dict[str, Any]:
-        # Obtiene la asignación actual de un empleado
+        """Obtiene la asignación actual detallada de un empleado."""
+        self._logger.info(f"Obteniendo asignación actual del empleado {employee_id}")
         return await self._employee_queries.get_employee_current_allocation(employee_id)
     
     # ==========================================
-    # CONSULTAS CENTRADAS EN PROYECTOS
+    # 4. OPERACIONES DE CONSULTA POR PROYECTO (4 métodos)
     # ==========================================
     
-    async def get_all_project_assignments(
-        self, 
-        project_id: int,
-        include_archived: bool = False
-    ) -> List[ProjectAssignment]:
-        # Obtiene todas las asignaciones de un proyecto
-        return await self._project_queries.get_all_project_assignments(
-            project_id, include_archived
-        )
+    async def get_assignments_by_project(self, project_id: int) -> List[ProjectAssignment]:
+        """Obtiene todas las asignaciones de un proyecto específico."""
+        self._logger.info(f"Obteniendo asignaciones del proyecto {project_id}")
+        return await self._project_queries.get_assignments_by_project(project_id)
     
     async def get_project_team_summary(self, project_id: int) -> Dict[str, Any]:
-        # Obtiene un resumen del equipo de un proyecto
+        """Obtiene un resumen completo del equipo asignado al proyecto."""
+        self._logger.info(f"Generando resumen de equipo para proyecto {project_id}")
         return await self._project_queries.get_project_team_summary(project_id)
     
     async def get_project_resource_allocation(self, project_id: int) -> Dict[str, Any]:
-        # Obtiene la asignación de recursos de un proyecto
+        """Analiza la distribución de recursos y capacidades del proyecto."""
+        self._logger.info(f"Analizando asignación de recursos para proyecto {project_id}")
         return await self._project_queries.get_project_resource_allocation(project_id)
     
-    async def get_project_assignment_timeline(self, project_id: int) -> Dict[str, Any]:
-        # Obtiene la línea de tiempo de asignaciones de un proyecto
-        return await self._project_queries.get_project_assignment_timeline(project_id)
-    
-    # ==========================================
-    # OPERACIONES DE BÚSQUEDA Y FILTRADO
-    # ==========================================
-    
-    async def get_assignments_with_filters(
+    async def get_project_assignment_timeline(
         self, 
-        filters: AssignmentAdvancedFilters
+        project_id: int, 
+        include_milestones: bool = True
+    ) -> Dict[str, Any]:
+        """Genera una línea de tiempo detallada de las asignaciones del proyecto."""
+        self._logger.info(f"Generando timeline de asignaciones para proyecto {project_id}")
+        return await self._project_queries.get_project_assignment_timeline(
+            project_id, include_milestones
+        )
+    
+    # ==========================================
+    # 5. OPERACIONES DE BÚSQUEDA Y FILTRADO (4 métodos)
+    # ==========================================
+    
+    async def search_assignments_by_criteria(
+        self, 
+        criteria: Dict[str, Any]
     ) -> List[ProjectAssignment]:
-        # Busca asignaciones con filtros avanzados
-        return await self._search_ops.get_assignments_with_filters(filters)
+        """Busca asignaciones aplicando criterios múltiples de filtrado."""
+        self._logger.info(f"Buscando asignaciones con criterios: {criteria}")
+        return await self._search_ops.search_assignments_by_criteria(criteria)
     
     async def get_assignments_by_date_range(
         self, 
         start_date: pendulum.Date, 
-        end_date: pendulum.Date
+        end_date: pendulum.Date,
+        include_partial_overlap: bool = True
     ) -> List[ProjectAssignment]:
-        # Obtiene asignaciones en un rango de fechas
-        return await self._search_ops.get_assignments_by_date_range(start_date, end_date)
+        """Obtiene asignaciones que se encuentran en un rango de fechas específico."""
+        self._logger.info(f"Obteniendo asignaciones entre {start_date} y {end_date}")
+        return await self._search_ops.get_assignments_by_date_range(
+            start_date, end_date, include_partial_overlap
+        )
     
-    async def get_assignments_by_role(self, role: str) -> List[ProjectAssignment]:
-        # Obtiene asignaciones por rol específico
-        return await self._search_ops.get_assignments_by_role(role)
+    async def get_assignments_by_role(
+        self, 
+        role: str,
+        exact_match: bool = False
+    ) -> List[ProjectAssignment]:
+        """Busca asignaciones por rol específico en el proyecto."""
+        self._logger.info(f"Buscando asignaciones por rol: {role}")
+        return await self._search_ops.get_assignments_by_role(role, exact_match)
     
     async def get_overlapping_assignments(
         self, 
-        employee_id: int, 
-        start_date: pendulum.Date, 
-        end_date: pendulum.Date,
-        exclude_assignment_id: Optional[int] = None
+        employee_id: Optional[int] = None,
+        project_id: Optional[int] = None,
+        threshold_percentage: float = 100.0
     ) -> List[Dict[str, Any]]:
-        # Detecta asignaciones superpuestas para un empleado
+        """Detecta solapamientos entre asignaciones de empleados o proyectos."""
+        self._logger.info(f"Detectando solapamientos - empleado: {employee_id}, proyecto: {project_id}")
         return await self._search_ops.get_overlapping_assignments(
-            employee_id, start_date, end_date, exclude_assignment_id
+            employee_id, project_id, threshold_percentage
         )
     
     # ==========================================
-    # GESTIÓN DE RECURSOS
+    # 6. OPERACIONES DE GESTIÓN DE RECURSOS (3 métodos)
     # ==========================================
     
-    async def optimize_resource_allocation(self, project_id: int) -> Dict[str, Any]:
-        # Optimiza la asignación de recursos para un proyecto
-        return await self._resource_mgmt.optimize_resource_allocation(project_id)
-    
-    async def calculate_team_capacity(
-        self, 
-        team_member_ids: List[int], 
-        period_start: pendulum.Date, 
-        period_end: pendulum.Date
-    ) -> Dict[str, Any]:
-        # Calcula la capacidad de un equipo en un período
-        return await self._resource_mgmt.calculate_team_capacity(
-            team_member_ids, period_start, period_end
+    async def assign_employee_to_project(
+        self,
+        employee_id: int,
+        project_id: int,
+        assignment_data: Dict[str, Any]
+    ) -> ProjectAssignment:
+        """Asigna un empleado a un proyecto específico."""
+        return await self._resource_mgmt.assign_employee_to_project(
+            employee_id, project_id, assignment_data
         )
     
-    async def balance_workload_across_team(self, project_id: int) -> Dict[str, Any]:
-        # Balancea la carga de trabajo dentro de un equipo de proyecto
-        return await self._resource_mgmt.balance_workload_across_team(project_id)
+    async def reassign_employee(
+        self,
+        assignment_id: int,
+        new_project_id: int,
+        reassignment_data: Optional[Dict[str, Any]] = None
+    ) -> ProjectAssignment:
+        """Reasigna un empleado de un proyecto a otro."""
+        return await self._resource_mgmt.reassign_employee(
+            assignment_id, new_project_id, reassignment_data
+        )
+    
+    async def calculate_employee_utilization(
+        self,
+        employee_id: int,
+        date_range: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
+        """Calcula la utilización de recursos de un empleado específico."""
+        return await self._resource_mgmt.calculate_employee_utilization(
+            employee_id, date_range
+        )
     
     # ==========================================
-    # ESTADÍSTICAS Y ANÁLISIS
+    # 7. OPERACIONES DE ESTADÍSTICAS BÁSICAS (4 métodos)
     # ==========================================
     
-    async def get_assignment_count_by_status(
+    async def get_total_assignments_count(
         self, 
-        filters: Optional[Dict[str, Any]] = None
-    ) -> Dict[str, int]:
-        # Obtiene el conteo de asignaciones por estado
-        return await self._statistics_ops.get_assignment_count_by_status(filters)
+        start_date: Optional[pendulum.Date] = None, 
+        end_date: Optional[pendulum.Date] = None
+    ) -> int:
+        """Obtiene el conteo total de asignaciones en un rango de fechas."""
+        return await self._statistics_ops.get_total_assignments_count(
+            start_date, end_date
+        )
     
-    async def get_assignment_distribution_by_role(
+    async def get_active_assignments_count(
         self, 
-        filters: Optional[Dict[str, Any]] = None
-    ) -> Dict[str, Any]:
-        # Obtiene la distribución de asignaciones por rol
-        return await self._statistics_ops.get_assignment_distribution_by_role(filters)
+        reference_date: Optional[pendulum.Date] = None
+    ) -> int:
+        """Obtiene el conteo de asignaciones activas en una fecha específica."""
+        return await self._statistics_ops.get_active_assignments_count(
+            reference_date
+        )
     
-    async def get_average_allocation_metrics(
-        self, 
-        filters: Optional[Dict[str, Any]] = None
-    ) -> Dict[str, float]:
-        # Obtiene métricas promedio de asignación
-        return await self._statistics_ops.get_average_allocation_metrics(filters)
+    async def get_assignments_by_status_count(self) -> Dict[str, int]:
+        """Obtiene el conteo de asignaciones agrupadas por estado."""
+        return await self._statistics_ops.get_assignments_by_status_count()
     
-    async def get_assignment_duration_statistics(
-        self, 
-        filters: Optional[Dict[str, Any]] = None
-    ) -> Dict[str, Any]:
-        # Obtiene estadísticas de duración de asignaciones
-        return await self._statistics_ops.get_assignment_duration_statistics(filters)
-    
-    async def analyze_assignment_trends(
-        self, 
-        period_months: int = 12,
-        granularity: str = "monthly"
-    ) -> Dict[str, Any]:
-        # Analiza tendencias de asignaciones en el tiempo
-        return await self._statistics_ops.analyze_assignment_trends(period_months, granularity)
-    
-    async def calculate_resource_utilization_metrics(
-        self, 
-        analysis_period: Optional[tuple] = None
-    ) -> Dict[str, Any]:
-        # Calcula métricas de utilización de recursos
-        return await self._statistics_ops.calculate_resource_utilization_metrics(analysis_period)
-    
-    async def get_project_performance_metrics(
-        self, 
-        project_ids: Optional[List[int]] = None
-    ) -> Dict[str, Any]:
-        # Obtiene métricas de rendimiento de proyectos
-        return await self._statistics_ops.get_project_performance_metrics(project_ids)
-    
-    async def generate_predictive_insights(
-        self, 
-        prediction_horizon_months: int = 3
-    ) -> Dict[str, Any]:
-        # Genera insights predictivos basados en datos históricos
-        return await self._statistics_ops.generate_predictive_insights(prediction_horizon_months)
+    async def get_assignments_by_allocation_category_count(self) -> Dict[str, int]:
+        """Obtiene el conteo de asignaciones agrupadas por categoría de asignación."""
+        return await self._statistics_ops.get_assignments_by_allocation_category_count()
     
     # ==========================================
-    # VALIDACIÓN Y REGLAS DE NEGOCIO
+    # 8. OPERACIONES DE ESTADÍSTICAS AVANZADAS (4 métodos)
+    # ==========================================
+    
+    async def get_assignment_duration_analytics(
+        self, 
+        start_date: Optional[pendulum.Date] = None, 
+        end_date: Optional[pendulum.Date] = None
+    ) -> Dict[str, Any]:
+        """Obtiene análisis de duración de asignaciones."""
+        return await self._statistics_ops.get_assignment_duration_analytics(
+            start_date, end_date
+        )
+    
+    async def get_workload_distribution_analytics(self) -> Dict[str, Any]:
+        """Obtiene análisis de distribución de carga de trabajo."""
+        return await self._statistics_ops.get_workload_distribution_analytics()
+    
+    async def get_assignment_trends(
+        self, 
+        months_back: int = 12
+    ) -> Dict[str, Any]:
+        """Obtiene análisis de tendencias de asignaciones."""
+        return await self._statistics_ops.get_assignment_trends(months_back)
+    
+    async def get_comprehensive_dashboard_metrics(self) -> Dict[str, Any]:
+        """Obtiene métricas completas para dashboard ejecutivo."""
+        return await self._statistics_ops.get_comprehensive_dashboard_metrics()
+    
+    # ==========================================
+    # 9. OPERACIONES DE VALIDACIÓN Y REGLAS DE NEGOCIO (5 métodos)
     # ==========================================
     
     async def validate_assignment_business_rules(
         self, 
-        assignment_data: ProjectAssignmentCreate
+        assignment_data: Dict[str, Any], 
+        exclude_id: Optional[int] = None
     ) -> Dict[str, Any]:
-        # Valida las reglas de negocio para una asignación
-        return await self._validation_ops.validate_assignment_business_rules(assignment_data)
-    
-    async def check_workload_constraints(
-        self, 
-        employee_id: int, 
-        additional_allocation: float,
-        period_start: pendulum.Date, 
-        period_end: pendulum.Date
-    ) -> Dict[str, Any]:
-        # Verifica las restricciones de carga de trabajo
-        return await self._validation_ops.check_workload_constraints(
-            employee_id, additional_allocation, period_start, period_end
+        """Valida todas las reglas de negocio para asignaciones."""
+        return await self._validation_ops.validate_assignment_business_rules(
+            assignment_data, exclude_id
         )
     
-    async def validate_date_consistency(
+    async def validate_no_overlapping_assignments(
         self, 
+        employee_id: int, 
+        start_date: pendulum.Date, 
+        end_date: pendulum.Date, 
+        exclude_id: Optional[int] = None
+    ) -> bool:
+        """Verifica que no existan solapamientos en las asignaciones de un empleado."""
+        return await self._validation_ops.validate_no_overlapping_assignments(
+            employee_id, start_date, end_date, exclude_id
+        )
+    
+    async def validate_workload_limits(
+        self, 
+        employee_id: int, 
+        start_date: pendulum.Date, 
+        end_date: pendulum.Date, 
+        allocation_percentage: float
+    ) -> bool:
+        """Valida que la carga de trabajo no exceda los límites establecidos."""
+        return await self._validation_ops.validate_workload_limits(
+            employee_id, start_date, end_date, allocation_percentage
+        )
+    
+    async def validate_assignment_deletion(self, assignment_id: int) -> Dict[str, Any]:
+        """Valida si una asignación puede ser eliminada sin afectar la integridad."""
+        return await self._validation_ops.validate_assignment_deletion(assignment_id)
+    
+    async def validate_employee_availability(
+        self, 
+        employee_id: int, 
         start_date: pendulum.Date, 
         end_date: pendulum.Date
     ) -> Dict[str, Any]:
-        # Valida la consistencia de fechas
-        return await self._validation_ops.validate_date_consistency(start_date, end_date)
-    
-    async def check_assignment_conflicts(
-        self, 
-        assignment_data: ProjectAssignmentCreate,
-        exclude_assignment_id: Optional[int] = None
-    ) -> Dict[str, Any]:
-        # Verifica conflictos con asignaciones existentes
-        return await self._validation_ops.check_assignment_conflicts(
-            assignment_data, exclude_assignment_id
-        )
-    
-    async def validate_assignment_update_integrity(
-        self, 
-        assignment_id: int, 
-        update_data: ProjectAssignmentUpdate
-    ) -> Dict[str, Any]:
-        # Valida la integridad de una actualización de asignación
-        return await self._validation_ops.validate_assignment_update_integrity(
-            assignment_id, update_data
+        """Verifica la disponibilidad completa de un empleado en un período."""
+        return await self._validation_ops.validate_employee_availability(
+            employee_id, start_date, end_date
         )
     
     # ==========================================
-    # DIAGNÓSTICO Y SALUD DEL SISTEMA
+    # 10. OPERACIONES DE DIAGNÓSTICO Y SALUD (2 métodos)
     # ==========================================
     
     async def get_system_health_status(
@@ -367,7 +422,7 @@ class ProjectAssignmentDomainService(IProjectAssignmentDomainService):
         include_performance_metrics: bool = True,
         include_data_quality_checks: bool = True
     ) -> Dict[str, Any]:
-        # Obtiene el estado de salud del sistema
+        """Obtiene el estado de salud del sistema de asignaciones."""
         return await self._diagnostic_ops.get_system_health_status(
             include_performance_metrics, include_data_quality_checks
         )
@@ -377,295 +432,7 @@ class ProjectAssignmentDomainService(IProjectAssignmentDomainService):
         fix_issues: bool = False,
         audit_scope: Optional[str] = None
     ) -> Dict[str, Any]:
-        # Ejecuta una auditoría de integridad de datos
-        return await self._diagnostic_ops.run_data_integrity_audit(fix_issues, audit_scope)
-    
-    async def analyze_performance_bottlenecks(
-        self, 
-        analysis_depth: str = "standard"
-    ) -> Dict[str, Any]:
-        # Analiza cuellos de botella de rendimiento
-        return await self._diagnostic_ops.analyze_performance_bottlenecks(analysis_depth)
-    
-    async def get_resource_usage_report(
-        self, 
-        include_historical_data: bool = False
-    ) -> Dict[str, Any]:
-        # Obtiene un reporte de uso de recursos
-        return await self._diagnostic_ops.get_resource_usage_report(include_historical_data)
-    
-    async def validate_system_configuration(self) -> Dict[str, Any]:
-        # Valida la configuración del sistema
-        return await self._diagnostic_ops.validate_system_configuration()
-    
-    # ==========================================
-    # MÉTODOS DE UTILIDAD Y COORDINACIÓN
-    # ==========================================
-    
-    async def get_service_statistics(self) -> Dict[str, Any]:
-        # Obtiene estadísticas generales del servicio
-        stats = {
-            "service_name": "ProjectAssignmentDomainService",
-            "version": "1.0.0",
-            "modules_loaded": {
-                "crud_operations": bool(self._crud_ops),
-                "employee_queries": bool(self._employee_queries),
-                "project_queries": bool(self._project_queries),
-                "search_operations": bool(self._search_ops),
-                "resource_management": bool(self._resource_mgmt),
-                "statistics_operations": bool(self._statistics_ops),
-                "validation_operations": bool(self._validation_ops),
-                "diagnostic_operations": bool(self._diagnostic_ops)
-            },
-            "total_methods": 45,
-            "categories": {
-                "crud": 7,
-                "employee_queries": 5,
-                "project_queries": 4,
-                "search_operations": 4,
-                "resource_management": 3,
-                "statistics": 8,
-                "validation": 5,
-                "diagnostics": 5,
-                "utilities": 4
-            }
-        }
-        
-        self._logger.info("Estadísticas del servicio obtenidas")
-        return stats
-    
-    async def validate_service_integrity(self) -> Dict[str, Any]:
-        # Valida la integridad del servicio completo
-        validation_results = {
-            "service_status": "healthy",
-            "modules_status": {},
-            "validation_timestamp": pendulum.now().isoformat(),
-            "issues_found": []
-        }
-        
-        # Validar cada módulo
-        modules = {
-            "crud_operations": self._crud_ops,
-            "employee_queries": self._employee_queries,
-            "project_queries": self._project_queries,
-            "search_operations": self._search_ops,
-            "resource_management": self._resource_mgmt,
-            "statistics_operations": self._statistics_ops,
-            "validation_operations": self._validation_ops,
-            "diagnostic_operations": self._diagnostic_ops
-        }
-        
-        for module_name, module_instance in modules.items():
-            if module_instance is None:
-                validation_results["modules_status"][module_name] = "error"
-                validation_results["issues_found"].append(f"Módulo {module_name} no inicializado")
-                validation_results["service_status"] = "degraded"
-            else:
-                validation_results["modules_status"][module_name] = "healthy"
-        
-        self._logger.info(f"Validación de integridad completada: {validation_results['service_status']}")
-        return validation_results
-    
-    async def get_available_operations(self) -> Dict[str, List[str]]:
-        # Obtiene la lista de operaciones disponibles por categoría
-        operations = {
-            "crud_operations": [
-                "create_assignment", "update_assignment", "delete_assignment",
-                "get_assignment_by_id", "bulk_create_assignments", 
-                "duplicate_assignment", "archive_assignment"
-            ],
-            "employee_queries": [
-                "get_all_employee_assignments", "get_active_employee_assignments",
-                "get_employee_workload_summary", "get_employee_assignment_history",
-                "get_employee_current_allocation"
-            ],
-            "project_queries": [
-                "get_all_project_assignments", "get_project_team_summary",
-                "get_project_resource_allocation", "get_project_assignment_timeline"
-            ],
-            "search_operations": [
-                "get_assignments_with_filters", "get_assignments_by_date_range",
-                "get_assignments_by_role", "get_overlapping_assignments"
-            ],
-            "resource_management": [
-                "optimize_resource_allocation", "calculate_team_capacity",
-                "balance_workload_across_team"
-            ],
-            "statistics": [
-                "get_assignment_count_by_status", "get_assignment_distribution_by_role",
-                "get_average_allocation_metrics", "get_assignment_duration_statistics",
-                "analyze_assignment_trends", "calculate_resource_utilization_metrics",
-                "get_project_performance_metrics", "generate_predictive_insights"
-            ],
-            "validation": [
-                "validate_assignment_business_rules", "check_workload_constraints",
-                "validate_date_consistency", "check_assignment_conflicts",
-                "validate_assignment_update_integrity"
-            ],
-            "diagnostics": [
-                "get_system_health_status", "run_data_integrity_audit",
-                "analyze_performance_bottlenecks", "get_resource_usage_report",
-                "validate_system_configuration"
-            ],
-            "utilities": [
-                "get_service_statistics", "validate_service_integrity",
-                "get_available_operations", "cleanup_resources"
-            ]
-        }
-        
-        return operations
-    
-    async def cleanup_resources(self) -> Dict[str, Any]:
-        # Limpia recursos y conexiones del servicio
-        cleanup_results = {
-            "cleanup_timestamp": pendulum.now().isoformat(),
-            "modules_cleaned": [],
-            "status": "success"
-        }
-        
-        try:
-            # Limpiar cada módulo si tiene método de limpieza
-            modules = [
-                ("crud_operations", self._crud_ops),
-                ("employee_queries", self._employee_queries),
-                ("project_queries", self._project_queries),
-                ("search_operations", self._search_ops),
-                ("resource_management", self._resource_mgmt),
-                ("statistics_operations", self._statistics_ops),
-                ("validation_operations", self._validation_ops),
-                ("diagnostic_operations", self._diagnostic_ops)
-            ]
-            
-            for module_name, module_instance in modules:
-                if module_instance and hasattr(module_instance, 'cleanup'):
-                    await module_instance.cleanup()
-                    cleanup_results["modules_cleaned"].append(module_name)
-            
-            self._logger.info("Limpieza de recursos completada exitosamente")
-            
-        except Exception as e:
-            cleanup_results["status"] = "error"
-            cleanup_results["error"] = str(e)
-            self._logger.error(f"Error durante la limpieza de recursos: {e}")
-        
-        return cleanup_results
-
-    # ==========================================
-    # MÉTODOS DE LA INTERFAZ PRINCIPAL
-    # ==========================================
-    
-    async def initialize_service(self) -> None:
-        """
-        Inicializa el servicio de dominio y sus dependencias.
-        
-        Este método debe ser llamado antes de usar cualquier funcionalidad
-        del servicio para garantizar que todas las dependencias estén
-        correctamente configuradas.
-        
-        Note:
-            Este método utiliza validate_service_integrity() para realizar
-            las validaciones y evitar duplicación de lógica de verificación.
-        """
-        try:
-            # Usar validate_service_integrity() que ya contiene toda la lógica de validación
-            validation_result = await self.validate_service_integrity()
-            
-            # Verificar el resultado de la validación
-            if validation_result["service_status"] == "error":
-                issues = ", ".join(validation_result["issues_found"])
-                raise ValidationError(f"Falló la inicialización del servicio: {issues}")
-            
-            elif validation_result["service_status"] == "degraded":
-                issues = ", ".join(validation_result["issues_found"])
-                self._logger.warning(f"Servicio inicializado con advertencias: {issues}")
-            
-            # Verificación adicional específica para inicialización
-            if not self._repository:
-                raise ValidationError("Repository facade no está configurado")
-            
-            self._logger.info("Servicio de dominio inicializado correctamente")
-            
-        except ValidationError:
-            # Re-lanzar errores de validación tal como están
-            raise
-        except Exception as e:
-            self._logger.error(f"Error inesperado al inicializar el servicio de dominio: {e}")
-            raise ValidationError(f"Error durante la inicialización: {str(e)}")
-    
-    async def cleanup_service(self) -> None:
-        """
-        Limpia recursos y conexiones del servicio.
-        
-        Este método debe ser llamado al finalizar el uso del servicio
-        para liberar recursos y cerrar conexiones de manera adecuada.
-        
-        Note:
-            Este método delega completamente a cleanup_resources() que ya
-            contiene toda la lógica de limpieza implementada y validada.
-        """
-        try:
-            # Delegar completamente a cleanup_resources que ya maneja todos los casos
-            await self.cleanup_resources()
-            self._logger.info("Servicio de dominio limpiado correctamente")
-            
-        except Exception as e:
-            # cleanup_resources ya maneja el logging de errores específicos
-            # Solo agregamos el contexto del servicio de dominio
-            self._logger.error(f"Error al limpiar el servicio de dominio: {e}")
-            raise
-    
-    def get_service_info(self) -> Dict[str, Any]:
-        """
-        Obtiene información general del servicio.
-        
-        Returns:
-            Dict con información del servicio incluyendo versión,
-            configuración y estado de las dependencias.
-            
-        Note:
-            Este método delega a get_service_statistics() para evitar duplicación
-            y proporciona una vista simplificada de la información del servicio.
-        """
-        # Delegar a get_service_statistics() que ya tiene la lógica completa
-        try:
-            # Obtener estadísticas completas (método asíncrono)
-            import asyncio
-            if asyncio.iscoroutinefunction(self.get_service_statistics):
-                # Si estamos en contexto asíncrono, usar await
-                try:
-                    loop = asyncio.get_event_loop()
-                    if loop.is_running():
-                        # Si ya hay un loop corriendo, crear una tarea
-                        stats = asyncio.create_task(self.get_service_statistics()).result()
-                    else:
-                        stats = loop.run_until_complete(self.get_service_statistics())
-                except RuntimeError:
-                    # Fallback: crear nuevo loop
-                    stats = asyncio.run(self.get_service_statistics())
-            else:
-                stats = self.get_service_statistics()
-            
-            # Simplificar la información para cumplir con el contrato de la interfaz
-            return {
-                "service_name": stats.get("service_name", "ProjectAssignmentDomainService"),
-                "version": stats.get("version", "1.0.0"),
-                "description": "Servicio de dominio principal para asignaciones de proyecto",
-                "status": "active",
-                "modules": list(stats.get("modules_loaded", {}).keys()),
-                "interface_compliance": "IProjectAssignmentDomainService",
-                "total_methods": stats.get("total_methods", 0),
-                "initialization_timestamp": pendulum.now().isoformat()
-            }
-        except Exception as e:
-            # Fallback en caso de error
-            self._logger.warning(f"Error al obtener estadísticas completas: {e}")
-            return {
-                "service_name": "ProjectAssignmentDomainService",
-                "version": "1.0.0",
-                "description": "Servicio de dominio principal para asignaciones de proyecto",
-                "status": "active",
-                "error": f"Error al obtener información completa: {str(e)}",
-                "interface_compliance": "IProjectAssignmentDomainService",
-                "initialization_timestamp": pendulum.now().isoformat()
-            }
-    
+        """Ejecuta una auditoría completa de integridad de datos."""
+        return await self._diagnostic_ops.run_data_integrity_audit(
+            fix_issues, audit_scope
+        )
