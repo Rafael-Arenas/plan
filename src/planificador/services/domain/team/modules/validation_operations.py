@@ -35,6 +35,7 @@ from loguru import logger
 
 from planificador.repositories.team import TeamRepositoryFacade
 from planificador.repositories.team_membership import TeamMembershipRepositoryFacade
+from planificador.schemas.team.team_advanced_schemas import TeamSchema
 from planificador.services.domain.team.interfaces.validation_operations_interface import (
     ITeamDomainValidationOperations,
     ValidationResult,
@@ -85,13 +86,15 @@ class TeamDomainValidationOperations(ITeamDomainValidationOperations):
 
     async def validate_team_data(
         self,
-        team_id: Optional[int] = None
+        team_data: TeamSchema,
+        validation_rules: List[str]
     ) -> ValidationResult:
         """
         Valida la integridad de datos de equipos.
         
         Args:
-            team_id: ID del equipo específico (opcional, todos si no se especifica)
+            team_data: Datos del equipo a validar
+            validation_rules: Lista de reglas de validación a aplicar
             
         Returns:
             ValidationResult: Resultado de la validación de integridad
@@ -102,46 +105,30 @@ class TeamDomainValidationOperations(ITeamDomainValidationOperations):
         """
         try:
             self._logger.debug(
-                 f"Validando integridad de datos para equipo: "
-                 f"{team_id if team_id else 'todos'}"
+                 f"Validando integridad de datos para equipo: {team_data.name}"
              )
+            
+            # Validar parámetros de entrada
+            if not team_data:
+                raise ValidationError("Los datos del equipo son requeridos")
+            
+            if not validation_rules:
+                raise ValidationError("Las reglas de validación son requeridas")
             
             validation_errors = []
             validation_warnings = []
-            teams_validated = 0
+            teams_validated = 1
             
-            # Obtener equipos a validar
-            if team_id:
-                # Validar ID específico
-                if not isinstance(team_id, int) or team_id <= 0:
-                    raise ValidationError("El ID del equipo debe ser un entero positivo")
-                
-                team = await self._team_repo.get_by_id(team_id)
-                if not team:
-                    raise ValidationError(f"No se encontró el equipo con ID {team_id}")
-                teams = [team]
-            else:
-                # Validar todos los equipos
-                teams = await self._team_repo.get_all()
+            # Validar datos básicos del equipo
+            team_errors, team_warnings = await self._validate_team_basic_data(team_data)
+            validation_errors.extend(team_errors)
+            validation_warnings.extend(team_warnings)
             
-            # Validar cada equipo
-            for team in teams:
-                teams_validated += 1
-                
-                # Validaciones de datos básicos
-                team_errors, team_warnings = await self._validate_team_basic_data(team)
-                validation_errors.extend(team_errors)
-                validation_warnings.extend(team_warnings)
-                
-                # Validaciones de relaciones
-                rel_errors, rel_warnings = await self._validate_team_relationships(team)
-                validation_errors.extend(rel_errors)
-                validation_warnings.extend(rel_warnings)
-                
-                # Validaciones de membresías
-                mem_errors, mem_warnings = await self._validate_team_memberships(team)
-                validation_errors.extend(mem_errors)
-                validation_warnings.extend(mem_warnings)
+            # Aplicar reglas de validación específicas
+            for rule in validation_rules:
+                rule_errors, rule_warnings = await self._apply_validation_rule(team_data, rule)
+                validation_errors.extend(rule_errors)
+                validation_warnings.extend(rule_warnings)
             
             # Determinar estado de validación
             is_valid = len(validation_errors) == 0
@@ -154,12 +141,12 @@ class TeamDomainValidationOperations(ITeamDomainValidationOperations):
                 validated_entities=teams_validated,
                 validation_type="data_integrity",
                 validated_at=pendulum.now().to_datetime_string(),
-                summary=f"Validación de integridad completada: {teams_validated} equipos, "
+                summary=f"Validación de integridad completada: {teams_validated} equipo, "
                        f"{len(validation_errors)} errores, {len(validation_warnings)} advertencias"
             )
             
             self._logger.debug(
-                f"Validación de integridad completada: {teams_validated} equipos, "
+                f"Validación de integridad completada para equipo {team_data.name}: "
                 f"válido: {is_valid}"
             )
             
@@ -171,7 +158,7 @@ class TeamDomainValidationOperations(ITeamDomainValidationOperations):
                 f"Error al validar integridad de datos: {e.message}",
                 operation="validate_team_data",
                 entity_type="Team",
-                entity_id=str(team_id) if team_id else None,
+                entity_id=str(team_data.id) if hasattr(team_data, 'id') and team_data.id else None,
                 original_error=e
             )
         except ValidationError:
@@ -182,67 +169,80 @@ class TeamDomainValidationOperations(ITeamDomainValidationOperations):
                 f"Error inesperado en validación de integridad: {str(e)}",
                 operation="validate_team_data",
                 entity_type="Team",
-                entity_id=str(team_id) if team_id else None,
+                entity_id=str(team_data.id) if hasattr(team_data, 'id') and team_data.id else None,
                 original_error=e
             )
 
     async def validate_team_business_rules(
         self,
-        context: BusinessContext
+        team_id: int,
+        business_context: BusinessContext
     ) -> BusinessRuleValidationResult:
         """
         Valida el cumplimiento de reglas de negocio.
         
         Args:
-            context: Contexto de negocio para la validación
+            team_id: ID del equipo a validar
+            business_context: Contexto de negocio para la validación
             
         Returns:
             BusinessRuleValidationResult: Resultado de validación de reglas
             
         Raises:
-            ValidationError: Si el contexto no es válido
+            ValidationError: Si los parámetros no son válidos
             TeamDomainError: Si ocurre un error inesperado
         """
         try:
             self._logger.debug(
-                 f"Validando reglas de negocio para operación: {context.operation}"
+                 f"Validando reglas de negocio para equipo: {team_id}"
              )
             
-            # Validar contexto
-            if not context.operation:
+            # Validar parámetros de entrada
+            if not isinstance(team_id, int) or team_id <= 0:
+                raise ValidationError("El ID del equipo debe ser un entero positivo")
+            
+            if not business_context:
+                raise ValidationError("El contexto de negocio es requerido")
+            
+            if not business_context.operation:
                 raise ValidationError("La operación es obligatoria en el contexto")
+            
+            # Verificar que el equipo existe
+            team = await self._team_repo.get_by_id(team_id)
+            if not team:
+                raise ValidationError(f"No se encontró el equipo con ID {team_id}")
             
             rule_violations = []
             compliance_score = 1.0
             rules_evaluated = 0
             
             # Validar reglas según la operación
-            if context.operation == "team_creation":
-                violations, score, count = await self._validate_team_creation_rules(context)
+            if business_context.operation == "team_creation":
+                violations, score, count = await self._validate_team_creation_rules(business_context)
                 rule_violations.extend(violations)
                 compliance_score = min(compliance_score, score)
                 rules_evaluated += count
                 
-            elif context.operation == "team_update":
-                violations, score, count = await self._validate_team_update_rules(context)
+            elif business_context.operation == "team_update":
+                violations, score, count = await self._validate_team_update_rules(business_context)
                 rule_violations.extend(violations)
                 compliance_score = min(compliance_score, score)
                 rules_evaluated += count
                 
-            elif context.operation == "membership_assignment":
-                violations, score, count = await self._validate_membership_rules(context)
+            elif business_context.operation == "membership_assignment":
+                violations, score, count = await self._validate_membership_rules(business_context)
                 rule_violations.extend(violations)
                 compliance_score = min(compliance_score, score)
                 rules_evaluated += count
                 
-            elif context.operation == "team_deletion":
-                violations, score, count = await self._validate_team_deletion_rules(context)
+            elif business_context.operation == "team_deletion":
+                violations, score, count = await self._validate_team_deletion_rules(business_context)
                 rule_violations.extend(violations)
                 compliance_score = min(compliance_score, score)
                 rules_evaluated += count
             
             # Validar reglas generales siempre
-            general_violations, general_score, general_count = await self._validate_general_business_rules(context)
+            general_violations, general_score, general_count = await self._validate_general_business_rules(business_context)
             rule_violations.extend(general_violations)
             compliance_score = min(compliance_score, general_score)
             rules_evaluated += general_count
@@ -252,7 +252,7 @@ class TeamDomainValidationOperations(ITeamDomainValidationOperations):
             
             # Generar recomendaciones
             recommendations = await self._generate_compliance_recommendations(
-                rule_violations, context
+                rule_violations, business_context
             )
             
             # Crear resultado de validación
@@ -261,14 +261,14 @@ class TeamDomainValidationOperations(ITeamDomainValidationOperations):
                 rule_violations=rule_violations,
                 compliance_score=round(compliance_score, 2),
                 rules_evaluated=rules_evaluated,
-                context=context,
+                context=business_context,
                 recommendations=recommendations,
                 validated_at=pendulum.now().to_datetime_string()
             )
             
             self._logger.debug(
-                f"Validación de reglas completada: {rules_evaluated} reglas, "
-                f"cumplimiento: {compliance_score:.2f}"
+                f"Validación de reglas completada para equipo {team_id}: "
+                f"{rules_evaluated} reglas, cumplimiento: {compliance_score:.2f}"
             )
             
             return business_result
@@ -278,9 +278,10 @@ class TeamDomainValidationOperations(ITeamDomainValidationOperations):
         except Exception as e:
             self._logger.error(f"Error inesperado en validación de reglas: {e}")
             raise TeamDomainError(
-                f"Error inesperado en validación de reglas: {str(e)}",
+                f"Error inesperado en validación de reglas para equipo {team_id}: {str(e)}",
                 operation="validate_team_business_rules",
                 entity_type="Team",
+                entity_id=team_id,
                 original_error=e
             )
 
