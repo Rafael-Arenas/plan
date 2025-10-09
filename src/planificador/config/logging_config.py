@@ -75,6 +75,8 @@ def setup_logging(
         level=log_level,
         format=console_format,
         colorize=True,
+        backtrace=True,
+        diagnose=True,
     )
 
     # Configuración para el fichero de log
