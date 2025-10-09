@@ -7,6 +7,21 @@ Este módulo centraliza todas las excepciones específicas de los dominios
 de negocio de la aplicación, incluyendo clientes y proyectos.
 """
 
+# Excepciones del dominio de equipos
+from .team_domain_exceptions import (
+    TeamDomainError,
+    TeamValidationError,
+    TeamBusinessRuleViolationError,
+    TeamMembershipError,
+    TeamCapacityExceededError,
+    TeamStatusTransitionError,
+    TeamStatisticsError,
+    TeamProductivityError,
+    create_team_not_found_error,
+    create_team_validation_error,
+    create_team_business_rule_error,
+)
+
 # Excepciones del dominio de clientes
 from .client_domain_exceptions import (
     ClientDomainError,
@@ -54,6 +69,19 @@ from .project_domain_exceptions import (
 
 # Exportar todas las excepciones del dominio
 __all__ = [
+    # Excepciones del dominio de equipos
+    "TeamDomainError",
+    "TeamValidationError",
+    "TeamBusinessRuleViolationError",
+    "TeamMembershipError",
+    "TeamCapacityExceededError",
+    "TeamStatusTransitionError",
+    "TeamStatisticsError",
+    "TeamProductivityError",
+    "create_team_not_found_error",
+    "create_team_validation_error",
+    "create_team_business_rule_error",
+    
     # Excepciones del dominio de clientes
     "ClientDomainError",
     "ClientBusinessRuleViolationError", 
