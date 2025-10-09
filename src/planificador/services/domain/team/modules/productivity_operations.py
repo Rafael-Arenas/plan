@@ -44,7 +44,10 @@ from planificador.services.domain.team.interfaces.productivity_operations_interf
     TeamsSummaryReport
 )
 from planificador.exceptions.domain import (
-    TeamDomainError, ValidationError
+    TeamDomainError
+)
+from planificador.exceptions.base import (
+    ValidationError
 )
 from planificador.exceptions.repository import (
     TeamRepositoryError, TeamMembershipRepositoryError
@@ -76,14 +79,15 @@ class TeamDomainProductivityOperations(ITeamDomainProductivityOperations):
             team_repo: Repositorio de equipos
             membership_repo: Repositorio de membresías
         """
-        self.team_repository = team_repo
-        self.membership_repository = membership_repo
+        self._team_repo = team_repo
+        self._membership_repo = membership_repo
         
         logger.debug("TeamDomainProductivityOperations inicializado")
 
     async def get_team_performance_metrics(
         self,
         team_id: int,
+        metric_types: List[str],
         date_range: Optional[DateRange] = None
     ) -> TeamPerformanceMetrics:
         """
@@ -106,7 +110,7 @@ class TeamDomainProductivityOperations(ITeamDomainProductivityOperations):
             )
             
             # Validar que el equipo existe
-            team = await self.team_repository.get_by_id(team_id)
+            team = await self._team_repo.get_by_id(team_id)
             if not team:
                 raise ValidationError(f"No se encontró el equipo con ID {team_id}")
             
@@ -123,7 +127,7 @@ class TeamDomainProductivityOperations(ITeamDomainProductivityOperations):
             await self._validate_date_range(date_range)
             
             # Obtener miembros del equipo
-            members = await self.membership_repository.get_by_team_id(team_id)
+            members = await self._membership_repo.get_by_team_id(team_id)
             member_count = len(members)
             
             # Calcular métricas básicas
@@ -191,8 +195,8 @@ class TeamDomainProductivityOperations(ITeamDomainProductivityOperations):
 
     async def get_teams_productivity_analysis(
         self,
-        date_range: DateRange,
-        team_ids: Optional[List[int]] = None
+        analysis_period: str = "quarter",
+        include_comparisons: bool = True
     ) -> ProductivityAnalysis:
         """
         Analiza la productividad general de equipos en un período.
@@ -221,12 +225,11 @@ class TeamDomainProductivityOperations(ITeamDomainProductivityOperations):
             if team_ids:
                 teams = []
                 for team_id in team_ids:
-                    team = await self.team_repository.get_by_id(team_id)
+                    team = await self._team_repo.get_by_id(team_id)
                     if team:
                         teams.append(team)
             else:
-                # Obtener todos los equipos activos
-                teams = await self.team_repository.get_all()
+                teams = await self._team_repo.get_all()
                 teams = [team for team in teams if team.is_active]
             
             if not teams:
@@ -315,8 +318,8 @@ class TeamDomainProductivityOperations(ITeamDomainProductivityOperations):
 
     async def get_team_collaboration_metrics(
         self,
-        date_range: DateRange,
-        team_ids: Optional[List[int]] = None
+        team_ids: Optional[List[int]] = None,
+        collaboration_types: List[str] = None
     ) -> CollaborationMetrics:
         """
         Obtiene métricas de colaboración entre equipos.
@@ -342,15 +345,8 @@ class TeamDomainProductivityOperations(ITeamDomainProductivityOperations):
             await self._validate_date_range(date_range)
             
             # Obtener equipos
-            if team_ids:
-                teams = []
-                for team_id in team_ids:
-                    team = await self.team_repository.get_by_id(team_id)
-                    if team:
-                        teams.append(team)
-            else:
-                teams = await self.team_repository.get_all()
-                teams = [team for team in teams if team.is_active]
+            teams = await self._team_repo.get_all()
+            teams = [team for team in teams if team.is_active]
             
             if not teams:
                 raise ValidationError("No se encontraron equipos para analizar")

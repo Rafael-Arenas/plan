@@ -38,9 +38,12 @@ from planificador.repositories.team_membership import TeamMembershipRepositoryFa
 from planificador.services.domain.team.interfaces.diagnostic_operations_interface import (
     ITeamDomainDiagnosticOperations
 )
-from planificador.schemas.team import TeamOutput
+from planificador.schemas.team import Team
 from planificador.exceptions.domain import (
-    TeamDomainError, ValidationError
+    TeamDomainError
+)
+from planificador.exceptions.base import (
+    ValidationError
 )
 from planificador.exceptions.repository import (
     TeamRepositoryError, TeamMembershipRepositoryError
@@ -73,17 +76,18 @@ class TeamDomainDiagnosticOperations(ITeamDomainDiagnosticOperations):
             team_repo: Repositorio de equipos
             membership_repo: Repositorio de membresías
         """
-        self.team_repository = team_repo
-        self.membership_repository = membership_repo
+        self._team_repo = team_repo
+        self._membership_repo = membership_repo
+        self._logger = logger
         self._service_start_time = pendulum.now()
         
-        logger.debug("TeamDomainDiagnosticOperations inicializado")
+        self._logger.debug("TeamDomainDiagnosticOperations inicializado")
 
     async def get_teams_by_creation_date(
         self,
-        target_date: datetime,
-        tolerance_hours: int = 24
-    ) -> List[TeamOutput]:
+        creation_date: pendulum.DateTime,
+        date_tolerance: int = 0
+    ) -> List[Team]:
         """
         Obtiene equipos creados cerca de una fecha específica con tolerancia.
         
@@ -92,81 +96,57 @@ class TeamDomainDiagnosticOperations(ITeamDomainDiagnosticOperations):
             tolerance_hours: Tolerancia en horas (por defecto 24)
             
         Returns:
-            List[TeamOutput]: Lista de equipos creados dentro del rango
+            List[Team]: Lista de equipos creados dentro del rango
             
         Raises:
             ValidationError: Si los parámetros no son válidos
             TeamDomainError: Si ocurre un error inesperado
         """
+        self._logger.debug(f"Buscando equipos creados en fecha: {creation_date}")
+        
         try:
-            logger.debug(
-                f"Buscando equipos creados cerca de {target_date} "
-                f"con tolerancia de {tolerance_hours} horas"
+            # Validar parámetros de entrada
+            if date_tolerance < 0:
+                raise ValidationError("La tolerancia de fecha no puede ser negativa")
+            
+            # Calcular rango de fechas basado en la tolerancia en días
+            start_date = creation_date.subtract(days=date_tolerance)
+            end_date = creation_date.add(days=date_tolerance)
+            
+            self._logger.debug(f"Rango de búsqueda: {start_date} - {end_date}")
+            
+            # Buscar equipos en el rango de fechas
+            teams = await self._team_repo.get_teams_by_creation_date_range(
+                start_date=start_date,
+                end_date=end_date
             )
             
-            # Validar parámetros
-            if not isinstance(target_date, datetime):
-                raise ValidationError("La fecha objetivo debe ser un objeto datetime")
-            
-            if not isinstance(tolerance_hours, int) or tolerance_hours < 0:
-                raise ValidationError("La tolerancia debe ser un entero no negativo")
-            
-            if tolerance_hours > 8760:  # Más de un año
-                raise ValidationError("La tolerancia no puede exceder un año (8760 horas)")
-            
-            # Convertir a pendulum para manejo consistente
-            target_pendulum = pendulum.instance(target_date)
-            
-            # Calcular rango de fechas
-            start_date = target_pendulum.subtract(hours=tolerance_hours)
-            end_date = target_pendulum.add(hours=tolerance_hours)
-            
-            logger.debug(
-                f"Rango de búsqueda: {start_date} - {end_date}"
-            )
-            
-            # Obtener todos los equipos
-            all_teams = await self.team_repository.get_all()
-            matching_teams = []
-            
-            for team in all_teams:
-                if team.created_at:
-                    team_created = pendulum.instance(team.created_at)
-                    
-                    # Verificar si está dentro del rango de tolerancia
-                    if start_date <= team_created <= end_date:
-                        matching_teams.append(team)
-            
-            # Ordenar por proximidad a la fecha objetivo
-            matching_teams.sort(
-                key=lambda t: abs(
-                    (pendulum.instance(t.created_at) - target_pendulum).total_seconds()
+            # Convertir a DTOs de salida
+            team_outputs = []
+            for team in teams:
+                team_output = Team(
+                    id=team.id,
+                    name=team.name,
+                    description=team.description,
+                    department=team.department,
+                    status=team.status,
+                    created_at=team.created_at,
+                    updated_at=team.updated_at
                 )
-            )
+                team_outputs.append(team_output)
             
-            logger.debug(
-                f"Encontrados {len(matching_teams)} equipos dentro de la tolerancia"
-            )
+            self._logger.debug(f"Encontrados {len(team_outputs)} equipos")
+            return team_outputs
             
-            return matching_teams
-            
-        except TeamRepositoryError as e:
-            logger.error(f"Error de repositorio en búsqueda con tolerancia: {e}")
-            raise TeamDomainError(
-                f"Error al buscar equipos por fecha con tolerancia: {e.message}",
-                operation="get_teams_by_creation_date",
-                entity_type="Team",
-                original_error=e
-            )
         except ValidationError:
+            self._logger.error(f"Error de validación en get_teams_by_creation_date: {creation_date}")
             raise
         except Exception as e:
-            logger.error(f"Error inesperado en búsqueda con tolerancia: {e}")
-            raise TeamDomainError(
-                f"Error inesperado en búsqueda con tolerancia: {str(e)}",
+            self._logger.error(f"Error inesperado en get_teams_by_creation_date: {str(e)}")
+            raise DiagnosticError(
+                message=f"Error al obtener equipos por fecha de creación: {str(e)}",
                 operation="get_teams_by_creation_date",
-                entity_type="Team",
-                original_error=e
+                context={"creation_date": str(creation_date), "date_tolerance": date_tolerance}
             )
 
     async def check_service_health(self) -> Dict[str, Any]:
@@ -180,7 +160,7 @@ class TeamDomainDiagnosticOperations(ITeamDomainDiagnosticOperations):
             TeamDomainError: Si ocurre un error inesperado
         """
         try:
-            logger.debug("Verificando estado de salud del servicio")
+            self._logger.debug("Verificando estado de salud del servicio")
             
             health_status = {
                 "service": "TeamDomainService",
@@ -230,12 +210,12 @@ class TeamDomainDiagnosticOperations(ITeamDomainDiagnosticOperations):
             if health_status["errors"]:
                 health_status["status"] = "unhealthy"
             
-            logger.debug(f"Verificación de salud completada: {health_status['status']}")
+            self._logger.debug(f"Verificación de salud completada: {health_status['status']}")
             
             return health_status
             
         except Exception as e:
-            logger.error(f"Error inesperado en verificación de salud: {e}")
+            self._logger.error(f"Error inesperado en verificación de salud: {e}")
             
             # Retornar estado de error
             return {
@@ -258,7 +238,7 @@ class TeamDomainDiagnosticOperations(ITeamDomainDiagnosticOperations):
             
             # Intentar operación básica en repositorio de equipos
             try:
-                teams_count = len(await self.team_repository.get_all())
+                teams_count = len(await self._team_repo.get_all())
                 team_repo_status = "healthy"
                 team_repo_error = None
             except Exception as e:
@@ -307,7 +287,7 @@ class TeamDomainDiagnosticOperations(ITeamDomainDiagnosticOperations):
             start_time = pendulum.now()
             
             # Obtener muestra de equipos para verificación
-            teams = await self.team_repository.get_all()
+            teams = await self._team_repo.get_all()
             
             integrity_issues = []
             teams_checked = 0
@@ -354,7 +334,7 @@ class TeamDomainDiagnosticOperations(ITeamDomainDiagnosticOperations):
             start_time = pendulum.now()
             
             # Obtener métricas básicas
-            teams = await self.team_repository.get_all()
+            teams = await self._team_repo.get_all()
             total_teams = len(teams)
             
             # Calcular métricas de distribución
@@ -390,7 +370,7 @@ class TeamDomainDiagnosticOperations(ITeamDomainDiagnosticOperations):
             
             # Test 1: Obtener todos los equipos
             start_time = pendulum.now()
-            teams = await self.team_repository.get_all()
+            teams = await self._team_repo.get_all()
             get_all_time = (pendulum.now() - start_time).total_seconds() * 1000
             
             performance_tests.append({
@@ -403,7 +383,7 @@ class TeamDomainDiagnosticOperations(ITeamDomainDiagnosticOperations):
             # Test 2: Búsqueda por nombre (si hay equipos)
             if teams:
                 start_time = pendulum.now()
-                await self.team_repository.get_team_by_name(teams[0].name)
+                await self._team_repo.get_team_by_name(teams[0].name)
                 search_time = (pendulum.now() - start_time).total_seconds() * 1000
                 
                 performance_tests.append({

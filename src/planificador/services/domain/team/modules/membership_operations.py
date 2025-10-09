@@ -33,7 +33,7 @@ from datetime import date
 from loguru import logger
 
 from planificador.schemas.team.team import (
-    TeamMembershipCreate, TeamMembershipUpdate
+    TeamMembershipCreate
 )
 from planificador.schemas.team.team_advanced_schemas import TeamMembershipSchema
 from planificador.repositories.team import TeamRepositoryFacade
@@ -42,11 +42,16 @@ from planificador.services.domain.team.interfaces.membership_operations_interfac
     ITeamDomainMembershipOperations
 )
 from planificador.exceptions.domain import (
-    TeamDomainError, ValidationError, NotFoundError, ConflictError
+    TeamDomainError
+)
+from planificador.exceptions.base import (
+    ValidationError, NotFoundError, ConflictError
 )
 from planificador.exceptions.repository import (
     TeamRepositoryError, TeamMembershipRepositoryError
 )
+from planificador.schemas.team import TeamMembership
+from planificador.models.team_membership import MembershipRole
 
 
 class TeamDomainMembershipOperations(ITeamDomainMembershipOperations):
@@ -110,7 +115,7 @@ class TeamDomainMembershipOperations(ITeamDomainMembershipOperations):
         try:
             self._logger.info(
                 f"Agregando miembro: empleado {employee_id} al equipo {team_id} "
-                f"como {role}{'(líder)' if is_leader else ''}"
+                f"como {role}"
             )
             
             # Validar parámetros
@@ -131,10 +136,6 @@ class TeamDomainMembershipOperations(ITeamDomainMembershipOperations):
                 raise ConflictError(
                     f"El empleado {employee_id} ya es miembro activo del equipo {team_id}"
                 )
-            
-            # Validar liderazgo si es necesario
-            if is_leader:
-                await self._validate_leadership_assignment(team_id, employee_id)
             
             # Crear datos de membresía
             membership_data = TeamMembershipCreate(
@@ -208,7 +209,7 @@ class TeamDomainMembershipOperations(ITeamDomainMembershipOperations):
             )
             
             # Buscar la membresía activa
-            membership = await self.membership_repository.get_by_team_and_employee(
+            membership = await self._membership_repo.get_by_team_and_employee(
                 team_id, employee_id, active_only=True
             )
             
@@ -218,7 +219,7 @@ class TeamDomainMembershipOperations(ITeamDomainMembershipOperations):
                 )
             
             # Desactivar la membresía
-            await self.membership_repository.deactivate(membership.id)
+            await self._membership_repo.deactivate(membership.id)
             
             logger.info(f"Miembro {employee_id} removido exitosamente del equipo {team_id}")
             return True
@@ -274,7 +275,7 @@ class TeamDomainMembershipOperations(ITeamDomainMembershipOperations):
             )
             
             # Buscar la membresía activa
-            membership = await self.membership_repository.get_by_team_and_employee(
+            membership = await self._membership_repo.get_by_team_and_employee(
                 team_id, employee_id, active_only=True
             )
             
@@ -285,7 +286,7 @@ class TeamDomainMembershipOperations(ITeamDomainMembershipOperations):
             
             # Actualizar el rol
             update_data = TeamMembershipUpdate(role=new_role)
-            updated_membership = await self.membership_repository.update(
+            updated_membership = await self._membership_repo.update(
                 membership.id, update_data
             )
             
@@ -353,7 +354,7 @@ class TeamDomainMembershipOperations(ITeamDomainMembershipOperations):
             )
             
             # Obtener membresías del repositorio
-            memberships = await self.membership_repository.get_by_team_id(
+            memberships = await self._membership_repo.get_by_team_id(
                 team_id, active_only=active_only
             )
             
@@ -404,7 +405,7 @@ class TeamDomainMembershipOperations(ITeamDomainMembershipOperations):
         self,
         team_id: int,
         employee_id: int,
-        role: str
+        role: MembershipRole
     ) -> None:
         """
         Valida los parámetros básicos de membresía.
@@ -423,14 +424,12 @@ class TeamDomainMembershipOperations(ITeamDomainMembershipOperations):
         if employee_id <= 0:
             raise ValidationError("El ID del empleado debe ser positivo")
         
-        if not role or not isinstance(role, str):
-            raise ValidationError("El rol es obligatorio y debe ser texto")
+        if not role:
+            raise ValidationError("El rol es obligatorio")
         
-        if len(role.strip()) < 2:
-            raise ValidationError("El rol debe tener al menos 2 caracteres")
-        
-        if len(role) > 50:
-            raise ValidationError("El rol no puede exceder 50 caracteres")
+        # Validar que el rol sea un valor válido del enum
+        if not isinstance(role, MembershipRole):
+            raise ValidationError("El rol debe ser un valor válido de MembershipRole")
 
     async def _validate_leadership_assignment(
         self,

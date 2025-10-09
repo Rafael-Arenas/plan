@@ -39,7 +39,10 @@ from planificador.services.domain.team.interfaces.statistics_operations_interfac
     ITeamDomainStatisticsOperations, TeamCreationTrend
 )
 from planificador.exceptions.domain import (
-    TeamDomainError, ValidationError
+    TeamDomainError
+)
+from planificador.exceptions.base import (
+    ValidationError
 )
 from planificador.exceptions.repository import (
     TeamRepositoryError, TeamMembershipRepositoryError
@@ -79,13 +82,15 @@ class TeamDomainStatisticsOperations(ITeamDomainStatisticsOperations):
 
     async def get_team_member_count(
         self,
-        team_id: int
+        team_id: int,
+        active_only: bool = True
     ) -> int:
         """
         Obtiene el conteo de miembros de un equipo específico.
         
         Args:
             team_id: ID del equipo
+            active_only: Si solo contar miembros activos
             
         Returns:
             int: Número de miembros del equipo
@@ -94,16 +99,16 @@ class TeamDomainStatisticsOperations(ITeamDomainStatisticsOperations):
             TeamDomainError: Si ocurre un error inesperado
         """
         try:
-            logger.debug(f"Obteniendo conteo de miembros para equipo {team_id}")
+            self._logger.debug(f"Obteniendo conteo de miembros para equipo {team_id}")
             
             # Obtener conteo de miembros del equipo
-            count = await self.membership_repository.count_team_members(team_id)
+            count = await self._membership_repo.count_team_members(team_id, active_only)
             
-            logger.debug(f"Equipo {team_id} tiene {count} miembros")
+            self._logger.debug(f"Equipo {team_id} tiene {count} miembros")
             return count
             
         except TeamMembershipRepositoryError as e:
-            logger.error(f"Error de repositorio al contar miembros del equipo {team_id}: {e}")
+            self._logger.error(f"Error de repositorio al contar miembros del equipo {team_id}: {e}")
             raise TeamDomainError(
                 f"Error al obtener conteo de miembros: {e.message}",
                 operation="get_team_member_count",
@@ -112,7 +117,7 @@ class TeamDomainStatisticsOperations(ITeamDomainStatisticsOperations):
                 original_error=e
             )
         except Exception as e:
-            logger.error(f"Error inesperado al contar miembros del equipo {team_id}: {e}")
+            self._logger.error(f"Error inesperado al contar miembros del equipo {team_id}: {e}")
             raise TeamDomainError(
                 f"Error inesperado al obtener conteo de miembros: {str(e)}",
                 operation="get_team_member_count",
@@ -121,9 +126,15 @@ class TeamDomainStatisticsOperations(ITeamDomainStatisticsOperations):
                 original_error=e
             )
 
-    async def get_teams_count_by_status(self) -> Dict[str, int]:
+    async def get_teams_count_by_status(
+        self,
+        include_details: bool = False
+    ) -> Dict[str, int]:
         """
         Obtiene el conteo de equipos agrupados por estado.
+        
+        Args:
+            include_details: Si incluir detalles adicionales
         
         Returns:
             Dict[str, int]: Diccionario {status: count}
@@ -132,11 +143,11 @@ class TeamDomainStatisticsOperations(ITeamDomainStatisticsOperations):
             TeamDomainError: Si ocurre un error inesperado
         """
         try:
-            logger.debug("Obteniendo conteos de equipos por estado")
+            self._logger.debug("Obteniendo conteos de equipos por estado")
             
             # Obtener conteos por estado
-            active_count = await self.team_repository.count_active_teams()
-            inactive_count = await self.team_repository.count_inactive_teams()
+            active_count = await self._team_repo.count_active_teams()
+            inactive_count = await self._team_repo.count_inactive_teams()
             total_count = active_count + inactive_count
             
             status_counts = {
@@ -145,12 +156,12 @@ class TeamDomainStatisticsOperations(ITeamDomainStatisticsOperations):
                 "total": total_count
             }
             
-            logger.debug(f"Conteos por estado: {status_counts}")
+            self._logger.debug(f"Conteos por estado: {status_counts}")
             
             return status_counts
             
         except TeamRepositoryError as e:
-            logger.error(f"Error de repositorio en conteos por estado: {e}")
+            self._logger.error(f"Error de repositorio en conteos por estado: {e}")
             raise TeamDomainError(
                 f"Error al obtener conteos por estado: {e.message}",
                 operation="get_teams_count_by_status",
@@ -158,7 +169,7 @@ class TeamDomainStatisticsOperations(ITeamDomainStatisticsOperations):
                 original_error=e
             )
         except Exception as e:
-            logger.error(f"Error inesperado en conteos por estado: {e}")
+            self._logger.error(f"Error inesperado en conteos por estado: {e}")
             raise TeamDomainError(
                 f"Error inesperado al obtener conteos por estado: {str(e)}",
                 operation="get_teams_count_by_status",
@@ -168,13 +179,15 @@ class TeamDomainStatisticsOperations(ITeamDomainStatisticsOperations):
 
     async def get_average_team_size(
         self,
-        active_only: bool = True
+        active_teams_only: bool = True,
+        exclude_empty: bool = True
     ) -> float:
         """
         Calcula el tamaño promedio de los equipos.
         
         Args:
-            active_only: Si solo incluir equipos activos
+            active_teams_only: Si solo incluir equipos activos
+            exclude_empty: Si excluir equipos vacíos
             
         Returns:
             float: Tamaño promedio de equipos
@@ -183,44 +196,47 @@ class TeamDomainStatisticsOperations(ITeamDomainStatisticsOperations):
             TeamDomainError: Si ocurre un error inesperado
         """
         try:
-            logger.debug(
+            self._logger.debug(
                 f"Calculando tamaño promedio de equipos "
-                f"({'activos' if active_only else 'todos'})"
+                f"({'activos' if active_teams_only else 'todos'})"
             )
             
             # Obtener todos los equipos según el filtro
-            if active_only:
-                teams = await self.team_repository.get_active_teams()
+            if active_teams_only:
+                teams = await self._team_repo.get_active_teams()
             else:
-                teams = await self.team_repository.get_all_teams()
+                teams = await self._team_repo.get_all_teams()
             
             if not teams:
-                logger.warning("No hay equipos para calcular promedio")
+                self._logger.warning("No hay equipos para calcular promedio")
                 return 0.0
             
             # Obtener conteos de miembros para cada equipo
             total_members = 0
+            valid_teams = 0
+            
             for team in teams:
                 try:
-                    count = await self.membership_repository.count_team_members(team.id)
-                    total_members += count
+                    count = await self._membership_repo.count_team_members(team.id)
+                    if not exclude_empty or count > 0:
+                        total_members += count
+                        valid_teams += 1
                 except TeamMembershipRepositoryError as e:
-                    logger.warning(f"Error al contar miembros del equipo {team.id}: {e}")
+                    self._logger.warning(f"Error al contar miembros del equipo {team.id}: {e}")
                     # Continuar con el siguiente equipo
             
             # Calcular promedio
-            total_teams = len(teams)
-            average_size = total_members / total_teams if total_teams > 0 else 0.0
+            average_size = total_members / valid_teams if valid_teams > 0 else 0.0
             
-            logger.debug(
+            self._logger.debug(
                 f"Tamaño promedio calculado: {average_size:.2f} "
-                f"({total_members} miembros en {total_teams} equipos)"
+                f"({total_members} miembros en {valid_teams} equipos)"
             )
             
             return round(average_size, 2)
             
         except TeamRepositoryError as e:
-            logger.error(f"Error de repositorio en cálculo de promedio: {e}")
+            self._logger.error(f"Error de repositorio en cálculo de promedio: {e}")
             raise TeamDomainError(
                 f"Error al calcular tamaño promedio: {e.message}",
                 operation="get_average_team_size",
@@ -228,7 +244,7 @@ class TeamDomainStatisticsOperations(ITeamDomainStatisticsOperations):
                 original_error=e
             )
         except Exception as e:
-            logger.error(f"Error inesperado en cálculo de promedio: {e}")
+            self._logger.error(f"Error inesperado en cálculo de promedio: {e}")
             raise TeamDomainError(
                 f"Error inesperado al calcular tamaño promedio: {str(e)}",
                 operation="get_average_team_size",
@@ -238,17 +254,15 @@ class TeamDomainStatisticsOperations(ITeamDomainStatisticsOperations):
 
     async def get_team_creation_trends(
         self,
-        start_date: Optional[datetime] = None,
-        end_date: Optional[datetime] = None,
-        group_by: str = "month"
+        period: str = "month",
+        months_back: int = 12
     ) -> List[TeamCreationTrend]:
         """
         Obtiene las tendencias de creación de equipos en un período.
         
         Args:
-            start_date: Fecha de inicio (opcional)
-            end_date: Fecha de fin (opcional)
-            group_by: Agrupación temporal ("day", "week", "month", "year")
+            period: Período de agrupación ("day", "week", "month", "year")
+            months_back: Número de meses hacia atrás desde ahora
             
         Returns:
             List[TeamCreationTrend]: Lista de tendencias por período
@@ -258,46 +272,40 @@ class TeamDomainStatisticsOperations(ITeamDomainStatisticsOperations):
             TeamDomainError: Si ocurre un error inesperado
         """
         try:
-            logger.debug(
-                f"Obteniendo tendencias de creación: {start_date} a {end_date}, "
-                f"agrupado por {group_by}"
+            self._logger.debug(
+                f"Obteniendo tendencias de creación: {months_back} meses atrás, "
+                f"agrupado por {period}"
             )
             
             # Validar parámetros
-            if group_by not in ["day", "week", "month", "year"]:
+            if period not in ["day", "week", "month", "year"]:
                 raise ValidationError(
-                    "group_by debe ser 'day', 'week', 'month' o 'year'"
+                    "period debe ser 'day', 'week', 'month' o 'year'"
                 )
             
-            # Establecer fechas por defecto si no se proporcionan
-            if end_date is None:
-                end_date = pendulum.now()
-            if start_date is None:
-                # Por defecto, últimos 12 meses
-                start_date = end_date.subtract(months=12)
+            if months_back < 1:
+                raise ValidationError("months_back debe ser mayor a 0")
             
-            # Validar rango de fechas
-            if start_date >= end_date:
-                raise ValidationError(
-                    "La fecha de inicio debe ser anterior a la fecha de fin"
-                )
+            # Calcular fechas
+            end_date = pendulum.now()
+            start_date = end_date.subtract(months=months_back)
             
             # Obtener equipos en el rango de fechas
-            teams = await self.team_repository.get_teams_by_date_range(
+            teams = await self._team_repo.get_teams_by_date_range(
                 start_date, end_date
             )
             
             # Agrupar por período
-            trends = await self._group_teams_by_period(teams, group_by)
+            trends = await self._group_teams_by_period(teams, period)
             
-            logger.debug(
+            self._logger.debug(
                 f"Tendencias calculadas: {len(trends)} períodos"
             )
             
             return trends
             
         except TeamRepositoryError as e:
-            logger.error(f"Error de repositorio en tendencias: {e}")
+            self._logger.error(f"Error de repositorio en tendencias: {e}")
             raise TeamDomainError(
                 f"Error al obtener tendencias de creación: {e.message}",
                 operation="get_team_creation_trends",
@@ -307,7 +315,7 @@ class TeamDomainStatisticsOperations(ITeamDomainStatisticsOperations):
         except ValidationError:
             raise
         except Exception as e:
-            logger.error(f"Error inesperado en tendencias: {e}")
+            self._logger.error(f"Error inesperado en tendencias: {e}")
             raise TeamDomainError(
                 f"Error inesperado al obtener tendencias: {str(e)}",
                 operation="get_team_creation_trends",

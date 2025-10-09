@@ -39,7 +39,10 @@ from planificador.services.domain.team.interfaces.search_operations_interface im
     ITeamDomainSearchOperations, TeamStatus
 )
 from planificador.exceptions.domain import (
-    TeamDomainError, ValidationError
+    TeamDomainError
+)
+from planificador.exceptions.base import (
+    ValidationError
 )
 from planificador.exceptions.repository import TeamRepositoryError
 

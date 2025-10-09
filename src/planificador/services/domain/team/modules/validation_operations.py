@@ -42,7 +42,10 @@ from planificador.services.domain.team.interfaces.validation_operations_interfac
     BusinessRuleValidationResult
 )
 from planificador.exceptions.domain import (
-    TeamDomainError, ValidationError
+    TeamDomainError
+)
+from planificador.exceptions.base import (
+    ValidationError
 )
 from planificador.exceptions.repository import (
     TeamRepositoryError, TeamMembershipRepositoryError
@@ -74,10 +77,11 @@ class TeamDomainValidationOperations(ITeamDomainValidationOperations):
             team_repo: Repositorio de equipos
             membership_repo: Repositorio de membresías
         """
-        self.team_repository = team_repo
-        self.membership_repository = membership_repo
+        self._team_repo = team_repo
+        self._membership_repo = membership_repo
+        self._logger = logger
         
-        logger.debug("TeamDomainValidationOperations inicializado")
+        self._logger.debug("TeamDomainValidationOperations inicializado")
 
     async def validate_team_data(
         self,
@@ -97,10 +101,10 @@ class TeamDomainValidationOperations(ITeamDomainValidationOperations):
             TeamDomainError: Si ocurre un error inesperado
         """
         try:
-            logger.debug(
-                f"Validando integridad de datos para equipo: "
-                f"{team_id if team_id else 'todos'}"
-            )
+            self._logger.debug(
+                 f"Validando integridad de datos para equipo: "
+                 f"{team_id if team_id else 'todos'}"
+             )
             
             validation_errors = []
             validation_warnings = []
@@ -112,13 +116,13 @@ class TeamDomainValidationOperations(ITeamDomainValidationOperations):
                 if not isinstance(team_id, int) or team_id <= 0:
                     raise ValidationError("El ID del equipo debe ser un entero positivo")
                 
-                team = await self.team_repository.get_by_id(team_id)
+                team = await self._team_repo.get_by_id(team_id)
                 if not team:
                     raise ValidationError(f"No se encontró el equipo con ID {team_id}")
                 teams = [team]
             else:
                 # Validar todos los equipos
-                teams = await self.team_repository.get_all()
+                teams = await self._team_repo.get_all()
             
             # Validar cada equipo
             for team in teams:
@@ -154,7 +158,7 @@ class TeamDomainValidationOperations(ITeamDomainValidationOperations):
                        f"{len(validation_errors)} errores, {len(validation_warnings)} advertencias"
             )
             
-            logger.debug(
+            self._logger.debug(
                 f"Validación de integridad completada: {teams_validated} equipos, "
                 f"válido: {is_valid}"
             )
@@ -162,7 +166,7 @@ class TeamDomainValidationOperations(ITeamDomainValidationOperations):
             return validation_result
             
         except TeamRepositoryError as e:
-            logger.error(f"Error de repositorio en validación de integridad: {e}")
+            self._logger.error(f"Error de repositorio en validación de integridad: {e}")
             raise TeamDomainError(
                 f"Error al validar integridad de datos: {e.message}",
                 operation="validate_team_data",
@@ -173,7 +177,7 @@ class TeamDomainValidationOperations(ITeamDomainValidationOperations):
         except ValidationError:
             raise
         except Exception as e:
-            logger.error(f"Error inesperado en validación de integridad: {e}")
+            self._logger.error(f"Error inesperado en validación de integridad: {e}")
             raise TeamDomainError(
                 f"Error inesperado en validación de integridad: {str(e)}",
                 operation="validate_team_data",
@@ -200,9 +204,9 @@ class TeamDomainValidationOperations(ITeamDomainValidationOperations):
             TeamDomainError: Si ocurre un error inesperado
         """
         try:
-            logger.debug(
-                f"Validando reglas de negocio para operación: {context.operation}"
-            )
+            self._logger.debug(
+                 f"Validando reglas de negocio para operación: {context.operation}"
+             )
             
             # Validar contexto
             if not context.operation:
@@ -262,7 +266,7 @@ class TeamDomainValidationOperations(ITeamDomainValidationOperations):
                 validated_at=pendulum.now().to_datetime_string()
             )
             
-            logger.debug(
+            self._logger.debug(
                 f"Validación de reglas completada: {rules_evaluated} reglas, "
                 f"cumplimiento: {compliance_score:.2f}"
             )
@@ -272,7 +276,7 @@ class TeamDomainValidationOperations(ITeamDomainValidationOperations):
         except ValidationError:
             raise
         except Exception as e:
-            logger.error(f"Error inesperado en validación de reglas: {e}")
+            self._logger.error(f"Error inesperado en validación de reglas: {e}")
             raise TeamDomainError(
                 f"Error inesperado en validación de reglas: {str(e)}",
                 operation="validate_team_business_rules",

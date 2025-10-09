@@ -31,11 +31,11 @@ Uso:
 from typing import List, Optional, Dict, Any, Tuple
 from loguru import logger
 
-from planificador.schemas.team.team import (
-    TeamCreate, TeamUpdate, TeamOutput, TeamWithDetails
-)
 from planificador.schemas.team.team_advanced_schemas import (
-    TeamCreateSchema, TeamUpdateSchema, TeamSchema, PaginatedResponse
+    TeamCreateSchema,
+    TeamUpdateSchema,
+    TeamSchema,
+    PaginatedResponse
 )
 from planificador.repositories.team import TeamRepositoryFacade
 from planificador.repositories.team_membership import TeamMembershipRepositoryFacade
@@ -43,7 +43,10 @@ from planificador.services.domain.team.interfaces.crud_operations_interface impo
     ITeamDomainCrudOperations
 )
 from planificador.exceptions.domain import (
-    TeamDomainError, ValidationError, NotFoundError, ConflictError
+    TeamDomainError
+)
+from planificador.exceptions.base import (
+    ValidationError, NotFoundError, ConflictError
 )
 from planificador.exceptions.repository import (
     TeamRepositoryError, TeamMembershipRepositoryError
@@ -218,7 +221,7 @@ class TeamDomainCrudOperations(ITeamDomainCrudOperations):
                 original_error=e
             )
 
-    async def get_all_teams(
+    async def get_teams(
         self,
         page: int = 1,
         page_size: int = 50,
@@ -466,8 +469,7 @@ class TeamDomainCrudOperations(ITeamDomainCrudOperations):
     async def bulk_create_teams(
         self,
         teams_data: List[TeamCreateSchema],
-        validate_business_rules: bool = True,
-        continue_on_error: bool = False
+        validate_all: bool = True
     ) -> List[TeamSchema]:
         """
         Crea múltiples equipos en una sola operación con validación en lote y manejo de errores.

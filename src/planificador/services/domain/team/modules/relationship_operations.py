@@ -40,7 +40,10 @@ from planificador.services.domain.team.interfaces.relationship_operations_interf
 )
 from planificador.schemas.team.team_advanced_schemas import TeamSchema
 from planificador.exceptions.domain import (
-    TeamDomainError, ValidationError
+    TeamDomainError
+)
+from planificador.exceptions.base import (
+    ValidationError
 )
 from planificador.exceptions.repository import (
     TeamRepositoryError, TeamMembershipRepositoryError
@@ -81,20 +84,21 @@ class TeamDomainRelationshipOperations(ITeamDomainRelationshipOperations):
     async def find_teams_by_leader(
         self,
         leader_id: int,
-        include_inactive: bool = False
+        include_team_details: bool = True
     ) -> List[TeamSchema]:
         """
-        Encuentra equipos liderados por un empleado específico.
+        Encuentra todos los equipos liderados por una persona específica.
         
         Args:
-            leader_id: ID del empleado líder
-            include_inactive: Si incluir equipos inactivos
+            leader_id: Identificador único del líder
+            include_team_details: Si incluir detalles completos del equipo
             
         Returns:
-            List[TeamSchema]: Lista de equipos liderados por el empleado
+            List[TeamSchema]: Lista de equipos liderados por la persona
             
         Raises:
-            ValidationError: Si el ID del líder no es válido
+            ValidationError: Si el leader_id no es válido
+            NotFoundError: Si el líder no existe
             TeamDomainError: Si ocurre un error inesperado
         """
         try:
@@ -121,7 +125,7 @@ class TeamDomainRelationshipOperations(ITeamDomainRelationshipOperations):
             for team_id in team_ids:
                 try:
                     team = await self._team_repo.get_team_by_id(team_id)
-                    if team and (include_inactive or team.is_active):
+                    if team and team.is_active:
                         teams.append(team)
                 except TeamRepositoryError as e:
                     self._logger.warning(
@@ -165,14 +169,14 @@ class TeamDomainRelationshipOperations(ITeamDomainRelationshipOperations):
     async def find_teams_by_project(
         self,
         project_id: int,
-        include_inactive: bool = False
+        active_only: bool = True
     ) -> List[TeamSchema]:
         """
         Encuentra equipos asignados a un proyecto específico.
         
         Args:
             project_id: ID del proyecto
-            include_inactive: Si incluir equipos inactivos
+            active_only: Si solo incluir equipos activos
             
         Returns:
             List[TeamSchema]: Lista de equipos asignados al proyecto
@@ -202,7 +206,7 @@ class TeamDomainRelationshipOperations(ITeamDomainRelationshipOperations):
                     project_teams.append(team)
             
             # Filtrar equipos según estado si es necesario
-            if not include_inactive:
+            if active_only:
                 project_teams = [team for team in project_teams if team.is_active]
             
             # Convertir a schemas de salida
