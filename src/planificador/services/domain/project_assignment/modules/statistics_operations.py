@@ -210,7 +210,7 @@ class StatisticsOperations(IStatisticsOperations):
             }
             
             for assignment in assignments:
-                percentage = assignment.allocation_percentage
+                percentage = assignment.percentage_allocation
                 
                 if percentage >= 80:
                     categories["Tiempo Completo (80-100%)"] += 1
@@ -375,7 +375,7 @@ class StatisticsOperations(IStatisticsOperations):
             # Análisis por empleado
             employee_workload = defaultdict(list)
             for assignment in assignments:
-                employee_workload[assignment.employee_id].append(assignment.allocation_percentage)
+                employee_workload[assignment.employee_id].append(assignment.percentage_allocation)
             
             employee_analysis = {}
             for employee_id, allocations in employee_workload.items():
@@ -390,7 +390,7 @@ class StatisticsOperations(IStatisticsOperations):
             # Análisis por proyecto
             project_workload = defaultdict(list)
             for assignment in assignments:
-                project_workload[assignment.project_id].append(assignment.allocation_percentage)
+                project_workload[assignment.project_id].append(assignment.percentage_allocation)
             
             project_analysis = {}
             for project_id, allocations in project_workload.items():
@@ -402,7 +402,7 @@ class StatisticsOperations(IStatisticsOperations):
                 }
             
             # Distribución general
-            all_allocations = [a.allocation_percentage for a in assignments]
+            all_allocations = [a.percentage_allocation for a in assignments]
             workload_distribution = {
                 "total_assignments": len(assignments),
                 "allocation_stats": {
@@ -501,7 +501,7 @@ class StatisticsOperations(IStatisticsOperations):
             for assignment in assignments:
                 month_key = assignment.start_date.strftime("%Y-%m")
                 monthly_data[month_key]["new_assignments"] += 1
-                monthly_data[month_key]["total_allocation"] += assignment.allocation_percentage
+                monthly_data[month_key]["total_allocation"] += assignment.percentage_allocation
                 
                 if assignment.end_date and assignment.end_date <= end_date:
                     end_month_key = assignment.end_date.strftime("%Y-%m")
@@ -572,7 +572,7 @@ class StatisticsOperations(IStatisticsOperations):
                 "total_assignments": len(all_assignments),
                 "active_assignments": len(active_assignments),
                 "completion_rate": self._calculate_completion_rate(all_assignments),
-                "average_allocation": statistics.mean([a.allocation_percentage for a in active_assignments]) if active_assignments else 0
+                "average_allocation": statistics.mean([a.percentage_allocation for a in active_assignments]) if active_assignments else 0
             }
             
             # Distribución por estado
@@ -661,7 +661,7 @@ class StatisticsOperations(IStatisticsOperations):
         # Agrupar por empleado
         employee_workload = defaultdict(float)
         for assignment in active_assignments:
-            employee_workload[assignment.employee_id] += assignment.allocation_percentage
+            employee_workload[assignment.employee_id] += assignment.percentage_allocation
         
         # Categorizar empleados
         categories = {
@@ -691,7 +691,7 @@ class StatisticsOperations(IStatisticsOperations):
         # Verificar sobrecarga
         employee_workload = defaultdict(float)
         for assignment in active_assignments:
-            employee_workload[assignment.employee_id] += assignment.allocation_percentage
+            employee_workload[assignment.employee_id] += assignment.percentage_allocation
         
         overloaded = [emp for emp, workload in employee_workload.items() if workload > 100]
         if overloaded:
