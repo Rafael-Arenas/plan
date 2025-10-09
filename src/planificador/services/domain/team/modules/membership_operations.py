@@ -33,7 +33,8 @@ from datetime import date
 from loguru import logger
 
 from planificador.schemas.team.team import (
-    TeamMembershipCreate
+    TeamMembershipCreate,
+    TeamMembershipUpdate
 )
 from planificador.schemas.team.team_advanced_schemas import TeamMembershipSchema
 from planificador.repositories.team import TeamRepositoryFacade
@@ -91,7 +92,8 @@ class TeamDomainMembershipOperations(ITeamDomainMembershipOperations):
         team_id: int,
         employee_id: int,
         role: MembershipRole,
-        start_date: Optional[date] = None
+        start_date: Optional[date] = None,
+        validate_capacity: bool = True
     ) -> TeamMembershipSchema:
         """
         Agrega un miembro a un equipo con validaciones de negocio.
@@ -185,7 +187,8 @@ class TeamDomainMembershipOperations(ITeamDomainMembershipOperations):
     async def remove_team_member(
         self,
         team_id: int,
-        employee_id: int
+        employee_id: int,
+        transfer_responsibilities: bool = True
     ) -> bool:
         """
         Remueve un miembro de un equipo.
@@ -249,7 +252,8 @@ class TeamDomainMembershipOperations(ITeamDomainMembershipOperations):
         self,
         team_id: int,
         employee_id: int,
-        new_role: MembershipRole
+        new_role: MembershipRole,
+        validate_permissions: bool = True
     ) -> TeamMembershipSchema:
         """
         Actualiza el rol de un miembro del equipo.
@@ -330,7 +334,8 @@ class TeamDomainMembershipOperations(ITeamDomainMembershipOperations):
     async def get_team_members(
         self,
         team_id: int,
-        active_only: bool = True
+        active_only: bool = True,
+        include_employee_details: bool = False
     ) -> List[TeamMembershipSchema]:
         """
         Obtiene los miembros de un equipo.
