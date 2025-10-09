@@ -2,7 +2,7 @@
 
 from typing import List, Optional, Dict, Any, Tuple, TYPE_CHECKING
 from datetime import datetime, date
-from pydantic import field_validator, Field
+from pydantic import field_validator, Field, ConfigDict
 import pendulum
 
 from ..base.base import BaseSchema
@@ -438,9 +438,11 @@ class HealthReportSchema(BaseSchema):
 
 class ProjectResponseSchema(Project):
     """Schema de respuesta estándar para proyectos."""
-    pass
+    
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
 
 class ProjectWithAssignmentsSchema(ProjectWithAssignments):
     """Schema de respuesta para proyectos con asignaciones."""
-    pass
+    
+    model_config = ConfigDict(arbitrary_types_allowed=True)

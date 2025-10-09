@@ -1,7 +1,7 @@
 # src/planificador/schemas/assignment/advanced_schemas.py
 
 from typing import List, Optional, Dict, Any
-from pydantic import Field, BaseModel
+from pydantic import Field, BaseModel, ConfigDict
 from datetime import date, datetime
 from decimal import Decimal
 
@@ -245,6 +245,8 @@ class ProjectAssignmentDuplicateSchema(BaseSchema):
 
 class ProjectAssignmentResponseSchema(ProjectAssignment):
     """Esquema de respuesta enriquecido para asignaciones de proyecto."""
+    
+    model_config = ConfigDict(arbitrary_types_allowed=True)
     
     employee_name: Optional[str] = None
     project_name: Optional[str] = None
