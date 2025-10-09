@@ -20,7 +20,7 @@ class ScheduleConfirmationSchema(BaseSchema):
 class BulkConfirmationSchema(BaseSchema):
     """Esquema para confirmación masiva de horarios."""
     
-    schedule_ids: List[int] = Field(..., min_items=1, max_items=100)
+    schedule_ids: List[int] = Field(..., min_length=1, max_length=100)
     is_confirmed: bool = True
     confirmation_notes: Optional[str] = Field(None, max_length=500)
     confirmed_by: Optional[int] = None  # ID del usuario que confirma
