@@ -30,11 +30,16 @@ pytest-cov = "^6.2.1"
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
-testpaths = ["src/planificador/tests"]
 pythonpath = ["src"]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
+markers = [
+    "unit: marks tests as unit tests",
+    "integration: marks tests as integration tests", 
+    "performance: marks tests as performance tests",
+    "slow: marks tests as slow running tests"
+]
 
 [tool.ruff]
 # Configuración de Ruff para linting y formateo
