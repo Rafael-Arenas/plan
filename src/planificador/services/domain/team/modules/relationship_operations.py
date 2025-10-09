@@ -244,17 +244,15 @@ class TeamDomainRelationshipOperations(ITeamDomainRelationshipOperations):
 
     async def find_teams_by_skill_set(
         self,
-        required_skills: Set[str],
-        match_all: bool = True,
-        include_inactive: bool = False
+        required_skills: List[str],
+        match_all: bool = False
     ) -> List[TeamSchema]:
         """
         Encuentra equipos que poseen un conjunto específico de habilidades.
         
         Args:
-            required_skills: Conjunto de habilidades requeridas
+            required_skills: Lista de habilidades requeridas
             match_all: Si debe coincidir con todas las habilidades (True) o al menos una (False)
-            include_inactive: Si incluir equipos inactivos
             
         Returns:
             List[TeamSchema]: Lista de equipos que cumplen con los criterios de habilidades
@@ -270,8 +268,8 @@ class TeamDomainRelationshipOperations(ITeamDomainRelationshipOperations):
             if not required_skills:
                 raise ValidationError("Debe especificar al menos una habilidad")
             
-            if not isinstance(required_skills, set):
-                required_skills = set(required_skills)
+            if not isinstance(required_skills, list):
+                raise ValidationError("required_skills debe ser una lista")
             
             # Validar que las habilidades sean strings no vacías
             for skill in required_skills:
@@ -285,8 +283,8 @@ class TeamDomainRelationshipOperations(ITeamDomainRelationshipOperations):
             matching_teams = []
             
             for team in all_teams:
-                # Filtrar por estado si es necesario
-                if not include_inactive and not team.is_active:
+                # Solo incluir equipos activos (sin parámetro include_inactive)
+                if not team.is_active:
                     continue
                     
                 # Obtener habilidades del equipo basándose en sus miembros
@@ -336,9 +334,8 @@ class TeamDomainRelationshipOperations(ITeamDomainRelationshipOperations):
 
     async def find_teams_by_date_range(
         self,
-        start_date: datetime,
-        end_date: datetime,
-        date_field: str = "created_at",
+        start_date: pendulum.DateTime,
+        end_date: pendulum.DateTime,
         include_inactive: bool = False
     ) -> List[TeamSchema]:
         """
@@ -347,69 +344,56 @@ class TeamDomainRelationshipOperations(ITeamDomainRelationshipOperations):
         Args:
             start_date: Fecha de inicio del rango
             end_date: Fecha de fin del rango
-            date_field: Campo de fecha a usar ("created_at" o "updated_at")
-            include_inactive: Si incluir equipos inactivos
+            include_inactive: Si incluir equipos inactivos en la búsqueda
             
         Returns:
-            List[TeamSchema]: Lista de equipos en el rango de fechas
+            List[TeamSchema]: Lista de equipos creados dentro del rango de fechas
             
         Raises:
-            ValidationError: Si las fechas o el campo no son válidos
+            ValidationError: Si las fechas no son válidas
             TeamDomainError: Si ocurre un error inesperado
         """
         try:
             self._logger.debug(
-                f"Buscando equipos por rango de fechas: {start_date} - {end_date} "
-                f"(campo: {date_field})"
+                f"Buscando equipos por rango de fechas: {start_date} - {end_date}"
             )
             
             # Validar parámetros
-            if not isinstance(start_date, datetime) or not isinstance(end_date, datetime):
-                raise ValidationError("Las fechas deben ser objetos datetime")
+            if not isinstance(start_date, pendulum.DateTime) or not isinstance(end_date, pendulum.DateTime):
+                raise ValidationError("Las fechas deben ser objetos pendulum.DateTime")
             
             if start_date >= end_date:
                 raise ValidationError("La fecha de inicio debe ser anterior a la fecha de fin")
             
-            # Validar campo de fecha
-            valid_date_fields = ["created_at", "updated_at"]
-            if date_field not in valid_date_fields:
-                raise ValidationError(
-                    f"Campo de fecha inválido. Debe ser uno de: {valid_date_fields}"
-                )
-            
-            # Convertir a pendulum para manejo consistente
-            start_pendulum = pendulum.instance(start_date)
-            end_pendulum = pendulum.instance(end_date)
-            
             # Validar que el rango no sea excesivamente amplio (más de 10 años)
-            if (end_pendulum - start_pendulum).total_seconds() > 10 * 365 * 24 * 3600:
+            if (end_date - start_date).total_seconds() > 10 * 365 * 24 * 3600:
                 raise ValidationError("El rango de fechas no puede exceder 10 años")
             
             all_teams = await self._team_repo.get_all_teams()
             matching_teams = []
             
             for team in all_teams:
-                # Filtrar por estado si es necesario
+                # Filtrar equipos según estado
                 if not include_inactive and not team.is_active:
                     continue
                     
-                # Obtener la fecha del campo especificado
-                team_date = getattr(team, date_field, None)
+                # Usar siempre created_at como campo de fecha
+                team_date = team.created_at
                 
                 if team_date:
                     # Convertir a pendulum para comparación consistente
                     team_pendulum = pendulum.instance(team_date)
                     
                     # Verificar si está dentro del rango
-                    if start_pendulum <= team_pendulum <= end_pendulum:
+                    if start_date <= team_pendulum <= end_date:
                         matching_teams.append(team)
             
             # Convertir a schemas de salida
             team_schemas = [TeamSchema.model_validate(team) for team in matching_teams]
             
-            # Ordenar por fecha del campo especificado (más reciente primero)
+            # Ordenar por fecha de creación (más reciente primero)
             team_schemas.sort(
-                key=lambda t: getattr(t, date_field, datetime.min),
+                key=lambda t: t.created_at,
                 reverse=True
             )
             
