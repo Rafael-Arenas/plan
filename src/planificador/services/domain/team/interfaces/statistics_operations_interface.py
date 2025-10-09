@@ -12,7 +12,7 @@ from typing import Dict, List, Any
 from datetime import datetime
 from pydantic import BaseModel
 
-from .search_operations import TeamStatus
+from .....schemas.team.enums import TeamStatus
 
 
 class TeamCreationTrend(BaseModel):

@@ -8,9 +8,11 @@ capacidad organizacional y transferencia de responsabilidades.
 """
 
 from abc import ABC, abstractmethod
-from typing import List
+from typing import List, Optional
+from datetime import datetime
 
 from .....schemas.team.team import TeamMembership, TeamMembershipCreate
+from .....schemas.team.team_advanced_schemas import TeamMembershipSchema
 from .....models.team_membership import MembershipRole
 
 
@@ -102,7 +104,7 @@ class ITeamDomainMembershipOperations(ABC):
         self,
         team_id: int,
         include_inactive: bool = False
-    ) -> List[TeamMemberSchema]:
+    ) -> List[TeamMembershipSchema]:
         """
         Obtiene todos los miembros de un equipo específico.
         

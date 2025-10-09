@@ -9,18 +9,22 @@ benchmarking y reportes ejecutivos de equipos.
 
 from abc import ABC, abstractmethod
 from typing import List, Optional, Dict, Any
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 import pendulum
 
 
 class DateRange(BaseModel):
     """Modelo para rangos de fechas."""
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+    
     start_date: pendulum.DateTime
     end_date: pendulum.DateTime
 
 
 class TeamPerformanceMetrics(BaseModel):
     """Modelo para métricas de rendimiento de equipo."""
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+    
     team_id: int
     efficiency_score: float
     collaboration_index: float
@@ -40,6 +44,8 @@ class ProductivityAnalysis(BaseModel):
 
 class CollaborationMetrics(BaseModel):
     """Modelo para métricas de colaboración."""
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+    
     team_synergy_score: float
     cross_team_interactions: int
     communication_effectiveness: float
@@ -48,6 +54,8 @@ class CollaborationMetrics(BaseModel):
 
 class TeamsSummaryReport(BaseModel):
     """Modelo para reporte resumen de equipos."""
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+    
     report_format: str
     generation_date: pendulum.DateTime
     total_teams: int

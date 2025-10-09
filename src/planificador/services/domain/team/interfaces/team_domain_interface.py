@@ -9,14 +9,14 @@ para proporcionar una API unificada para la gestión completa de equipos.
 
 from abc import ABC
 
-from .crud_operations import ITeamDomainCrudOperations
-from .membership_operations import ITeamDomainMembershipOperations
-from .search_operations import ITeamDomainSearchOperations
-from .statistics_operations import ITeamDomainStatisticsOperations
-from .productivity_operations import ITeamDomainProductivityOperations
-from .validation_operations import ITeamDomainValidationOperations
-from .relationship_operations import ITeamDomainRelationshipOperations
-from .diagnostic_operations import ITeamDomainDiagnosticOperations
+from .crud_operations_interface import ITeamDomainCrudOperations
+from .membership_operations_interface import ITeamDomainMembershipOperations
+from .search_operations_interface import ITeamDomainSearchOperations
+from .statistics_operations_interface import ITeamDomainStatisticsOperations
+from .productivity_operations_interface import ITeamDomainProductivityOperations
+from .validation_operations_interface import ITeamDomainValidationOperations
+from .relationship_operations_interface import ITeamDomainRelationshipOperations
+from .diagnostic_operations_interface import ITeamDomainDiagnosticOperations
 
 
 class ITeamDomainService(

@@ -8,10 +8,12 @@ proyectos, habilidades y análisis de fechas específicas.
 """
 
 from abc import ABC, abstractmethod
-from typing import List, Optional
+from typing import List, Optional, Set
+from datetime import datetime
 import pendulum
 
 from .....schemas.team.team import Team
+from .....schemas.team.team_advanced_schemas import TeamSchema
 
 
 class ITeamDomainRelationshipOperations(ABC):

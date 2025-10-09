@@ -11,7 +11,7 @@ from abc import ABC, abstractmethod
 from typing import List, Dict, Any, Optional
 from pydantic import BaseModel
 
-from .....schemas.team.team import TeamSchema
+from .....schemas.team.team_advanced_schemas import TeamSchema
 
 
 class ValidationResult(BaseModel):

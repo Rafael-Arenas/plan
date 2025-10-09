@@ -9,9 +9,11 @@ de salud del servicio y sus dependencias críticas.
 
 from abc import ABC, abstractmethod
 from typing import List, Dict, Any
+from datetime import datetime
 import pendulum
 
 from .....schemas.team.team import Team
+from .....schemas.team.team_advanced_schemas import TeamSchema
 
 
 class ITeamDomainDiagnosticOperations(ABC):

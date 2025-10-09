@@ -9,19 +9,9 @@ incluyendo filtros por criterios múltiples y ordenamiento personalizado.
 
 from abc import ABC, abstractmethod
 from typing import List, Optional
-from enum import Enum
 
-from .....schemas.team.team import TeamSchema
-from .....schemas.common.pagination import PaginatedResponse
-from .....schemas.team.search import TeamSearchCriteria
-
-
-class TeamStatus(str, Enum):
-    """Estados posibles de un equipo."""
-    ACTIVE = "active"
-    INACTIVE = "inactive"
-    SUSPENDED = "suspended"
-    ARCHIVED = "archived"
+from .....schemas.team.enums import TeamStatus
+from .....schemas.team.team_advanced_schemas import TeamSchema, PaginatedResponse, TeamSearchCriteria
 
 
 class ITeamDomainSearchOperations(ABC):
