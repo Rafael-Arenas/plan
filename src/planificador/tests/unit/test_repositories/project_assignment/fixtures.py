@@ -18,8 +18,18 @@ def mock_session() -> AsyncMock:
 
 @pytest.fixture
 def project_assignment_repository(mock_session: AsyncMock) -> ProjectAssignmentRepositoryFacade:
-    """Fixture que proporciona una instancia del facade de asignaciones de proyecto."""
-    return ProjectAssignmentRepositoryFacade(mock_session)
+    """Fixture que proporciona una instancia real del facade con dependencias mockeadas."""
+    facade = ProjectAssignmentRepositoryFacade(mock_session)
+    
+    # Mockear solo las operaciones internas para que los métodos del facade funcionen
+    facade._crud_operations = AsyncMock()
+    facade._query_operations = AsyncMock()
+    facade._relationship_operations = AsyncMock()
+    facade._search_operations = AsyncMock()
+    facade._statistics_operations = AsyncMock()
+    facade._validation_operations = AsyncMock()
+    
+    return facade
 
 
 @pytest.fixture
