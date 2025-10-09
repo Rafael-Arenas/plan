@@ -32,7 +32,7 @@ from typing import List, Optional, Dict, Any
 from loguru import logger
 
 from planificador.schemas.team.team_advanced_schemas import (
-    TeamSchema, TeamSearchCriteria, PaginatedResponse
+    TeamSchema, TeamSearchCriteria
 )
 from planificador.repositories.team import TeamRepositoryFacade
 from planificador.services.domain.team.interfaces.search_operations_interface import (
@@ -74,8 +74,7 @@ class TeamDomainSearchOperations(ITeamDomainSearchOperations):
     async def find_teams_by_name(
         self,
         name_pattern: str,
-        exact_match: bool = False,
-        include_inactive: bool = False
+        exact_match: bool = False
     ) -> List[TeamSchema]:
         """
         Busca equipos por nombre o patrón de nombre con opciones de filtrado.
@@ -83,7 +82,6 @@ class TeamDomainSearchOperations(ITeamDomainSearchOperations):
         Args:
             name_pattern: Patrón de nombre a buscar
             exact_match: Si buscar coincidencia exacta o parcial
-            include_inactive: Si incluir equipos inactivos
             
         Returns:
             List[TeamSchema]: Lista de equipos encontrados
@@ -112,15 +110,14 @@ class TeamDomainSearchOperations(ITeamDomainSearchOperations):
             if exact_match:
                 # Búsqueda exacta
                 team = await self._team_repo.get_team_by_name(name_pattern)
-                teams = [team] if team and (include_inactive or team.is_active) else []
+                teams = [team] if team and team.is_active else []
             else:
                 # Búsqueda parcial usando criterios
                 search_criteria = {
                     "name_pattern": name_pattern,
-                    "partial_match": True
+                    "partial_match": True,
+                    "is_active": True
                 }
-                if not include_inactive:
-                    search_criteria["is_active"] = True
                     
                 teams = await self._team_repo.search_teams_by_criteria(search_criteria)
             
@@ -155,64 +152,43 @@ class TeamDomainSearchOperations(ITeamDomainSearchOperations):
     async def get_teams_by_status(
         self,
         status: TeamStatus,
-        page: int = 1,
-        page_size: int = 10
-    ) -> PaginatedResponse[TeamSchema]:
+        include_details: bool = False
+    ) -> List[TeamSchema]:
         """
-        Obtiene equipos filtrados por estado con paginación.
+        Obtiene equipos filtrados por estado.
         
         Args:
-            status: Estado del equipo a filtrar
-            page: Número de página (inicia en 1)
-            page_size: Tamaño de página
+            status: Estado de los equipos a buscar
+            include_details: Si incluir detalles adicionales del equipo
             
         Returns:
-            PaginatedResponse[TeamSchema]: Respuesta paginada con equipos
+            List[TeamSchema]: Lista de equipos con el estado especificado
             
         Raises:
-            ValidationError: Si los parámetros de paginación no son válidos
+            ValidationError: Si el estado no es válido
             TeamDomainError: Si ocurre un error inesperado
         """
         try:
             self._logger.info(f"Obteniendo equipos por estado: {status}")
             
-            # Validar parámetros de paginación
-            if page < 1:
-                raise ValidationError("El número de página debe ser mayor a 0")
-            if page_size < 1 or page_size > 100:
-                raise ValidationError("El tamaño de página debe estar entre 1 y 100")
+            # Validar estado
+            if not isinstance(status, TeamStatus):
+                raise ValidationError(
+                    message="Estado de equipo no válido",
+                    details={"status": str(status)}
+                )
             
-            # Buscar equipos por estado con paginación
-            is_active = status == TeamStatus.ACTIVE
-            teams, total_count = await self._team_repo.get_teams_by_status(
-                is_active=is_active,
-                page=page,
-                page_size=page_size
-            )
+            # Buscar equipos por estado
+            teams = await self._team_repo.get_teams_by_status(status)
             
-            # Convertir a schemas de salida
-            team_schemas = [TeamSchema.model_validate(team) for team in teams]
+            # Aplicar filtros adicionales si se requieren detalles
+            if include_details:
+                # Cargar detalles adicionales si es necesario
+                for team in teams:
+                    # Aquí se podrían cargar miembros, proyectos, etc.
+                    pass
             
-            # Crear respuesta paginada
-            total_pages = (total_count + page_size - 1) // page_size
-            has_next = page < total_pages
-            has_previous = page > 1
-            
-            paginated_response = PaginatedResponse(
-                items=team_schemas,
-                total_count=total_count,
-                page=page,
-                page_size=page_size,
-                total_pages=total_pages,
-                has_next=has_next,
-                has_previous=has_previous
-            )
-            
-            self._logger.debug(
-                f"Equipos encontrados por estado {status}: {len(team_schemas)}"
-            )
-            
-            return paginated_response
+            return teams
             
         except TeamRepositoryError as e:
             self._logger.error(f"Error de repositorio en búsqueda por estado: {e}")
@@ -235,78 +211,49 @@ class TeamDomainSearchOperations(ITeamDomainSearchOperations):
 
     async def get_teams_by_department(
         self,
-        department: str,
-        include_inactive: bool = False,
-        page: int = 1,
-        page_size: int = 10
-    ) -> PaginatedResponse[TeamSchema]:
+        department_id: int,
+        include_members: bool = False
+    ) -> List[TeamSchema]:
         """
-        Obtiene equipos filtrados por departamento con paginación.
+        Obtiene equipos filtrados por departamento.
         
         Args:
-            department: Nombre del departamento
-            include_inactive: Si incluir equipos inactivos
-            page: Número de página (inicia en 1)
-            page_size: Tamaño de página
+            department_id: ID del departamento
+            include_members: Si incluir información de miembros del equipo
             
         Returns:
-            PaginatedResponse[TeamSchema]: Respuesta paginada con equipos
+            List[TeamSchema]: Lista de equipos del departamento especificado
             
         Raises:
-            ValidationError: Si los parámetros no son válidos
+            ValidationError: Si el department_id no es válido
             TeamDomainError: Si ocurre un error inesperado
         """
         try:
             self._logger.debug(
-                f"Buscando equipos por departamento: '{department}' "
-                f"({'activos' if active_only else 'todos'})"
+                f"Buscando equipos por departamento ID: {department_id}"
             )
             
-            # Validar departamento
-            if not department or not isinstance(department, str):
-                raise ValidationError("El departamento es obligatorio")
-            
-            department = department.strip()
-            if len(department) < 2:
+            # Validar department_id
+            if not isinstance(department_id, int) or department_id <= 0:
                 raise ValidationError(
-                    "El departamento debe tener al menos 2 caracteres"
+                    message="ID de departamento no válido",
+                    details={"department_id": department_id}
                 )
             
-            # Validar parámetros de paginación
-            if page < 1:
-                raise ValidationError("El número de página debe ser mayor a 0")
-            if page_size < 1 or page_size > 100:
-                raise ValidationError("El tamaño de página debe estar entre 1 y 100")
+            # Buscar equipos por departamento
+            teams = await self._team_repo.get_teams_by_department(department_id)
             
-            # Buscar equipos en el repositorio con paginación
-            active_only = not include_inactive
-            teams, total_count = await self._team_repo.get_teams_by_department(
-                department, active_only=active_only, page=page, page_size=page_size
-            )
-            
-            # Convertir a schemas de salida
-            team_schemas = [TeamSchema.model_validate(team) for team in teams]
-            
-            # Crear respuesta paginada
-            total_pages = (total_count + page_size - 1) // page_size
-            has_next = page < total_pages
-            has_previous = page > 1
-            
-            paginated_response = PaginatedResponse(
-                items=team_schemas,
-                total_count=total_count,
-                page=page,
-                page_size=page_size,
-                total_pages=total_pages,
-                has_next=has_next,
-                has_previous=has_previous
-            )
+            # Incluir miembros si se solicita
+            if include_members:
+                for team in teams:
+                    # Cargar miembros del equipo
+                    team.members = await self._team_repo.get_team_members(team.id)
             
             self._logger.debug(
-                f"Equipos encontrados por departamento '{department}': {len(team_schemas)}"
+                f"Equipos encontrados por departamento {department_id}: {len(teams)}"
             )
             
-            return paginated_response
+            return teams
             
         except TeamRepositoryError as e:
             self._logger.error(f"Error de repositorio en búsqueda por departamento: {e}")
@@ -329,16 +276,20 @@ class TeamDomainSearchOperations(ITeamDomainSearchOperations):
 
     async def search_teams_advanced(
         self,
-        criteria: TeamSearchCriteria
-    ) -> PaginatedResponse[TeamSchema]:
+        search_criteria: Dict[str, Any],
+        include_details: bool = False,
+        include_members: bool = False
+    ) -> List[TeamSchema]:
         """
-        Búsqueda avanzada de equipos con múltiples criterios y paginación.
+        Búsqueda avanzada de equipos con múltiples criterios.
         
         Args:
-            criteria: Criterios de búsqueda avanzada
+            search_criteria: Diccionario con criterios de búsqueda
+            include_details: Si incluir detalles adicionales del equipo
+            include_members: Si incluir información de miembros del equipo
             
         Returns:
-            PaginatedResponse[TeamSchema]: Respuesta paginada con equipos
+            List[TeamSchema]: Lista de equipos que cumplen los criterios
             
         Raises:
             ValidationError: Si los criterios de búsqueda no son válidos
@@ -348,49 +299,26 @@ class TeamDomainSearchOperations(ITeamDomainSearchOperations):
             self._logger.info("Realizando búsqueda avanzada de equipos")
             
             # Validar criterios de búsqueda
-            if not criteria:
-                raise ValidationError("Los criterios de búsqueda son requeridos")
+            if not isinstance(search_criteria, dict) or not search_criteria:
+                raise ValidationError(
+                    message="Los criterios de búsqueda son obligatorios",
+                    details={"search_criteria": search_criteria}
+                )
             
-            # Validar parámetros de paginación
-            page = getattr(criteria, 'page', 1)
-            page_size = getattr(criteria, 'page_size', 10)
+            # Realizar búsqueda avanzada
+            teams = await self._team_repo.search_teams_by_criteria(search_criteria)
             
-            if page < 1:
-                raise ValidationError("El número de página debe ser mayor a 0")
-            if page_size < 1 or page_size > 100:
-                raise ValidationError("El tamaño de página debe estar entre 1 y 100")
+            # Aplicar filtros adicionales según las opciones
+            if include_details or include_members:
+                for team in teams:
+                    if include_details:
+                        # Cargar detalles adicionales del equipo
+                        pass
+                    if include_members:
+                        # Cargar miembros del equipo
+                        team.members = await self._team_repo.get_team_members(team.id)
             
-            # Convertir criterios a diccionario para el repositorio
-            search_dict = criteria.model_dump(exclude_unset=True)
-            
-            # Buscar equipos con criterios avanzados
-            teams, total_count = await self._team_repo.search_teams_by_criteria(
-                search_dict, page=page, page_size=page_size
-            )
-            
-            # Convertir a schemas de salida
-            team_schemas = [TeamSchema.model_validate(team) for team in teams]
-            
-            # Crear respuesta paginada
-            total_pages = (total_count + page_size - 1) // page_size
-            has_next = page < total_pages
-            has_previous = page > 1
-            
-            paginated_response = PaginatedResponse(
-                items=team_schemas,
-                total_count=total_count,
-                page=page,
-                page_size=page_size,
-                total_pages=total_pages,
-                has_next=has_next,
-                has_previous=has_previous
-            )
-            
-            self._logger.debug(
-                f"Equipos encontrados con búsqueda avanzada: {len(team_schemas)}"
-            )
-            
-            return paginated_response
+            return teams
             
         except TeamRepositoryError as e:
             self._logger.error(f"Error de repositorio en búsqueda avanzada: {e}")
