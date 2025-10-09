@@ -9,7 +9,7 @@ from abc import ABC, abstractmethod
 from typing import Dict, Any
 
 
-class DiagnosticOperationsInterface(ABC):
+class IScheduleDomainDiagnosticOperations(ABC):
     """
     Interfaz para operaciones de diagnóstico del servicio de dominio Schedule.
     

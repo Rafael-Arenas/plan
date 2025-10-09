@@ -20,7 +20,7 @@ from planificador.exceptions.validation import ValidationError
 from planificador.exceptions.repository import RepositoryError
 
 
-class ValidationOperationsInterface(ABC):
+class IScheduleDomainValidationOperations(ABC):
     """
     Interfaz abstracta para operaciones de validación de horarios.
     
