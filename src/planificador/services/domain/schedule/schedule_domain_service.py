@@ -10,7 +10,7 @@ from datetime import date, time
 import pendulum
 from loguru import logger
 
-from ...repositories.schedule.schedule_repository_facade import ScheduleRepositoryFacade
+from ....repositories.schedule.schedule_repository_facade import ScheduleRepositoryFacade
 from .interfaces import IScheduleDomainService
 from .modules import (
     ScheduleDomainCrudOperations,
