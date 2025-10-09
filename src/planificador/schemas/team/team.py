@@ -97,6 +97,42 @@ class TeamMembershipCreate(TeamMembershipBase):
     pass
 
 
+class TeamMembershipUpdate(BaseSchema):
+    """Schema para actualizar una TeamMembership."""
+    
+    role: Optional[MembershipRole] = None
+    start_date: Optional[date] = None
+    end_date: Optional[date] = None
+    is_active: Optional[bool] = None
+
+    @field_validator('start_date')
+    @classmethod
+    def validate_start_date(cls, v: Optional[date]) -> Optional[date]:
+        """Valida que la fecha de inicio no sea muy antigua ni muy futura."""
+        if v is not None:
+            if v < pendulum.now().subtract(years=10).date():
+                raise ValueError("La fecha de inicio no puede ser anterior a 10 años")
+            if v > pendulum.now().add(years=5).date():
+                raise ValueError("La fecha de inicio no puede ser posterior a 5 años")
+        return v
+
+    @field_validator('end_date')
+    @classmethod
+    def validate_end_date(cls, v: Optional[date]) -> Optional[date]:
+        """Valida que la fecha de fin no sea muy futura."""
+        if v is not None:
+            if v > pendulum.now().add(years=10).date():
+                raise ValueError("La fecha de fin no puede ser posterior a 10 años")
+        return v
+
+    @model_validator(mode='after')
+    def validate_date_range(self) -> 'TeamMembershipUpdate':
+        """Valida que el rango de fechas sea coherente."""
+        if self.end_date and self.start_date and self.start_date >= self.end_date:
+            raise ValueError("La fecha de inicio debe ser anterior a la fecha de fin")
+        return self
+
+
 class TeamMembership(TeamMembershipBase):
     """Schema de salida para TeamMembership."""
 
