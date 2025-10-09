@@ -11,7 +11,7 @@ from loguru import logger
 
 from planificador.schemas.schedule.schedule import Schedule
 from planificador.schemas.response.response_schemas import ScheduleListResponse, ScheduleSearchResponse
-from planificador.services.domain.schedule.interfaces.project_operations import (
+from planificador.services.domain.schedule.interfaces.project_operations_interface import (
     IScheduleDomainProjectOperations
 )
 from planificador.repositories.schedule.schedule_repository_facade import ScheduleRepositoryFacade

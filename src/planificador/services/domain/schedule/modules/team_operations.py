@@ -11,7 +11,7 @@ from loguru import logger
 
 from planificador.schemas.schedule.schedule_response import ScheduleResponseSchema
 from planificador.schemas.schedule.team_schedule_coordination import TeamScheduleCoordinationSchema
-from planificador.services.domain.schedule.interfaces.team_operations import (
+from planificador.services.domain.schedule.interfaces.team_operations_interface import (
     IScheduleDomainTeamOperations
 )
 from planificador.repositories.schedule.schedule_repository_facade import ScheduleRepositoryFacade

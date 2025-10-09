@@ -13,7 +13,7 @@ from planificador.schemas.schedule.schedule import (
     ScheduleUpdate,
     Schedule
 )
-from planificador.services.domain.schedule.interfaces.crud_operations import (
+from planificador.services.domain.schedule.interfaces.crud_operations_interface import (
     IScheduleDomainCrudOperations
 )
 from planificador.repositories.schedule.schedule_repository_facade import ScheduleRepositoryFacade

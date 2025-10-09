@@ -15,7 +15,7 @@ from planificador.schemas.schedule.schedule_confirmation import (
     BulkConfirmationResultSchema,
     PendingConfirmationSchema
 )
-from planificador.services.domain.schedule.interfaces.confirmation_operations import (
+from planificador.services.domain.schedule.interfaces.confirmation_operations_interface import (
     IScheduleDomainConfirmationOperations
 )
 from planificador.repositories.schedule.schedule_repository_facade import ScheduleRepositoryFacade

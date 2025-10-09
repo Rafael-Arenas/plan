@@ -16,7 +16,7 @@ from planificador.schemas.schedule.schedule import (
     WorkloadValidationSchema
 )
 from planificador.schemas.response_schemas import ScheduleSearchResponse
-from planificador.services.domain.schedule.interfaces.validation_operations import (
+from planificador.services.domain.schedule.interfaces.validation_operations_interface import (
     IScheduleDomainValidationOperations
 )
 from planificador.repositories.schedule.schedule_repository_facade import ScheduleRepositoryFacade

@@ -15,7 +15,7 @@ from planificador.schemas.schedule import (
     TeamHoursSummarySchema,
     OvertimeAnalysisSchema
 )
-from planificador.services.domain.schedule.interfaces.statistics_operations import (
+from planificador.services.domain.schedule.interfaces.statistics_operations_interface import (
     IScheduleDomainStatisticsOperations
 )
 from planificador.repositories.schedule.schedule_repository_facade import ScheduleRepositoryFacade

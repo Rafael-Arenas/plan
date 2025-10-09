@@ -14,7 +14,7 @@ from planificador.schemas.schedule.schedule import (
     UtilizationReportSchema,
     ScheduleDistributionSchema
 )
-from planificador.services.domain.schedule.interfaces.productivity_operations import (
+from planificador.services.domain.schedule.interfaces.productivity_operations_interface import (
     IScheduleDomainProductivityOperations
 )
 from planificador.repositories.schedule.schedule_repository_facade import ScheduleRepositoryFacade

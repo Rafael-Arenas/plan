@@ -7,7 +7,7 @@ y diagnósticos comprehensivos para monitoreo y mantenimiento.
 
 from typing import Dict, Any
 from loguru import logger
-from planificador.services.domain.schedule.interfaces.diagnostic_operations import (
+from planificador.services.domain.schedule.interfaces.diagnostic_operations_interface import (
     DiagnosticOperationsInterface
 )
 from planificador.repositories.schedule.schedule_repository_facade import ScheduleRepositoryFacade

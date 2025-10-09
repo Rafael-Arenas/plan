@@ -14,7 +14,7 @@ from planificador.schemas.response.response_schemas import (
     ScheduleListResponse,
     ScheduleSearchResponse
 )
-from planificador.services.domain.schedule.interfaces.employee_operations import (
+from planificador.services.domain.schedule.interfaces.employee_operations_interface import (
     IScheduleDomainEmployeeOperations
 )
 from planificador.repositories.schedule.schedule_repository_facade import ScheduleRepositoryFacade
