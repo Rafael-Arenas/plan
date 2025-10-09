@@ -17,12 +17,6 @@ from planificador.database.database import Base, get_db, db_manager
 from planificador.tests.fixtures.database import *
 
 
-# Configuración de pytest
-pytest_plugins = [
-    "pytest_asyncio",
-    "planificador.tests.unit.test_repositories.team_membership.fixtures",
-]
-
 # Configuración de pytest-asyncio para evitar warnings
 pytestmark = pytest.mark.asyncio(scope="session")
 
@@ -111,21 +105,21 @@ def setup_test_logging():
     Se ejecuta automáticamente antes de cada test.
     """
     # Configurar loguru para testing
-    logger.remove()  # Remover handlers existentes
+    # logger.remove()  # Remover handlers existentes
     
     # Agregar handler para testing con nivel DEBUG
-    logger.add(
-        sink=lambda msg: None,  # No output durante tests
-        level="DEBUG",
-        format="{time} | {level} | {name}:{function}:{line} | {message}",
-        backtrace=True,
-        diagnose=True,
-    )
+    # logger.add(
+    #     sink=lambda msg: None,  # No output durante tests
+    #     level="DEBUG",
+    #     format="{time} | {level} | {name}:{function}:{line} | {message}",
+    #     backtrace=True,
+    #     diagnose=True,
+    # )
     
     yield
     
     # Cleanup después del test
-    logger.remove()
+    # logger.remove()
 
 
 @pytest.fixture(scope="session")
@@ -136,10 +130,3 @@ def test_data_dir() -> Path:
         Path: Ruta al directorio de datos de testing
     """
     return Path(__file__).parent / "fixtures" / "data"
-
-
-# Configuración de marcadores pytest
-pytest.mark.unit = pytest.mark.unit
-pytest.mark.integration = pytest.mark.integration
-pytest.mark.performance = pytest.mark.performance
-pytest.mark.slow = pytest.mark.slow
