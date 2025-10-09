@@ -13,7 +13,7 @@ Operaciones probadas:
 import pytest
 import pendulum
 from typing import List
-from unittest.mock import AsyncMock, patch
+from unittest.mock import MagicMock, AsyncMock
 from uuid import UUID
 
 from planificador.services.domain.project_assignment.modules.project_queries import ProjectQueries
@@ -34,262 +34,338 @@ class TestProjectQueries:
     """
 
     @pytest.fixture
+    def mock_repository_facade(self) -> AsyncMock:
+        """Fixture para mockear RepositoryFacade."""
+        facade = AsyncMock()
+        facade.project_assignment = AsyncMock()
+        facade.project = AsyncMock()
+        return facade
+
+    @pytest.fixture
     def project_queries(self, mock_repository_facade: AsyncMock) -> ProjectQueries:
-        """
-        Fixture que crea una instancia de ProjectQueries con dependencias mockeadas.
-        
-        Returns:
-            ProjectQueries: Instancia del servicio con mocks
-        """
+        """Fixture que crea una instancia de ProjectQueries con un mock de RepositoryFacade."""
         return ProjectQueries(repository_facade=mock_repository_facade)
 
     # ==================== TESTS GET_ASSIGNMENTS_BY_PROJECT ====================
 
     @pytest.mark.asyncio
-    async def test_get_assignments_by_project_success(
-        self,
-        project_queries: ProjectQueries,
-        sample_project_id: int,
-        sample_assignment_list: List[ProjectAssignment]
-    ):
+    async def test_get_assignments_by_project_success(self, project_queries, mock_repository_facade):
         """
-        Test: Obtención exitosa de asignaciones por proyecto.
-        
-        Verifica que el método get_assignments_by_project retorne
-        correctamente las asignaciones del proyecto especificado.
+        Prueba que se obtienen las asignaciones de un proyecto correctamente.
         """
-        # Arrange
-        project_queries._repository.get_assignments_by_project.return_value = sample_assignment_list
-        
-        # Act
-        result = await project_queries.get_assignments_by_project(sample_project_id)
-        
-        # Assert
-        assert result == sample_assignment_list
-        project_queries._repository.get_assignments_by_project.assert_called_once_with(project_id=sample_project_id)
+        # Configuración del mock
+        project_id = 1
+        now = pendulum.now()
+        mock_assignments = [
+            ProjectAssignment(
+                id=1, project_id=project_id, employee_id=101, 
+                start_date=now.date(), created_at=now, updated_at=now
+            ),
+            ProjectAssignment(
+                id=2, project_id=project_id, employee_id=102, 
+                start_date=now.date(), created_at=now, updated_at=now
+            ),
+        ]
+        mock_repository_facade.project_assignment.get_assignments_by_project.return_value = mock_assignments
+
+        # Ejecución
+        assignments = await project_queries.get_assignments_by_project(project_id)
+
+        # Verificación
+        assert assignments == mock_assignments
+        mock_repository_facade.project_assignment.get_assignments_by_project.assert_called_once_with(project_id)
 
     @pytest.mark.asyncio
-    async def test_get_assignments_by_project_empty_result(
-        self, project_queries, sample_project_id
-    ):
-        """Test obtener asignaciones por proyecto con resultado vacío."""
-        # Configurar mock
-        project_queries._repository.get_assignments_by_project.return_value = []
-        
-        # Ejecutar
-        result = await project_queries.get_assignments_by_project(sample_project_id)
-        
-        # Verificar
-        assert result == []
-        project_queries._repository.get_assignments_by_project.assert_called_once_with(
-            project_id=sample_project_id
-        )
-
-    @pytest.mark.asyncio
-    async def test_get_assignments_by_project_invalid_id(
-        self,
-        project_queries: ProjectQueries
-    ):
+    async def test_get_assignments_by_project_empty_result(self, project_queries, mock_repository_facade):
         """
-        Test: ID de proyecto inválido.
-        
-        Verifica que se lance ValidationError para IDs inválidos.
+        Prueba que se maneja correctamente un resultado vacío.
         """
-        # Arrange
-        invalid_project_id = -1
-        
-        # Act & Assert
-        with pytest.raises(ValidationError) as exc_info:
-            await project_queries.get_assignments_by_project(
-                project_id=invalid_project_id,
-                include_inactive=False
-            )
-        
-        assert "ID de proyecto debe ser positivo" in str(exc_info.value)
+        # Configuración del mock
+        project_id = 99
+        mock_repository_facade.project_assignment.get_assignments_by_project.return_value = []
+
+        # Ejecución
+        assignments = await project_queries.get_assignments_by_project(project_id)
+
+        # Verificación
+        assert assignments == []
+        mock_repository_facade.project_assignment.get_assignments_by_project.assert_called_once_with(project_id)
 
     @pytest.mark.asyncio
-    async def test_get_assignments_by_project_repository_error(
-        self, project_queries, sample_project_id
-    ):
-        """Test manejo de error del repositorio."""
-        # Configurar mock para lanzar excepción
-        project_queries._repository.get_assignments_by_project.side_effect = RepositoryError(
-            message="Error de base de datos",
-            operation="get_assignments_by_project",
-            entity_type="ProjectAssignment"
-        )
-        
-        # Verificar que se propague la excepción
-        with pytest.raises(RepositoryError):
-            await project_queries.get_assignments_by_project(sample_project_id)
-
-    # ==================== TESTS GET_PROJECT_TEAM_SUMMARY ====================
+    async def test_get_assignments_by_project_invalid_id(self, project_queries):
+        """Test con ID de proyecto inválido."""
+        project_id = -1
+        with pytest.raises(ValidationError, match="ID de proyecto debe ser un entero positivo."):
+            await project_queries.get_assignments_by_project(project_id)
 
     @pytest.mark.asyncio
-    async def test_get_project_team_summary(
-        self, project_queries, sample_project_id, sample_assignment_list
-    ):
-        """Test obtener resumen del equipo del proyecto."""
-        # Configurar mock
-        project_queries._repository.get_assignments_by_project.return_value = sample_assignment_list
-        
-        # Ejecutar
-        result = await project_queries.get_project_team_summary(sample_project_id)
-        
-        # Verificar estructura del resultado
-        assert isinstance(result, dict)
-        assert "project_id" in result
-        assert "total_members" in result
-        assert "team_composition" in result
-        assert result["project_id"] == sample_project_id
-
-    @pytest.mark.asyncio
-    async def test_get_project_team_summary_no_assignments(
-        self,
-        project_queries: ProjectQueries,
-        sample_project_id: int
-    ):
+    async def test_get_assignments_by_project_repository_error(self, project_queries, mock_repository_facade):
         """
-        Test: Resumen de equipo para proyecto sin asignaciones.
-        
-        Verifica que se genere un resumen vacío para proyectos
-        sin asignaciones.
+        Prueba el manejo de RepositoryError.
         """
-        # Arrange
-        project_queries._repository.get_assignments_by_project.return_value = []
-        project_queries._repository.project_exists.return_value = True
-        project_queries._repository.get_project_basic_info.return_value = {"name": "Empty Project"}
-        
-        # Act
-        result = await project_queries.get_project_team_summary(sample_project_id)
-        
-        # Assert
-        assert isinstance(result, dict)
-        assert result["project_id"] == sample_project_id
-        assert result["total_members"] == 0
-        assert len(result["team_composition"]) == 0
-        
-        # Verificar que se llamaron los métodos correctos
-        project_queries._repository.get_assignments_by_project.assert_called_once_with(
-            project_id=sample_project_id, active_only=True
-        )
-        project_queries._repository.project_exists.assert_called_once_with(sample_project_id)
-        project_queries._repository.get_project_basic_info.assert_called_once_with(sample_project_id)
+        # Configuración del mock
+        project_id = 1
+        error_message = "Database connection failed"
+        mock_repository_facade.project_assignment.get_assignments_by_project.side_effect = RepositoryError(message=error_message)
 
-    # ==================== TESTS GET_PROJECT_RESOURCE_ALLOCATION ====================
+        # Ejecución y verificación
+        with pytest.raises(RepositoryError, match=error_message):
+            await project_queries.get_assignments_by_project(project_id)
+        
+        mock_repository_facade.project_assignment.get_assignments_by_project.assert_called_once_with(project_id)
+
+    # ===========================================================================
+    # Pruebas para get_project_team_summary
+    # ===========================================================================
 
     @pytest.mark.asyncio
-    async def test_get_project_resource_allocation(
-        self, project_queries, sample_project_id, sample_assignment_list
-    ):
-        """Test obtener asignación de recursos del proyecto."""
-        # Configurar mock
-        project_queries._repository.get_assignments_by_project.return_value = sample_assignment_list
-        
-        # Ejecutar
-        result = await project_queries.get_project_resource_allocation(sample_project_id)
-        
-        # Verificar estructura del resultado
-        assert isinstance(result, dict)
-        assert "project_id" in result
-        assert "total_allocation" in result
-        assert "resource_distribution" in result
+    async def test_get_project_team_summary_success(self, project_queries, mock_repository_facade):
+        """
+        Prueba que se obtiene el resumen del equipo de un proyecto correctamente.
+        """
+        # Configuración del mock
+        project_id = 1
+        now = pendulum.now()
+        mock_assignments = [
+            ProjectAssignment(
+                id=1, project_id=project_id, employee_id=101, role_in_project="Developer",
+                percentage_allocation=80.0, start_date=now.date(),
+                end_date=now.date().add(months=6), is_active=True,
+                created_at=now, updated_at=now
+            ),
+            ProjectAssignment(
+                id=2, project_id=project_id, employee_id=102, role_in_project="Designer",
+                percentage_allocation=60.0, start_date=now.date().add(months=1),
+                end_date=now.date().add(months=5), is_active=True,
+                created_at=now, updated_at=now
+            ),
+        ]
+        mock_repository_facade.project_assignment.get_assignments_by_project.return_value = mock_assignments
 
-    # ==================== TESTS GET_PROJECT_ASSIGNMENT_TIMELINE ====================
+        # Ejecución
+        summary = await project_queries.get_project_team_summary(project_id)
 
-    @pytest.mark.asyncio
-    async def test_get_project_assignment_timeline_success(
-        self, project_queries, sample_project_id, sample_assignment_list
-    ):
-        """Test obtener timeline del proyecto."""
-        # Configurar mock
-        project_queries._repository.get_assignments_by_project.return_value = sample_assignment_list
-        
-        # Ejecutar
-        result = await project_queries.get_project_assignment_timeline(sample_project_id)
-        
-        # Verificar estructura del resultado
-        assert isinstance(result, dict)
-        assert "project_id" in result
-        assert "timeline_events" in result
+        # Verificación
+        assert summary["project_id"] == project_id
+        assert summary["total_team_members"] == 2
+        assert "Developer" in summary["team_composition"]["roles_distribution"]
+        mock_repository_facade.project_assignment.get_assignments_by_project.assert_called_once_with(project_id)
 
     @pytest.mark.asyncio
-    async def test_get_project_assignment_timeline_invalid_date_range(
-        self,
-        project_queries: ProjectQueries,
-        sample_project_id: int
-    ):
+    async def test_get_project_team_summary_no_assignments(self, project_queries, mock_repository_facade):
+        """
+        Prueba el comportamiento cuando no hay asignaciones para el proyecto.
+        """
+        # Configuración del mock
+        project_id = 2
+        mock_repository_facade.project_assignment.get_assignments_by_project.return_value = []
+
+        # Ejecución
+        summary = await project_queries.get_project_team_summary(project_id)
+
+        # Verificación
+        assert summary["project_id"] == project_id
+        assert summary["total_team_members"] == 0
+        assert summary["team_composition"]["roles_distribution"] == {}
+        assert summary["allocation_summary"]["total_allocated_hours"] == 0.0
+        mock_repository_facade.project_assignment.get_assignments_by_project.assert_called_once_with(project_id)
+
+    @pytest.mark.asyncio
+    async def test_get_project_team_summary_invalid_id(self, project_queries):
+        """Test con ID de proyecto inválido."""
+        project_id = -1
+        with pytest.raises(ValidationError, match="ID de proyecto debe ser un entero positivo."):
+            await project_queries.get_project_team_summary(project_id)
+
+    @pytest.mark.asyncio
+    async def test_get_project_team_summary_repository_error(self, project_queries, mock_repository_facade):
+        """
+        Prueba el manejo de RepositoryError en get_project_team_summary.
+        """
+        # Configuración del mock
+        project_id = 1
+        error_message = "Error fetching assignments"
+        mock_repository_facade.project_assignment.get_assignments_by_project.side_effect = RepositoryError(message=error_message)
+
+        # Ejecución y verificación
+        with pytest.raises(RepositoryError, match=error_message):
+            await project_queries.get_project_team_summary(project_id)
+        
+        mock_repository_facade.project_assignment.get_assignments_by_project.assert_called_once_with(project_id)
+
+    # ===========================================================================
+    # Pruebas para get_project_resource_allocation
+    # ===========================================================================
+
+    @pytest.mark.asyncio
+    async def test_get_project_resource_allocation_success(self, project_queries, mock_repository_facade):
+        """
+        Prueba que se obtiene la distribución de recursos de un proyecto correctamente.
+        """
+        # Configuración del mock
+        project_id = 1
+        now = pendulum.now()
+        mock_assignments = [
+            ProjectAssignment(
+                id=1, project_id=project_id, employee_id=101, role_in_project="Backend",
+                percentage_allocation=100.0, start_date=now.date(),
+                created_at=now, updated_at=now
+            ),
+            ProjectAssignment(
+                id=2, project_id=project_id, employee_id=102, role_in_project="Frontend",
+                percentage_allocation=50.0, start_date=now.date().add(days=15),
+                created_at=now, updated_at=now
+            ),
+        ]
+        mock_repository_facade.project_assignment.get_assignments_by_project.return_value = mock_assignments
+
+        # Ejecución
+        allocation = await project_queries.get_project_resource_allocation(project_id)
+
+        # Verificación
+        assert allocation["project_id"] == project_id
+        assert allocation["total_resources"] == 2
+        assert "Backend" in allocation["resource_distribution"]["by_role"]
+        mock_repository_facade.project_assignment.get_assignments_by_project.assert_called_once_with(project_id)
+
+    @pytest.mark.asyncio
+    async def test_get_project_resource_allocation_no_assignments(self, project_queries, mock_repository_facade):
+        """
+        Prueba el caso donde no hay asignaciones para el proyecto.
+        """
+        # Configuración del mock
+        project_id = 2
+        mock_repository_facade.project_assignment.get_assignments_by_project.return_value = []
+
+        # Ejecución
+        allocation = await project_queries.get_project_resource_allocation(project_id)
+
+        # Verificación
+        assert allocation["project_id"] == project_id
+        assert allocation["total_resources"] == 0
+        mock_repository_facade.project_assignment.get_assignments_by_project.assert_called_once_with(project_id)
+
+    @pytest.mark.asyncio
+    async def test_get_project_resource_allocation_invalid_id(self, project_queries):
+        """Test con ID de proyecto inválido."""
+        project_id = -1
+        with pytest.raises(ValidationError, match="ID de proyecto debe ser un entero positivo."):
+            await project_queries.get_project_resource_allocation(project_id)
+
+    @pytest.mark.asyncio
+    async def test_get_project_resource_allocation_repository_error(self, project_queries, mock_repository_facade):
+        """
+        Prueba el manejo de RepositoryError en get_project_resource_allocation.
+        """
+        # Configuración del mock
+        project_id = 1
+        error_message = "Failed to fetch data"
+        mock_repository_facade.project_assignment.get_assignments_by_project.side_effect = RepositoryError(message=error_message)
+
+        # Ejecución y verificación
+        with pytest.raises(RepositoryError, match=error_message):
+            await project_queries.get_project_resource_allocation(project_id)
+        
+        mock_repository_facade.project_assignment.get_assignments_by_project.assert_called_once_with(project_id)
+
+    # ===========================================================================
+    # Pruebas para get_project_assignment_timeline
+    # ===========================================================================
+
+    @pytest.mark.asyncio
+    async def test_get_project_assignment_timeline_success(self, project_queries, mock_repository_facade):
+        """
+        Prueba que se genera la línea de tiempo de un proyecto correctamente.
+        """
+        # Configuración del mock
+        project_id = 1
+        now = pendulum.now()
+        start_date = now.date()
+        mock_assignments = [
+            ProjectAssignment(
+                id=1, project_id=project_id, employee_id=101, role_in_project="Lead",
+                start_date=start_date, end_date=now.add(months=6).date(),
+                created_at=now, updated_at=now
+            ),
+            ProjectAssignment(
+                id=2, project_id=project_id, employee_id=102, role_in_project="Support",
+                start_date=now.add(months=2).date(), end_date=now.add(months=9).date(),
+                created_at=now, updated_at=now
+            ),
+        ]
+        # Forzar el mock a ser un AsyncMock que devuelve la lista correcta
+        mock_repository_facade.project_assignment.get_assignments_by_project = AsyncMock(return_value=mock_assignments)
+
+        # Ejecución
+        timeline = await project_queries.get_project_assignment_timeline(project_id)
+
+        # Verificación
+        assert timeline["project_id"] == project_id
+        assert len(timeline["timeline_data"]) == 2
+        assert timeline["project_span"]["duration_days"] > 0
+        mock_repository_facade.project_assignment.get_assignments_by_project.assert_called_once_with(project_id)
+
+    @pytest.mark.asyncio
+    async def test_get_project_assignment_timeline_no_assignments(self, project_queries, mock_repository_facade):
+        """
+        Prueba el caso donde no hay asignaciones para generar la línea de tiempo.
+        """
+        # Configuración del mock
+        project_id = 2
+        mock_repository_facade.project_assignment.get_assignments_by_project.return_value = []
+
+        # Ejecución
+        timeline = await project_queries.get_project_assignment_timeline(project_id)
+
+        # Verificación
+        assert timeline["project_id"] == project_id
+        assert timeline["timeline_data"] == []
+        mock_repository_facade.project_assignment.get_assignments_by_project.assert_called_once_with(project_id)
+
+    @pytest.mark.asyncio
+    async def test_get_project_assignment_timeline_invalid_id(self, project_queries):
+        """Test con ID de proyecto inválido."""
+        project_id = -1
+        with pytest.raises(ValidationError, match="ID de proyecto debe ser un entero positivo."):
+            await project_queries.get_project_assignment_timeline(project_id)
+
+    @pytest.mark.asyncio
+    async def test_get_project_assignment_timeline_invalid_date_range(self, project_queries):
         """
         Test: Rango de fechas inválido para línea de tiempo.
         
         Verifica que se lance ValidationError para rangos de fechas inválidos.
         """
-        # Arrange
-        start_date = pendulum.now().date()
-        end_date = start_date.subtract(days=1)  # Fecha fin anterior a fecha inicio
-        
+        # Crear un mock para el objeto de rango de fechas
+        class MockDateRange:
+            def __init__(self, start, end):
+                self.start_date = start
+                self.end_date = end
+
+        invalid_range = MockDateRange(
+            start=pendulum.date(2023, 1, 1),
+            end=pendulum.date(2022, 12, 31)
+        )
+
         # Act & Assert
-        with pytest.raises(ValidationError) as exc_info:
+        with pytest.raises(ValidationError, match="La fecha de fin debe ser posterior a la fecha de inicio"):
             await project_queries.get_project_assignment_timeline(
-                project_id=sample_project_id,
-                start_date=start_date,
-                end_date=end_date
+                project_id=1,
+                date_range=invalid_range
             )
-        
-        assert "La fecha de fin debe ser posterior a la fecha de inicio" in str(exc_info.value)
-
-    # ==================== TESTS MÉTODOS PRIVADOS ====================
 
     @pytest.mark.asyncio
-    async def test_validate_project_id_valid(self, project_queries: ProjectQueries):
+    async def test_get_project_assignment_timeline_repository_error(self, project_queries, mock_repository_facade):
         """
-        Test: Validación exitosa de ID de proyecto.
-        
-        Verifica que no se lance excepción para IDs válidos.
+        Prueba el manejo de RepositoryError en get_project_assignment_timeline.
         """
-        # Act & Assert - No debe lanzar excepción
-        project_queries._validate_project_id(1)
-        project_queries._validate_project_id(999)
+        # Configuración del mock
+        project_id = 1
+        error_message = "Timeline generation failed"
+        mock_repository_facade.project_assignment.get_assignments_by_project.side_effect = RepositoryError(message=error_message)
 
-    @pytest.mark.asyncio
-    async def test_validate_project_id_invalid(self, project_queries: ProjectQueries):
-        """
-        Test: Validación fallida de ID de proyecto.
+        # Ejecución y verificación
+        with pytest.raises(RepositoryError, match=error_message):
+            await project_queries.get_project_assignment_timeline(project_id)
         
-        Verifica que se lance ValidationError para IDs inválidos.
-        """
-        # Act & Assert
-        with pytest.raises(ValidationError):
-            project_queries._validate_project_id(0)
-        
-        with pytest.raises(ValidationError):
-            project_queries._validate_project_id(-1)
-
-    @pytest.mark.asyncio
-    async def test_validate_date_range_valid(self, project_queries: ProjectQueries):
-        """
-        Test: Validación exitosa de rango de fechas.
-        
-        Verifica que no se lance excepción para rangos válidos.
-        """
-        # Arrange
-        start_date = pendulum.now().date()
-        end_date = start_date.add(days=30)
-        
-        # Act & Assert - No debe lanzar excepción
-        project_queries._validate_date_range(start_date, end_date)
-
-    @pytest.mark.asyncio
-    async def test_validate_date_range_invalid(self, project_queries: ProjectQueries):
-        """
-        Test: Validación fallida de rango de fechas.
-        
-        Verifica que se lance ValidationError para rangos inválidos.
-        """
-        # Arrange
-        start_date = pendulum.now().date()
-        end_date = start_date.subtract(days=1)
-        
-        # Act & Assert
-        with pytest.raises(ValidationError):
-            project_queries._validate_date_range(start_date, end_date)
+        mock_repository_facade.project_assignment.get_assignments_by_project.assert_called_once_with(project_id)
