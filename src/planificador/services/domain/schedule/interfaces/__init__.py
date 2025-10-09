@@ -23,16 +23,16 @@ el testing mediante dependency injection y mocking.
 """
 
 from .schedule_domain_interface import IScheduleDomainService
-from .crud_operations import IScheduleDomainCrudOperations
-from .employee_operations import IScheduleDomainEmployeeOperations
-from .project_operations import IScheduleDomainProjectOperations
-from .team_operations import IScheduleDomainTeamOperations
-from .search_operations import IScheduleDomainSearchOperations
-from .confirmation_operations import IScheduleDomainConfirmationOperations
-from .statistics_operations import IScheduleDomainStatisticsOperations
-from .productivity_operations import IScheduleDomainProductivityOperations
-from .validation_operations import IScheduleDomainValidationOperations
-from .diagnostic_operations import IScheduleDomainDiagnosticOperations
+from .crud_operations_interface import IScheduleDomainCrudOperations
+from .employee_operations_interface import IScheduleDomainEmployeeOperations
+from .project_operations_interface import IScheduleDomainProjectOperations
+from .team_operations_interface import IScheduleDomainTeamOperations
+from .search_operations_interface import IScheduleDomainSearchOperations
+from .confirmation_operations_interface import IScheduleDomainConfirmationOperations
+from .statistics_operations_interface import IScheduleDomainStatisticsOperations
+from .productivity_operations_interface import IScheduleDomainProductivityOperations
+from .validation_operations_interface import IScheduleDomainValidationOperations
+from .diagnostic_operations_interface import IScheduleDomainDiagnosticOperations
 
 __all__ = [
     # Interfaz principal del Facade
