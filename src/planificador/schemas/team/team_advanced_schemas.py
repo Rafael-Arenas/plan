@@ -17,7 +17,7 @@ from pydantic import Field, field_validator, model_validator
 from ..base.base import BaseSchema
 from ..common_schemas import DateRangeSchema, PaginationSchema
 from ...models.team_membership import MembershipRole
-from ...services.domain.team.interfaces.search_operations_interface import TeamStatus
+from .enums import TeamStatus
 
 # Definir TypeVar para el tipo genérico
 T = TypeVar('T')
