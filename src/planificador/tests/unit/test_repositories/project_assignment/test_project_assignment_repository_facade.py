@@ -676,7 +676,7 @@ class TestStatisticsOperations:
             "completed": 15,
             "cancelled": 2
         }
-        project_assignment_repository._statistics_operations.get_assignments_by_status_count = AsyncMock(
+        project_assignment_repository._statistics_operations.get_assignments_by_status = AsyncMock(
             return_value=expected_counts
         )
         
@@ -685,7 +685,7 @@ class TestStatisticsOperations:
         
         # Verificar
         assert result == expected_counts
-        project_assignment_repository._statistics_operations.get_assignments_by_status_count.assert_called_once()
+        project_assignment_repository._statistics_operations.get_assignments_by_status.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_get_assignments_by_allocation_category_count(
@@ -698,7 +698,7 @@ class TestStatisticsOperations:
             "part_time": 15,
             "contractor": 7
         }
-        project_assignment_repository._statistics_operations.get_assignments_by_allocation_category_count = AsyncMock(
+        project_assignment_repository._statistics_operations.get_assignments_by_allocation_category = AsyncMock(
             return_value=expected_counts
         )
         
@@ -707,7 +707,7 @@ class TestStatisticsOperations:
         
         # Verificar
         assert result == expected_counts
-        project_assignment_repository._statistics_operations.get_assignments_by_allocation_category_count.assert_called_once()
+        project_assignment_repository._statistics_operations.get_assignments_by_allocation_category.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_get_employee_assignment_stats(
@@ -801,7 +801,7 @@ class TestStatisticsOperations:
             "optimal_load_employees": 17,
             "average_workload_percentage": 78.2
         }
-        project_assignment_repository._statistics_operations.get_workload_distribution_stats = AsyncMock(
+        project_assignment_repository._statistics_operations.get_workload_distribution = AsyncMock(
             return_value=expected_stats
         )
         
@@ -810,7 +810,7 @@ class TestStatisticsOperations:
         
         # Verificar
         assert result == expected_stats
-        project_assignment_repository._statistics_operations.get_workload_distribution_stats.assert_called_once()
+        project_assignment_repository._statistics_operations.get_workload_distribution.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_get_assignment_trends(
@@ -872,7 +872,7 @@ class TestStatisticsOperations:
             "Tester": 12,
             "Analyst": 6
         }
-        project_assignment_repository._statistics_operations.get_role_distribution_stats = AsyncMock(
+        project_assignment_repository._statistics_operations.get_role_distribution = AsyncMock(
             return_value=expected_stats
         )
         
@@ -881,7 +881,7 @@ class TestStatisticsOperations:
         
         # Verificar
         assert result == expected_stats
-        project_assignment_repository._statistics_operations.get_role_distribution_stats.assert_called_once()
+        project_assignment_repository._statistics_operations.get_role_distribution.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_get_comprehensive_dashboard_metrics(
