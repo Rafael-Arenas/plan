@@ -11,7 +11,7 @@ import pendulum
 from loguru import logger
 
 from ....repositories.team.team_repository_facade import TeamRepositoryFacade
-from ....repositories.team.team_membership_repository_facade import TeamMembershipRepositoryFacade
+from ....repositories.team_membership.team_membership_repository_facade import TeamMembershipRepositoryFacade
 from .interfaces import ITeamDomainService
 from .modules import (
     TeamDomainCrudOperations,
@@ -26,19 +26,33 @@ from .modules import (
 from planificador.exceptions import RepositoryError, ValidationError, NotFoundError
 from planificador.models.team import Team
 from planificador.schemas.team import (
-    TeamResponseSchema,
-    TeamListResponse,
-    TeamSearchResponse,
-    TeamMemberResponseSchema,
-    TeamMembershipResponseSchema,
-    BulkTeamCreationResultSchema,
-    TeamCreationTrend,
+    Team,
+    TeamCreate,
+    TeamUpdate,
+    TeamMembership,
+    TeamMembershipCreate,
+    TeamWithMembers,
+    TeamWithSchedules,
+    TeamWithDetails,
+    MembershipRole
+)
+from planificador.schemas.team.enums import TeamStatus
+from planificador.schemas.team.team_advanced_schemas import (
+    TeamCreateSchema,
+    TeamUpdateSchema,
+    TeamSchema,
+    TeamMembershipSchema,
+    PaginatedResponse,
     TeamPerformanceMetrics,
     ProductivityAnalysis,
     CollaborationMetrics,
     TeamsSummaryReport,
     ValidationResult,
-    BusinessRuleValidationResult
+    BusinessRuleValidationResult,
+    TeamSearchCriteria,
+    DateRange,
+    BusinessContext,
+    TeamCreationTrend
 )
 
 
@@ -114,281 +128,371 @@ class TeamDomainService(ITeamDomainService):
             membership_repository_facade
         )
         
-        self._logger.info("TeamDomainService inicializado correctamente")
-    
+        self._logger.info(
+            "TeamDomainService inicializado correctamente",
+            modules_count=8,
+            timestamp=pendulum.now().isoformat()
+        )
+
     async def initialize_service(self) -> None:
         """
-        Inicializa el servicio y sus dependencias.
+        Inicializa el servicio y todos sus módulos.
         
-        Raises:
-            RepositoryError: Si hay problemas con la inicialización del repositorio
+        Realiza verificaciones de salud y configuraciones iniciales
+        necesarias para el correcto funcionamiento del servicio.
         """
         try:
             self._logger.info("Inicializando TeamDomainService...")
-            # Aquí se pueden agregar inicializaciones específicas si es necesario
+            
+            # Verificar salud del servicio
+            health_status = await self.check_service_health()
+            
+            if not health_status.get("healthy", False):
+                raise RepositoryError("El servicio no pasó las verificaciones de salud")
+            
             self._logger.info("TeamDomainService inicializado exitosamente")
+            
         except Exception as e:
-            self._logger.error(f"Error inicializando TeamDomainService: {e}")
-            raise RepositoryError(f"Error en inicialización del servicio: {e}")
-    
+            self._logger.error(f"Error inicializando TeamDomainService: {str(e)}")
+            raise
+
     def get_service_info(self) -> Dict[str, Any]:
         """
-        Obtiene información del servicio y sus capacidades.
+        Obtiene información detallada del servicio.
         
         Returns:
-            Dict con información del servicio, módulos disponibles y estadísticas
+            Dict con información del servicio y sus módulos
         """
         return {
             "service_name": "TeamDomainService",
             "version": "1.0.0",
-            "description": "Servicio de dominio para gestión integral de equipos",
+            "description": "Servicio de dominio principal para gestión de equipos",
             "modules": {
-                "crud_operations": "Operaciones CRUD básicas para equipos",
-                "membership_operations": "Gestión de membresías y roles",
+                "crud_operations": "Operaciones CRUD básicas",
+                "membership_operations": "Gestión de membresías de equipo",
                 "search_operations": "Búsqueda y filtrado avanzado",
-                "statistics_operations": "Métricas y estadísticas de equipos",
-                "productivity_operations": "Análisis de productividad y rendimiento",
-                "validation_operations": "Validaciones de reglas de negocio",
-                "relationship_operations": "Consultas por relaciones específicas",
+                "statistics_operations": "Métricas y estadísticas",
+                "productivity_operations": "Análisis de productividad",
+                "validation_operations": "Validaciones y reglas de negocio",
+                "relationship_operations": "Consultas por relaciones",
                 "diagnostic_operations": "Diagnósticos y salud del sistema"
             },
             "capabilities": [
-                "Gestión completa del ciclo de vida de equipos",
-                "Administración de membresías y roles",
-                "Análisis de productividad y colaboración",
-                "Validación de reglas de negocio",
-                "Reportes estadísticos avanzados",
-                "Diagnósticos de salud del sistema"
+                "CRUD completo de equipos",
+                "Gestión de membresías",
+                "Búsqueda avanzada",
+                "Análisis de productividad",
+                "Validaciones de negocio",
+                "Diagnósticos de sistema"
             ],
             "initialized_at": pendulum.now().isoformat()
         }
-    
-    # ==========================================
-    # OPERACIONES CRUD
-    # ==========================================
-    
-    async def create_team(self, team_data: Dict[str, Any]) -> Team:
-        """Delega la creación de equipo al módulo CRUD."""
-        return await self._crud_ops.create_team(team_data)
-    
-    async def get_team_by_id(self, team_id: int) -> Optional[Team]:
-        """Delega la obtención de equipo por ID al módulo CRUD."""
-        return await self._crud_ops.get_team_by_id(team_id)
-    
-    async def update_team(self, team_id: int, team_data: Dict[str, Any]) -> Team:
-        """Delega la actualización de equipo al módulo CRUD."""
-        return await self._crud_ops.update_team(team_id, team_data)
-    
-    async def delete_team(self, team_id: int) -> bool:
-        """Delega la eliminación de equipo al módulo CRUD."""
-        return await self._crud_ops.delete_team(team_id)
-    
+
+    # ========================================================================
+    # OPERACIONES CRUD (Create, Read, Update, Delete)
+    # ========================================================================
+
+    async def create_team(
+        self, 
+        team_data: TeamCreateSchema, 
+        validate_business_rules: bool = True
+    ) -> TeamSchema:
+        """Crea un nuevo equipo con validación completa de datos de negocio."""
+        return await self._crud_ops.create_team(team_data, validate_business_rules)
+
+    async def get_team_by_id(
+        self, 
+        team_id: int, 
+        include_members: bool = False
+    ) -> Optional[TeamSchema]:
+        """Obtiene un equipo específico por su identificador único."""
+        return await self._crud_ops.get_team_by_id(team_id, include_members)
+
+    async def get_all_teams(
+        self, 
+        page: int = 1, 
+        page_size: int = 50, 
+        include_inactive: bool = False
+    ) -> PaginatedResponse[TeamSchema]:
+        """Obtiene todos los equipos del sistema con paginación y filtros."""
+        return await self._crud_ops.get_all_teams(page, page_size, include_inactive)
+
+    async def update_team(
+        self, 
+        team_id: int, 
+        update_data: TeamUpdateSchema, 
+        validate_changes: bool = True
+    ) -> TeamSchema:
+        """Actualiza la información de un equipo existente."""
+        return await self._crud_ops.update_team(team_id, update_data, validate_changes)
+
+    async def delete_team(
+        self, 
+        team_id: int, 
+        force_delete: bool = False
+    ) -> bool:
+        """Elimina un equipo del sistema después de validar dependencias."""
+        return await self._crud_ops.delete_team(team_id, force_delete)
+
     async def bulk_create_teams(
         self, 
-        teams_data: List[Dict[str, Any]]
-    ) -> BulkTeamCreationResultSchema:
-        """Delega la creación masiva de equipos al módulo CRUD."""
-        return await self._crud_ops.bulk_create_teams(teams_data)
-    
-    # ==========================================
+        teams_data: List[TeamCreateSchema], 
+        validate_all: bool = True
+    ) -> List[TeamSchema]:
+        """Crea múltiples equipos en una operación transaccional."""
+        return await self._crud_ops.bulk_create_teams(teams_data, validate_all)
+
+    # ========================================================================
     # OPERACIONES DE MEMBRESÍA
-    # ==========================================
-    
+    # ========================================================================
+
     async def add_team_member(
         self, 
         team_id: int, 
         employee_id: int, 
-        role: str = "member"
-    ) -> TeamMembershipResponseSchema:
-        """Delega la adición de miembro al módulo de membresía."""
-        return await self._membership_ops.add_team_member(team_id, employee_id, role)
-    
+        role: MembershipRole, 
+        validate_capacity: bool = True
+    ) -> TeamMembershipSchema:
+        """Agrega un nuevo miembro a un equipo con validación de roles."""
+        return await self._membership_ops.add_team_member(
+            team_id, employee_id, role, validate_capacity
+        )
+
     async def remove_team_member(
         self, 
         team_id: int, 
-        employee_id: int
+        employee_id: int, 
+        transfer_responsibilities: bool = True
     ) -> bool:
-        """Delega la remoción de miembro al módulo de membresía."""
-        return await self._membership_ops.remove_team_member(team_id, employee_id)
-    
+        """Remueve un miembro de un equipo con validación de dependencias."""
+        return await self._membership_ops.remove_team_member(
+            team_id, employee_id, transfer_responsibilities
+        )
+
     async def update_member_role(
         self, 
         team_id: int, 
         employee_id: int, 
-        new_role: str
-    ) -> TeamMembershipResponseSchema:
-        """Delega la actualización de rol al módulo de membresía."""
-        return await self._membership_ops.update_member_role(team_id, employee_id, new_role)
-    
-    async def get_team_members(self, team_id: int) -> List[TeamMemberResponseSchema]:
-        """Delega la obtención de miembros al módulo de membresía."""
-        return await self._membership_ops.get_team_members(team_id)
-    
-    # ==========================================
+        new_role: MembershipRole, 
+        validate_permissions: bool = True
+    ) -> TeamMembershipSchema:
+        """Actualiza el rol de un miembro dentro del equipo."""
+        return await self._membership_ops.update_member_role(
+            team_id, employee_id, new_role, validate_permissions
+        )
+
+    async def get_team_members(
+        self, 
+        team_id: int, 
+        active_only: bool = True, 
+        include_employee_details: bool = False
+    ) -> List[TeamMembershipSchema]:
+        """Obtiene todos los miembros de un equipo con sus roles."""
+        return await self._membership_ops.get_team_members(
+            team_id, active_only, include_employee_details
+        )
+
+    # ========================================================================
     # OPERACIONES DE BÚSQUEDA
-    # ==========================================
-    
+    # ========================================================================
+
     async def find_teams_by_name(
         self, 
         name_pattern: str, 
         exact_match: bool = False
-    ) -> List[Team]:
-        """Delega la búsqueda por nombre al módulo de búsqueda."""
+    ) -> List[TeamSchema]:
+        """Busca equipos por nombre con coincidencia parcial o exacta."""
         return await self._search_ops.find_teams_by_name(name_pattern, exact_match)
-    
-    async def find_teams_by_status(self, status: str) -> List[Team]:
-        """Delega la búsqueda por estado al módulo de búsqueda."""
-        return await self._search_ops.find_teams_by_status(status)
-    
-    async def find_teams_by_department(self, department: str) -> List[Team]:
-        """Delega la búsqueda por departamento al módulo de búsqueda."""
-        return await self._search_ops.find_teams_by_department(department)
-    
-    async def advanced_team_search(
+
+    async def get_teams_by_status(
         self, 
-        search_criteria: Dict[str, Any]
-    ) -> TeamSearchResponse:
-        """Delega la búsqueda avanzada al módulo de búsqueda."""
-        return await self._search_ops.advanced_team_search(search_criteria)
-    
-    # ==========================================
+        status: TeamStatus, 
+        include_details: bool = False
+    ) -> List[TeamSchema]:
+        """Obtiene equipos filtrados por su estado actual."""
+        return await self._search_ops.get_teams_by_status(status, include_details)
+
+    async def get_teams_by_department(
+        self, 
+        department_id: int, 
+        include_members: bool = False
+    ) -> List[TeamSchema]:
+        """Obtiene equipos asociados a un departamento específico."""
+        return await self._search_ops.get_teams_by_department(department_id, include_members)
+
+    async def search_teams_advanced(
+        self, 
+        search_criteria: TeamSearchCriteria, 
+        sort_by: str = "name", 
+        sort_order: str = "asc"
+    ) -> List[TeamSchema]:
+        """Búsqueda avanzada con múltiples criterios complejos."""
+        return await self._search_ops.search_teams_advanced(
+            search_criteria, sort_by, sort_order
+        )
+
+    # ========================================================================
     # OPERACIONES DE ESTADÍSTICAS
-    # ==========================================
-    
-    async def get_team_member_count(self, team_id: int) -> int:
-        """Delega el conteo de miembros al módulo de estadísticas."""
-        return await self._statistics_ops.get_team_member_count(team_id)
-    
-    async def get_teams_count_by_status(self, status: Optional[str] = None) -> Dict[str, int]:
-        """Delega el conteo por estado al módulo de estadísticas."""
-        return await self._statistics_ops.get_teams_count_by_status(status)
-    
-    async def get_average_team_size(self) -> float:
-        """Delega el cálculo de tamaño promedio al módulo de estadísticas."""
-        return await self._statistics_ops.get_average_team_size()
-    
+    # ========================================================================
+
+    async def get_team_member_count(
+        self, 
+        team_id: int, 
+        active_only: bool = True
+    ) -> int:
+        """Obtiene el número total de miembros de un equipo."""
+        return await self._statistics_ops.get_team_member_count(team_id, active_only)
+
+    async def get_teams_count_by_status(
+        self, 
+        include_details: bool = False
+    ) -> Dict[TeamStatus, int]:
+        """Obtiene el conteo de equipos agrupados por estado."""
+        return await self._statistics_ops.get_teams_count_by_status(include_details)
+
+    async def get_average_team_size(
+        self, 
+        active_teams_only: bool = True, 
+        exclude_empty: bool = True
+    ) -> float:
+        """Calcula el tamaño promedio de los equipos en el sistema."""
+        return await self._statistics_ops.get_average_team_size(
+            active_teams_only, exclude_empty
+        )
+
     async def get_team_creation_trends(
         self, 
-        start_date: date, 
-        end_date: date, 
-        group_by: str = "month"
+        period: str = "month", 
+        months_back: int = 12
     ) -> List[TeamCreationTrend]:
-        """Delega las tendencias de creación al módulo de estadísticas."""
-        return await self._statistics_ops.get_team_creation_trends(
-            start_date, end_date, group_by
-        )
-    
-    # ==========================================
+        """Obtiene tendencias de creación de equipos por período."""
+        return await self._statistics_ops.get_team_creation_trends(period, months_back)
+
+    # ========================================================================
     # OPERACIONES DE PRODUCTIVIDAD
-    # ==========================================
-    
-    async def calculate_team_performance_metrics(
+    # ========================================================================
+
+    async def get_team_performance_metrics(
         self, 
         team_id: int, 
-        start_date: date, 
-        end_date: date
+        metric_types: List[str], 
+        date_range: Optional[DateRange] = None
     ) -> TeamPerformanceMetrics:
-        """Delega el cálculo de métricas al módulo de productividad."""
-        return await self._productivity_ops.calculate_team_performance_metrics(
-            team_id, start_date, end_date
+        """Calcula métricas avanzadas de rendimiento de un equipo específico."""
+        return await self._productivity_ops.get_team_performance_metrics(
+            team_id, metric_types, date_range
         )
-    
-    async def analyze_team_productivity(
+
+    async def get_teams_productivity_analysis(
         self, 
-        team_id: int, 
-        analysis_period_start: date, 
-        analysis_period_end: date
+        analysis_period: str = "quarter", 
+        include_comparisons: bool = True
     ) -> ProductivityAnalysis:
-        """Delega el análisis de productividad al módulo de productividad."""
-        return await self._productivity_ops.analyze_team_productivity(
-            team_id, analysis_period_start, analysis_period_end
+        """Analiza la productividad de todos los equipos con comparaciones."""
+        return await self._productivity_ops.get_teams_productivity_analysis(
+            analysis_period, include_comparisons
         )
-    
-    async def get_collaboration_metrics(
+
+    async def get_team_collaboration_metrics(
         self, 
-        team_id: int, 
-        metric_period_start: date, 
-        metric_period_end: date
+        team_ids: Optional[List[int]] = None, 
+        collaboration_types: List[str] = None
     ) -> CollaborationMetrics:
-        """Delega las métricas de colaboración al módulo de productividad."""
-        return await self._productivity_ops.get_collaboration_metrics(
-            team_id, metric_period_start, metric_period_end
+        """Obtiene métricas de colaboración entre equipos."""
+        return await self._productivity_ops.get_team_collaboration_metrics(
+            team_ids, collaboration_types or []
         )
-    
+
     async def generate_teams_summary_report(
         self, 
-        report_start_date: date, 
-        report_end_date: date, 
-        include_inactive: bool = False
+        report_format: str = "detailed", 
+        include_charts: bool = False, 
+        export_format: str = "json"
     ) -> TeamsSummaryReport:
-        """Delega el reporte resumen al módulo de productividad."""
+        """Genera un reporte resumen completo de todos los equipos."""
         return await self._productivity_ops.generate_teams_summary_report(
-            report_start_date, report_end_date, include_inactive
+            report_format, include_charts, export_format
         )
-    
-    # ==========================================
+
+    # ========================================================================
     # OPERACIONES DE VALIDACIÓN
-    # ==========================================
-    
-    async def validate_team_data_integrity(
+    # ========================================================================
+
+    async def validate_team_data(
         self, 
-        team_data: Dict[str, Any]
+        team_data: TeamSchema, 
+        validation_rules: List[str]
     ) -> ValidationResult:
-        """Delega la validación de integridad al módulo de validación."""
-        return await self._validation_ops.validate_team_data_integrity(team_data)
-    
-    async def validate_business_rules(
+        """Valida la integridad y consistencia de los datos de un equipo."""
+        return await self._validation_ops.validate_team_data(team_data, validation_rules)
+
+    async def validate_team_business_rules(
         self, 
-        operation_type: str, 
-        operation_data: Dict[str, Any], 
-        business_context: Optional[Dict[str, Any]] = None
+        team_id: int, 
+        business_context: BusinessContext
     ) -> BusinessRuleValidationResult:
-        """Delega la validación de reglas al módulo de validación."""
-        return await self._validation_ops.validate_business_rules(
-            operation_type, operation_data, business_context
+        """Valida que un equipo cumple con las reglas de negocio específicas."""
+        return await self._validation_ops.validate_team_business_rules(
+            team_id, business_context
         )
-    
-    # ==========================================
+
+    # ========================================================================
     # OPERACIONES DE RELACIONES
-    # ==========================================
-    
-    async def find_teams_by_leader(self, leader_id: int) -> List[Team]:
-        """Delega la búsqueda por líder al módulo de relaciones."""
-        return await self._relationship_ops.find_teams_by_leader(leader_id)
-    
-    async def find_teams_by_project(self, project_id: int) -> List[Team]:
-        """Delega la búsqueda por proyecto al módulo de relaciones."""
-        return await self._relationship_ops.find_teams_by_project(project_id)
-    
-    async def find_teams_by_skill_set(self, required_skills: List[str]) -> List[Team]:
-        """Delega la búsqueda por habilidades al módulo de relaciones."""
-        return await self._relationship_ops.find_teams_by_skill_set(required_skills)
-    
+    # ========================================================================
+
+    async def find_teams_by_leader(
+        self, 
+        leader_id: int, 
+        include_team_details: bool = True
+    ) -> List[TeamSchema]:
+        """Encuentra equipos liderados por un empleado específico."""
+        return await self._relationship_ops.find_teams_by_leader(
+            leader_id, include_team_details
+        )
+
+    async def find_teams_by_project(
+        self, 
+        project_id: int, 
+        active_only: bool = True
+    ) -> List[TeamSchema]:
+        """Encuentra equipos asignados a un proyecto específico."""
+        return await self._relationship_ops.find_teams_by_project(project_id, active_only)
+
+    async def find_teams_by_skill_set(
+        self, 
+        required_skills: List[str], 
+        match_all: bool = False
+    ) -> List[TeamSchema]:
+        """Encuentra equipos que poseen un conjunto específico de habilidades."""
+        return await self._relationship_ops.find_teams_by_skill_set(
+            required_skills, match_all
+        )
+
     async def find_teams_by_date_range(
         self, 
-        start_date: date, 
-        end_date: date, 
-        date_field: str = "created_at"
-    ) -> List[Team]:
-        """Delega la búsqueda por rango de fechas al módulo de relaciones."""
+        start_date: pendulum.DateTime, 
+        end_date: pendulum.DateTime, 
+        include_inactive: bool = False
+    ) -> List[TeamSchema]:
+        """Encuentra equipos creados en un rango de fechas específico."""
         return await self._relationship_ops.find_teams_by_date_range(
-            start_date, end_date, date_field
+            start_date, end_date, include_inactive
         )
-    
-    # ==========================================
+
+    # ========================================================================
     # OPERACIONES DE DIAGNÓSTICO
-    # ==========================================
-    
-    async def get_teams_by_creation_date_with_tolerance(
+    # ========================================================================
+
+    async def get_teams_by_creation_date(
         self, 
-        target_date: date, 
-        tolerance_days: int = 1
-    ) -> List[Team]:
-        """Delega la búsqueda con tolerancia al módulo de diagnóstico."""
-        return await self._diagnostic_ops.get_teams_by_creation_date_with_tolerance(
-            target_date, tolerance_days
+        creation_date: pendulum.DateTime, 
+        date_tolerance: int = 0
+    ) -> List[TeamSchema]:
+        """Obtiene equipos filtrados por fecha de creación con tolerancia."""
+        return await self._diagnostic_ops.get_teams_by_creation_date(
+            creation_date, date_tolerance
         )
-    
+
     async def check_service_health(self) -> Dict[str, Any]:
-        """Delega la verificación de salud al módulo de diagnóstico."""
+        """Verifica el estado de salud del servicio de equipos."""
         return await self._diagnostic_ops.check_service_health()
