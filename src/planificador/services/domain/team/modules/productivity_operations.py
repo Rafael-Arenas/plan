@@ -403,15 +403,17 @@ class TeamDomainProductivityOperations(ITeamDomainProductivityOperations):
 
     async def generate_teams_summary_report(
         self,
-        date_range: DateRange,
-        include_inactive: bool = False
+        report_format: str = "detailed",
+        include_charts: bool = False,
+        export_format: str = "json"
     ) -> TeamsSummaryReport:
         """
         Genera un reporte de resumen ejecutivo de equipos.
         
         Args:
-            date_range: Rango de fechas para el reporte
-            include_inactive: Si incluir equipos inactivos
+            report_format: Formato del reporte (detailed, summary, executive)
+            include_charts: Si incluir gráficos en el reporte
+            export_format: Formato de exportación (json, pdf, excel)
             
         Returns:
             TeamsSummaryReport: Reporte de resumen
@@ -422,19 +424,24 @@ class TeamDomainProductivityOperations(ITeamDomainProductivityOperations):
         """
         try:
             logger.debug(
-                f"Generando reporte de resumen para período: "
-                f"{date_range.start_date} a {date_range.end_date}"
+                f"Generando reporte de resumen con formato: {report_format}, "
+                f"gráficos: {include_charts}, exportación: {export_format}"
+            )
+            
+            # Establecer rango de fechas por defecto (últimos 3 meses)
+            end_date = pendulum.now()
+            start_date = end_date.subtract(months=3)
+            date_range = DateRange(
+                start_date=start_date.to_datetime_string(),
+                end_date=end_date.to_datetime_string()
             )
             
             # Validar rango de fechas
             await self._validate_date_range(date_range)
             
-            # Obtener equipos
-            if include_inactive:
-                teams = await self.team_repository.get_all()
-            else:
-                teams = await self.team_repository.get_all()
-                teams = [team for team in teams if team.is_active]
+            # Obtener equipos (solo activos por defecto)
+            teams = await self._team_repo.get_all()
+            teams = [team for team in teams if team.is_active]
             
             # Obtener análisis de productividad
             productivity_analysis = await self.get_teams_productivity_analysis(
