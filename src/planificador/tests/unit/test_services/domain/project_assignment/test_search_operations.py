@@ -43,10 +43,10 @@ class TestSearchOperations:
         """
         return SearchOperations(repository_facade=mock_repository_facade)
 
-    # ==================== TESTS GET_ASSIGNMENTS_WITH_FILTERS ====================
+    # ==================== TESTS SEARCH_ASSIGNMENTS_BY_CRITERIA ====================
 
-    async def test_get_assignments_with_filters_success(self, search_operations, sample_assignment_list):
-        """Test exitoso de obtención de asignaciones con filtros."""
+    async def test_search_assignments_by_criteria_success(self, search_operations, sample_assignment_list):
+        """Test exitoso de obtención de asignaciones con criterios."""
         from datetime import date
         from planificador.schemas.assignment.advanced_schemas import AssignmentAdvancedFilters
         
@@ -69,7 +69,7 @@ class TestSearchOperations:
         search_operations._repository.queries.get_all_assignments.return_value = sample_assignment_list
         
         # Ejecutar método
-        result = await search_operations.get_assignments_with_filters(filters)
+        result = await search_operations.search_assignments_by_criteria(filters.model_dump(exclude_none=True))
         
         # Verificar resultado
         assert isinstance(result, list)
@@ -78,7 +78,7 @@ class TestSearchOperations:
         # Verificar que se llamó al repositorio
         search_operations._repository.queries.get_all_assignments.assert_called_once()
     
-    async def test_get_assignments_with_filters_empty_result(self, search_operations):
+    async def test_search_assignments_by_criteria_empty_result(self, search_operations):
         """Test de obtención de asignaciones con filtros que no devuelven resultados."""
         from planificador.schemas.assignment.advanced_schemas import AssignmentAdvancedFilters
         
@@ -92,7 +92,7 @@ class TestSearchOperations:
         search_operations._repository.queries.get_all_assignments.return_value = []
         
         # Ejecutar método
-        result = await search_operations.get_assignments_with_filters(filters)
+        result = await search_operations.search_assignments_by_criteria(filters.model_dump(exclude_none=True))
         
         # Verificar resultado
         assert isinstance(result, list)
@@ -157,7 +157,7 @@ class TestSearchOperations:
                 end_date=end_date
             )
         
-        assert exc_info.value == repository_error
+        assert "Error al obtener asignaciones por rango de fechas" in str(exc_info.value)
 
     # ==================== TESTS GET_ASSIGNMENTS_BY_ROLE ====================
 
@@ -229,7 +229,7 @@ class TestSearchOperations:
         with pytest.raises(RepositoryError) as exc_info:
             await search_operations.get_assignments_by_role(role=role)
         
-        assert exc_info.value == repository_error
+        assert "Error al buscar asignaciones por rol" in str(exc_info.value)
 
     # ==================== TESTS GET_OVERLAPPING_ASSIGNMENTS ====================
 
@@ -265,7 +265,10 @@ class TestSearchOperations:
         assert len(result) >= 0  # Puede ser vacío si no hay solapamientos
         
         # Verificar que se llamó al método correcto del repositorio
-        search_operations._repository.queries.get_assignments_by_employee.assert_called_once_with(employee_id)
+        search_operations._repository.queries.get_assignments_by_employee.assert_called_once_with(
+            employee_id=employee_id,
+            include_inactive=False
+        )
 
     @pytest.mark.asyncio
     async def test_get_overlapping_assignments_repository_error(
@@ -273,23 +276,19 @@ class TestSearchOperations:
         search_operations: SearchOperations
     ):
         """
-        Test: Error del repositorio al detectar asignaciones superpuestas.
+        Test: Manejo de RepositoryError durante la detección de solapamientos.
         
-        Verifica que se maneje correctamente un error del repositorio
-        al buscar asignaciones superpuestas.
+        Verifica que se lance un RepositoryError si ocurre un error
+        en el repositorio al obtener las asignaciones.
         """
         # Arrange
         employee_id = 1
-        project_id = 1
-        threshold_percentage = 80.0
-        search_operations._repository.queries.get_assignments_by_employee.side_effect = Exception("Database error")
+        
+        # Configurar mock para que lance una excepción
+        search_operations._repository.queries.get_assignments_by_employee.side_effect = Exception("DB Error")
         
         # Act & Assert
         with pytest.raises(RepositoryError) as exc_info:
-            await search_operations.get_overlapping_assignments(
-                employee_id=employee_id,
-                project_id=project_id,
-                threshold_percentage=threshold_percentage
-            )
-        
-        assert "Error inesperado detectando solapamientos" in str(exc_info.value)
+            await search_operations.get_overlapping_assignments(employee_id=employee_id)
+            
+        assert "Error al detectar solapamientos: DB Error" in str(exc_info.value)
