@@ -242,7 +242,7 @@ class ValidationOperations(IValidationOperations):
             
             # Calcular carga total actual
             current_workload = sum(
-                assignment.allocation_percentage 
+                assignment.percentage_allocation 
                 for assignment in existing_assignments
             )
             
@@ -338,9 +338,9 @@ class ValidationOperations(IValidationOperations):
                 validation_result["impact_analysis"]["employee_impact"] = "high"
             
             # Verificar porcentaje de asignación alto
-            if assignment.allocation_percentage >= 50:
+            if assignment.percentage_allocation >= 50:
                 validation_result["warnings"].append(
-                    f"La asignación tiene un porcentaje alto ({assignment.allocation_percentage}%)"
+                    f"La asignación tiene un porcentaje alto ({assignment.percentage_allocation}%)"
                 )
                 validation_result["impact_analysis"]["project_impact"] = "high"
             
@@ -400,7 +400,7 @@ class ValidationOperations(IValidationOperations):
             
             # Calcular carga actual
             current_workload = sum(
-                assignment.allocation_percentage 
+                assignment.percentage_allocation 
                 for assignment in existing_assignments
             )
             
