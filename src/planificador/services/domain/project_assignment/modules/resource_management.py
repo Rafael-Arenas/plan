@@ -377,7 +377,7 @@ class ResourceManagement(IResourceManagement):
         
         # Calcular porcentajes de asignación
         total_allocation = sum(
-            Decimal(str(a.allocation_percentage or 0)) for a in assignments
+            Decimal(str(a.percentage_allocation or 0)) for a in assignments
         )
         
         average_allocation = total_allocation / len(assignments) if assignments else Decimal('0.00')
@@ -389,12 +389,12 @@ class ResourceManagement(IResourceManagement):
         workload_distribution = {}
         for assignment in assignments:
             project_id = assignment.project_id
-            allocation = Decimal(str(assignment.allocation_percentage or 0))
+            allocation = Decimal(str(assignment.percentage_allocation or 0))
             
             if project_id not in workload_distribution:
                 workload_distribution[project_id] = {
                     'allocation_percentage': allocation,
-                    'role': assignment.role,
+                    'role': assignment.role_in_project,
                     'is_active': assignment.is_active
                 }
             else:
