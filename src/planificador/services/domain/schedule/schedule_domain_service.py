@@ -46,6 +46,7 @@ from planificador.schemas.schedule import (
     TeamCoordinationValidationSchema,
     WorkloadValidationSchema
 )
+from planificador.schemas.schedule.schedule_advanced_filters import ScheduleAdvancedFilters
 
 
 class ScheduleDomainService(IScheduleDomainService):
@@ -212,14 +213,66 @@ class ScheduleDomainService(IScheduleDomainService):
     # 3. OPERACIONES DE BÚSQUEDA
     # ==========================================
     
+    async def get_schedules_by_date(
+        self, 
+        target_date: date, 
+        employee_id: Optional[int] = None,
+        project_id: Optional[int] = None
+    ) -> List[ScheduleResponseSchema]:
+        """Obtiene horarios por fecha específica con filtros opcionales."""
+        self._logger.info(f"Obteniendo horarios para la fecha {target_date}")
+        return await self._search_ops.get_schedules_by_date(target_date, employee_id, project_id)
+    
+    async def get_confirmed_schedules(
+        self, 
+        date_from: Optional[date] = None,
+        date_to: Optional[date] = None,
+        employee_id: Optional[int] = None
+    ) -> List[ScheduleResponseSchema]:
+        """Obtiene horarios confirmados con filtros opcionales de fecha y empleado."""
+        self._logger.info("Obteniendo horarios confirmados")
+        return await self._search_ops.get_confirmed_schedules(date_from, date_to, employee_id)
+    
+    async def search_schedules_advanced(
+        self,
+        filters: ScheduleAdvancedFilters
+    ) -> ScheduleSearchResponse:
+        """
+        Busca horarios con filtros avanzados.
+        
+        Args:
+            filters: Filtros avanzados para la búsqueda
+            
+        Returns:
+            ScheduleSearchResponse: Resultado de la búsqueda con horarios encontrados
+            
+        Raises:
+            ValidationError: Si los filtros son inválidos
+            RepositoryError: Si hay error en la base de datos
+        """
+        return await self._search_ops.search_schedules_advanced(filters)
+    
+    # ==========================================
+    # MÉTODOS LEGACY PARA COMPATIBILIDAD HACIA ATRÁS
+    # ==========================================
+    
     async def search_schedules_by_date(
         self, 
         target_date: date, 
         confirmed_only: bool = False
     ) -> List[Schedule]:
-        """Busca horarios por fecha específica."""
-        self._logger.info(f"Buscando horarios para la fecha {target_date}")
-        return await self._search_ops.search_schedules_by_date(target_date, confirmed_only)
+        """Busca horarios por fecha específica (método legacy)."""
+        self._logger.warning("Usando método legacy search_schedules_by_date. Considere usar get_schedules_by_date")
+        
+        # Convertir a nuevo método
+        if confirmed_only:
+            result = await self._search_ops.get_confirmed_schedules(target_date, target_date)
+        else:
+            result = await self._search_ops.get_schedules_by_date(target_date)
+        
+        # Convertir ScheduleResponseSchema a Schedule (si es necesario)
+        # Por ahora retornamos la respuesta directamente
+        return result
     
     async def search_schedules_by_confirmed_status(
         self, 
@@ -227,19 +280,20 @@ class ScheduleDomainService(IScheduleDomainService):
         end_date: date, 
         confirmed: bool = True
     ) -> List[Schedule]:
-        """Busca horarios por estado de confirmación."""
-        self._logger.info(f"Buscando horarios confirmados entre {start_date} y {end_date}")
-        return await self._search_ops.search_schedules_by_confirmed_status(start_date, end_date, confirmed)
-    
-    async def search_schedules_advanced(
-        self, 
-        filters: Dict[str, Any], 
-        limit: Optional[int] = None, 
-        offset: Optional[int] = None
-    ) -> List[Schedule]:
-        """Realiza búsqueda avanzada de horarios con filtros múltiples."""
-        self._logger.info("Realizando búsqueda avanzada de horarios")
-        return await self._search_ops.search_schedules_advanced(filters, limit, offset)
+        """Busca horarios por estado de confirmación (método legacy)."""
+        self._logger.warning("Usando método legacy search_schedules_by_confirmed_status. Considere usar get_confirmed_schedules")
+        
+        if confirmed:
+            return await self._search_ops.get_confirmed_schedules(start_date, end_date)
+        else:
+            # Para horarios no confirmados, usar búsqueda avanzada
+            from planificador.schemas.schedule.schedule_advanced_filters import ScheduleAdvancedFilters
+            filters = ScheduleAdvancedFilters(
+                date_from=start_date,
+                date_to=end_date,
+                is_confirmed=False
+            )
+            return await self._search_ops.search_schedules_advanced(filters)
 
     # ==========================================
     # 4. OPERACIONES DE ESTADÍSTICAS (Legacy methods for backward compatibility)

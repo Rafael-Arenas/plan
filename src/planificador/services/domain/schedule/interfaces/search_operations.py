@@ -1,125 +1,88 @@
 """
 Interfaz para Operaciones de Búsqueda y Filtrado del Servicio de Dominio Schedule.
 
-Define los contratos para búsquedas avanzadas, filtrado por múltiples criterios
-y consultas complejas con paginación y ordenamiento.
+Define los métodos de búsqueda avanzada y filtrado según la documentación oficial.
 """
 
 from abc import ABC, abstractmethod
-from typing import List, Optional, Dict, Any
-from datetime import date, time
+from typing import List, Optional
+from datetime import date
 
-from planificador.schemas.schedule.schedule import (
-    Schedule,
-    ScheduleSearchFilter
-)
-from planificador.schemas.response.response_schemas import (
-    ScheduleListResponse,
-    ScheduleSearchResponse
-)
-from planificador.schemas.common_schemas import PaginationSchema
+from planificador.schemas.response.response_schemas import ScheduleResponseSchema
+from planificador.schemas.schedule.schedule_advanced_filters import ScheduleAdvancedFilters
 
 
 class IScheduleDomainSearchOperations(ABC):
     """
     Interfaz para operaciones de búsqueda y filtrado del servicio de dominio Schedule.
     
-    Define los métodos para búsquedas avanzadas y filtrado por múltiples
-    criterios con soporte para paginación y ordenamiento.
+    Define los métodos de búsqueda según la documentación oficial.
     """
 
     @abstractmethod
-    async def search_schedules_by_criteria(
+    async def get_schedules_by_date(
         self,
-        criteria: ScheduleSearchFilter,
-        pagination: Optional[PaginationSchema] = None
-    ) -> ScheduleSearchResponse:
+        target_date: date,
+        employee_id: Optional[int] = None,
+        project_id: Optional[int] = None
+    ) -> List[ScheduleResponseSchema]:
         """
-        Busca horarios usando criterios múltiples con paginación y ordenamiento.
+        Obtiene horarios para una fecha específica con filtros opcionales.
         
         Args:
-            criteria: Criterios de búsqueda y filtrado
-            pagination: Configuración de paginación (opcional)
+            target_date: Fecha objetivo para la búsqueda
+            employee_id: ID del empleado (opcional)
+            project_id: ID del proyecto (opcional)
             
         Returns:
-            ScheduleSearchResponse: Resultados paginados con metadatos
+            List[ScheduleResponseSchema]: Lista de horarios encontrados
             
         Raises:
-            ValidationError: Si los criterios no son válidos
-            RepositoryError: Si hay error en la consulta
+            ValidationError: Si la fecha no es válida
+            RepositoryError: Si hay error en la base de datos
         """
         pass
 
     @abstractmethod
-    async def find_schedules_by_date_range(
+    async def get_confirmed_schedules(
         self,
-        start_date: date,
-        end_date: date,
-        employee_ids: Optional[List[int]] = None,
-        project_ids: Optional[List[int]] = None
-    ) -> List[ScheduleSearchResponse]:
+        date_from: Optional[date] = None,
+        date_to: Optional[date] = None,
+        employee_id: Optional[int] = None
+    ) -> List[ScheduleResponseSchema]:
         """
-        Encuentra horarios en un rango de fechas con filtros opcionales.
+        Obtiene horarios confirmados con filtros opcionales de fecha y empleado.
         
         Args:
-            start_date: Fecha de inicio del rango
-            end_date: Fecha de fin del rango
-            employee_ids: IDs de empleados a filtrar (opcional)
-            project_ids: IDs de proyectos a filtrar (opcional)
+            date_from: Fecha de inicio del rango (opcional)
+            date_to: Fecha de fin del rango (opcional)
+            employee_id: ID del empleado (opcional)
             
         Returns:
-            List[ScheduleSearchResponse]: Lista de horarios encontrados
+            List[ScheduleResponseSchema]: Lista de horarios confirmados
             
         Raises:
             ValidationError: Si el rango de fechas no es válido
-            RepositoryError: Si hay error en la consulta
+            RepositoryError: Si hay error en la base de datos
         """
         pass
 
     @abstractmethod
-    async def find_schedules_by_time_range(
+    async def search_schedules_advanced(
         self,
-        start_time: time,
-        end_time: time,
-        target_date: Optional[date] = None
-    ) -> List[ScheduleSearchResponse]:
+        filters: ScheduleAdvancedFilters
+    ) -> List[ScheduleResponseSchema]:
         """
-        Encuentra horarios que se superponen con un rango de tiempo específico.
+        Realiza búsqueda avanzada de horarios con filtros complejos.
         
         Args:
-            start_time: Hora de inicio del rango
-            end_time: Hora de fin del rango
-            target_date: Fecha específica a consultar (opcional, por defecto hoy)
+            filters: Filtros avanzados para la búsqueda
             
         Returns:
-            List[ScheduleSearchResponse]: Lista de horarios en el rango de tiempo
+            List[ScheduleResponseSchema]: Lista de horarios encontrados
             
         Raises:
-            ValidationError: Si el rango de tiempo no es válido
-            RepositoryError: Si hay error en la consulta
-        """
-        pass
-
-    @abstractmethod
-    async def search_schedules_with_advanced_filters(
-        self,
-        filters: ScheduleSearchFilter,
-        sort_by: Optional[str] = None,
-        sort_order: Optional[str] = "asc"
-    ) -> List[ScheduleSearchResponse]:
-        """
-        Realiza búsqueda avanzada con filtros dinámicos y ordenamiento personalizado.
-        
-        Args:
-            filters: Diccionario de filtros dinámicos
-            sort_by: Campo por el cual ordenar (opcional)
-            sort_order: Orden de clasificación: 'asc' o 'desc' (opcional)
-            
-        Returns:
-            List[ScheduleSearchResponse]: Lista de horarios filtrados y ordenados
-            
-        Raises:
-            ValidationError: Si los filtros o criterios de ordenamiento no son válidos
-            RepositoryError: Si hay error en la consulta
+            ValidationError: Si los filtros no son válidos
+            RepositoryError: Si hay error en la base de datos
         """
         pass
